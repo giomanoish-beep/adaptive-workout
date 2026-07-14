@@ -1,0 +1,17 @@
+{
+  "name": "@adaptive-workout/workout-decision-persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "browser": false,
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@adaptive-workout/domain": "0.0.0",
+    "@adaptive-workout/workout-engine": "0.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @adaptive-workout/domain && npm run build --workspace @adaptive-workout/workout-engine && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  }
+}

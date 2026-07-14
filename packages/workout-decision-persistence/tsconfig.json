@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@adaptive-workout/domain": ["../domain/src/index.ts"],
+      "@adaptive-workout/workout-engine": ["../workout-engine/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

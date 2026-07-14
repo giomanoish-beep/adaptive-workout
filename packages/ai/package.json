@@ -1,0 +1,18 @@
+{
+  "name": "@adaptive-workout/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@adaptive-workout/domain": "0.0.0",
+    "@adaptive-workout/pain-safety": "0.0.0",
+    "@adaptive-workout/progression-engine": "0.0.0",
+    "@adaptive-workout/workout-engine": "0.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @adaptive-workout/domain && npm run build --workspace @adaptive-workout/pain-safety && npm run build --workspace @adaptive-workout/progression-engine && npm run build --workspace @adaptive-workout/workout-engine && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  }
+}

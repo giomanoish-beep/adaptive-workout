@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@adaptive-workout/domain": ["../domain/dist/index.d.ts"],
+      "@adaptive-workout/pain-safety": ["../pain-safety/dist/index.d.ts"],
+      "@adaptive-workout/progression-engine": ["../progression-engine/dist/index.d.ts"],
+      "@adaptive-workout/workout-engine": ["../workout-engine/dist/index.d.ts"]
+    }
+  },
+  "exclude": ["src/**/*.test.ts"]
+}

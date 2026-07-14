@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.tools/
+node-runtime.zip
+.env
+.env.*
+!.env.example
+*.local
+*.log
+.DS_Store

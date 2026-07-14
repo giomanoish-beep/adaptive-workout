@@ -1,0 +1,2 @@
+-- Establishes the Supabase migration history baseline for adaptive-workout.
+-- Domain tables are intentionally introduced by DATABASE-002 through DATABASE-006.

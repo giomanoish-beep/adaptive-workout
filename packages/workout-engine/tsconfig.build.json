@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "paths": {
+      "@adaptive-workout/domain": ["../domain/dist/index.d.ts"]
+    },
+    "rootDir": "src"
+  },
+  "exclude": ["src/**/*.test.ts"]
+}

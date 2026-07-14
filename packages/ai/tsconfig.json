@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@adaptive-workout/domain": ["../domain/src/index.ts"],
+      "@adaptive-workout/pain-safety": ["../pain-safety/src/index.ts"],
+      "@adaptive-workout/progression-engine": ["../progression-engine/src/index.ts"],
+      "@adaptive-workout/workout-engine": ["../workout-engine/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
