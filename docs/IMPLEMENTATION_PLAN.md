@@ -37,11 +37,11 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | PAIN_SAFETY-005        | Implement follow-up and recurrence rules                     | DONE   | PAIN_SAFETY-003                                              |
 | PAIN_SAFETY-006        | Add non-diagnostic language fixtures                         | DONE   | PAIN_SAFETY-003                                              |
 | AI-001                 | Define provider and structured task contracts                | DONE   | FOUNDATION-003                                               |
-| AI-002                 | Implement server-side GLM provider                           | TODO   | AI-001                                                       |
-| AI-003                 | Implement DeepSeek fallback and routing                      | TODO   | AI-002                                                       |
-| AI-004                 | Implement workout-intent extraction                          | TODO   | AI-003, WORKOUT_ENGINE-001                                   |
-| AI-005                 | Implement discomfort extraction                              | TODO   | AI-003, PAIN_SAFETY-001                                      |
-| AI-006                 | Implement grounded decision explanations                     | TODO   | AI-003, DATABASE-006                                         |
+| AI-002                 | Implement server-side GLM provider                           | DONE   | AI-001                                                       |
+| AI-003                 | Implement DeepSeek fallback and routing                      | DONE   | AI-002                                                       |
+| AI-004                 | Implement workout-intent extraction                          | DONE   | AI-003, WORKOUT_ENGINE-001                                   |
+| AI-005                 | Implement discomfort extraction                              | DONE   | AI-003, PAIN_SAFETY-001                                      |
+| AI-006                 | Implement grounded decision explanations                     | DONE   | AI-003, DATABASE-006                                         |
 | WEB_APP-001            | Add Supabase client and authentication shell                 | TODO   | DATABASE-001                                                 |
 | WEB_APP-002            | Build mobile-first app navigation                            | TODO   | WEB_APP-001                                                  |
 | WEB_APP-003            | Build workout request and review flow                        | TODO   | WEB_APP-002, WORKOUT_ENGINE-007                              |

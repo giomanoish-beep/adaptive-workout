@@ -1,0 +1,17 @@
+{
+  "name": "@adaptive-workout/ai-router",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "browser": false,
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@adaptive-workout/ai": "0.0.0",
+    "@adaptive-workout/domain": "0.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @adaptive-workout/domain && npm run build --workspace @adaptive-workout/ai && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  }
+}
