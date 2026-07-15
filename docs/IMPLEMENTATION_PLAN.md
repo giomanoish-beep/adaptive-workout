@@ -42,10 +42,11 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | AI-004                 | Implement workout-intent extraction                          | DONE   | AI-003, WORKOUT_ENGINE-001                                   |
 | AI-005                 | Implement discomfort extraction                              | DONE   | AI-003, PAIN_SAFETY-001                                      |
 | AI-006                 | Implement grounded decision explanations                     | DONE   | AI-003, DATABASE-006                                         |
-| WEB_APP-001            | Add Supabase client and authentication shell                 | TODO   | DATABASE-001                                                 |
-| WEB_APP-002            | Build mobile-first app navigation                            | TODO   | WEB_APP-001                                                  |
-| WEB_APP-003            | Build workout request and review flow                        | TODO   | WEB_APP-002, WORKOUT_ENGINE-007                              |
-| WEB_APP-004            | Build active workout and set logging                         | TODO   | WEB_APP-002, DATABASE-004                                    |
+| WEB_APP-001            | Add Supabase client and authentication shell                 | DONE   | DATABASE-001                                                 |
+| WEB_APP-002            | Build mobile-first app navigation                            | DONE   | WEB_APP-001                                                  |
+| WEB_APP-003            | Build workout request and review flow                        | DONE   | WEB_APP-002, WORKOUT_ENGINE-007                              |
+| WEB_APP-004            | Build active workout and set logging                         | DONE   | WEB_APP-002, DATABASE-004                                    |
+| ONBOARDING-001         | Add training profile onboarding                              | DONE   | WEB_APP-002                                                  |
 | WEB_APP-005            | Build history and progression views                          | TODO   | WEB_APP-004, PROGRESSION_ENGINE-005                          |
 | WEB_APP-006            | Build discomfort report and follow-up flow                   | TODO   | WEB_APP-002, PAIN_SAFETY-005                                 |
 | HARDENING-001          | Add end-to-end critical-flow tests                           | TODO   | WEB_APP-003, WEB_APP-004, WEB_APP-006                        |
