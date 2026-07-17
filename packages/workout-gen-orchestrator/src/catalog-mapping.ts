@@ -16,6 +16,7 @@ import type {
   CatalogExerciseRow,
   CatalogExerciseMuscleRow,
   CatalogExerciseEquipmentRow,
+  CatalogEquipmentRow,
   CatalogMuscleRow,
 } from './contracts.js';
 
@@ -24,6 +25,7 @@ export interface CatalogMappingResult {
   readonly muscleIdToSlug: ReadonlyMap<string, string>;
   readonly muscleIdToName: ReadonlyMap<string, string>;
   readonly exerciseIdToName: ReadonlyMap<string, string>;
+  readonly equipmentIdToSlug: ReadonlyMap<string, string>;
 }
 
 /**
@@ -38,6 +40,7 @@ export function mapCatalogToEngineCandidates(
   muscles: readonly CatalogMuscleRow[],
   exerciseMuscles: readonly CatalogExerciseMuscleRow[],
   exerciseEquipment: readonly CatalogExerciseEquipmentRow[],
+  equipmentRows: readonly CatalogEquipmentRow[],
 ): CatalogMappingResult {
   const activeExercises = exercises
     .filter((ex) => ex.isActive)
@@ -46,10 +49,15 @@ export function mapCatalogToEngineCandidates(
   const muscleIdToSlug = new Map<string, string>();
   const muscleIdToName = new Map<string, string>();
   const exerciseIdToName = new Map<string, string>();
+  const equipmentIdToSlug = new Map<string, string>();
 
   for (const m of muscles) {
     muscleIdToSlug.set(m.id, m.slug);
     muscleIdToName.set(m.id, m.name);
+  }
+
+  for (const equipment of equipmentRows) {
+    equipmentIdToSlug.set(equipment.id, equipment.slug);
   }
 
   const muscleContributionsByExercise = new Map<string, readonly CatalogExerciseMuscleRow[]>();
@@ -97,5 +105,6 @@ export function mapCatalogToEngineCandidates(
     muscleIdToSlug,
     muscleIdToName,
     exerciseIdToName,
+    equipmentIdToSlug,
   };
 }

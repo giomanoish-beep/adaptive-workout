@@ -57,3 +57,4 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | HARDENING-004          | Complete security and data-retention review                  | TODO    | DATABASE-007, HARDENING-002                                  |
 | V1-005                 | Remediate executable V1 validation and production safeguards | DONE    | WEB_APP-003, WEB_APP-004, ONBOARDING-001                     |
 | V1-006                 | Deploy V1 and verify iPhone PWA installation readiness       | BLOCKED | V1-005                                                       |
+| V1-007                 | Fix production workout equipment-context mapping             | DONE    | V1-005, DEPLOY-001                                           |

@@ -139,6 +139,7 @@ export async function generateWorkout(
     catalog.muscles,
     catalog.exerciseMuscles,
     catalog.exerciseEquipment,
+    catalog.equipment,
   );
 
   // 6. Build engine input
@@ -169,7 +170,7 @@ export async function generateWorkout(
     {
       contractVersion: ORCHESTRATOR_CONTRACT_VERSION,
       ruleSetVersion: ORCHESTRATOR_RULE_SET_VERSION,
-      maximumComponentMagnitude: 5.0,
+      maximumComponentMagnitude: 6.0,
       relevance: {
         primaryRoleWeight: 2.0,
         secondaryRoleWeight: 1.0,

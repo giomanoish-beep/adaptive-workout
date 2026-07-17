@@ -30,9 +30,11 @@ import type { CatalogMappingResult } from './catalog-mapping.js';
 
 /** Engine version constants for the orchestrator. */
 export const ORCHESTRATOR_ENGINE_NAME = 'adaptive-workout/workout-engine' as const;
-export const ORCHESTRATOR_CONTRACT_VERSION: ContractVersion = 'contract/1' as ContractVersion;
-export const ORCHESTRATOR_ENGINE_VERSION_ID: EngineVersion = '1' as EngineVersion;
-export const ORCHESTRATOR_RULE_SET_VERSION: RuleSetVersion = 'rule-set/8' as RuleSetVersion;
+export const ORCHESTRATOR_CONTRACT_VERSION: ContractVersion =
+  'workout-generation-contract-v1' as ContractVersion;
+export const ORCHESTRATOR_ENGINE_VERSION_ID: EngineVersion = 'workout-engine-v1' as EngineVersion;
+export const ORCHESTRATOR_RULE_SET_VERSION: RuleSetVersion =
+  'workout-generation-rules-v8' as RuleSetVersion;
 export const ORCHESTRATOR_ENGINE_VERSION: DeterministicEngineVersion = {
   engineName: ORCHESTRATOR_ENGINE_NAME,
   engineVersion: ORCHESTRATOR_ENGINE_VERSION_ID,
@@ -161,10 +163,8 @@ function findEquipmentIdBySlug(
   catalogResult: CatalogMappingResult,
   slug: string,
 ): EquipmentId | null {
-  for (const c of catalogResult.candidates) {
-    for (const e of c.equipment) {
-      if (e.equipmentId === slug) return e.equipmentId;
-    }
+  for (const [id, equipmentSlug] of catalogResult.equipmentIdToSlug) {
+    if (equipmentSlug === slug) return id as EquipmentId;
   }
   return null;
 }

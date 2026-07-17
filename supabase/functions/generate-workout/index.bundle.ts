@@ -4144,14 +4144,18 @@ function mapGoal(goal) {
 }
 
 // packages/workout-gen-orchestrator/src/catalog-mapping.ts
-function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerciseEquipment) {
+function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerciseEquipment, equipmentRows) {
   const activeExercises = exercises.filter((ex) => ex.isActive).sort((a, b) => a.id.localeCompare(b.id));
   const muscleIdToSlug = /* @__PURE__ */ new Map();
   const muscleIdToName = /* @__PURE__ */ new Map();
   const exerciseIdToName = /* @__PURE__ */ new Map();
+  const equipmentIdToSlug = /* @__PURE__ */ new Map();
   for (const m of muscles) {
     muscleIdToSlug.set(m.id, m.slug);
     muscleIdToName.set(m.id, m.name);
+  }
+  for (const equipment of equipmentRows) {
+    equipmentIdToSlug.set(equipment.id, equipment.slug);
   }
   const muscleContributionsByExercise = /* @__PURE__ */ new Map();
   for (const em of exerciseMuscles) {
@@ -4167,13 +4171,13 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
   for (const ex of activeExercises) {
     exerciseIdToName.set(ex.id, ex.name);
     const muscleRows = muscleContributionsByExercise.get(ex.id) ?? [];
-    const equipmentRows = equipmentRequirementsByExercise.get(ex.id) ?? [];
+    const equipmentRows2 = equipmentRequirementsByExercise.get(ex.id) ?? [];
     const muscleContributions = muscleRows.map((row) => ({
       muscleId: row.muscleId,
       role: row.role,
       contribution: row.contribution
     }));
-    const equipment = equipmentRows.map((row) => ({
+    const equipment = equipmentRows2.map((row) => ({
       equipmentId: row.equipmentId,
       requirement: row.requirement
     }));
@@ -4189,15 +4193,16 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     candidates,
     muscleIdToSlug,
     muscleIdToName,
-    exerciseIdToName
+    exerciseIdToName,
+    equipmentIdToSlug
   };
 }
 
 // packages/workout-gen-orchestrator/src/engine-input.ts
 var ORCHESTRATOR_ENGINE_NAME = "adaptive-workout/workout-engine";
-var ORCHESTRATOR_CONTRACT_VERSION = "contract/1";
-var ORCHESTRATOR_ENGINE_VERSION_ID = "1";
-var ORCHESTRATOR_RULE_SET_VERSION = "rule-set/8";
+var ORCHESTRATOR_CONTRACT_VERSION = "workout-generation-contract-v1";
+var ORCHESTRATOR_ENGINE_VERSION_ID = "workout-engine-v1";
+var ORCHESTRATOR_RULE_SET_VERSION = "workout-generation-rules-v8";
 var ORCHESTRATOR_ENGINE_VERSION = {
   engineName: ORCHESTRATOR_ENGINE_NAME,
   engineVersion: ORCHESTRATOR_ENGINE_VERSION_ID,
@@ -4297,10 +4302,8 @@ function findMuscleIdBySlug(muscleIdToSlug, slug) {
   return slug;
 }
 function findEquipmentIdBySlug(catalogResult, slug) {
-  for (const c of catalogResult.candidates) {
-    for (const e of c.equipment) {
-      if (e.equipmentId === slug) return e.equipmentId;
-    }
+  for (const [id, equipmentSlug] of catalogResult.equipmentIdToSlug) {
+    if (equipmentSlug === slug) return id;
   }
   return null;
 }
@@ -4564,7 +4567,8 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     catalog.exercises,
     catalog.muscles,
     catalog.exerciseMuscles,
-    catalog.exerciseEquipment
+    catalog.exerciseEquipment,
+    catalog.equipment
   );
   const engineInput = buildEngineInput(
     request,
@@ -4588,7 +4592,7 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     {
       contractVersion: ORCHESTRATOR_CONTRACT_VERSION,
       ruleSetVersion: ORCHESTRATOR_RULE_SET_VERSION,
-      maximumComponentMagnitude: 5,
+      maximumComponentMagnitude: 6,
       relevance: {
         primaryRoleWeight: 2,
         secondaryRoleWeight: 1,
