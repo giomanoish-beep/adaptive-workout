@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   buildProfile,
   initialOnboardingDraft,
@@ -49,12 +49,15 @@ import {
  * desktop by the existing `main` content max.
  */
 export interface OnboardingFlowProps {
-  readonly onComplete: (profile: TrainingProfile) => void;
+  readonly onComplete: (profile: TrainingProfile) => Promise<void>;
 }
 
 export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const [step, setStep] = useState<OnboardingStep>(initialOnboardingStep);
   const [draft, setDraft] = useState<OnboardingDraft>(initialOnboardingDraft);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savingRef = useRef(false);
 
   const progress = stepProgress(step);
   const canAdvance = isStepValid(step, draft);
@@ -67,9 +70,25 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     setStep(previousStep(step));
   }, [step]);
 
-  const handleFinish = useCallback(() => {
+  const handleFinish = useCallback(async () => {
+    if (savingRef.current) return;
     const profile = buildProfile(draft);
-    if (profile) onComplete(profile);
+    if (!profile) {
+      setSaveError('Review your setup and complete every required field.');
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onComplete(profile);
+    } catch {
+      setSaveError('Could not save your setup. Please try again.');
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
   }, [draft, onComplete]);
 
   return (
@@ -77,7 +96,14 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       <p className="eyebrow onboarding__eyebrow">
         Setup {progress.current} of {progress.total}
       </p>
-      <div className="onboarding__progress" role="progressbar" aria-label="Onboarding progress" aria-valuenow={progress.current} aria-valuemin={1} aria-valuemax={progress.total}>
+      <div
+        className="onboarding__progress"
+        role="progressbar"
+        aria-label="Onboarding progress"
+        aria-valuenow={progress.current}
+        aria-valuemin={1}
+        aria-valuemax={progress.total}
+      >
         <span
           className="onboarding__progress-fill"
           style={{ width: `${(progress.current / progress.total) * 100}%` }}
@@ -111,9 +137,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         />
       )}
 
-      {step === 'duration' && (
-        <DurationStep draft={draft} onChange={setDraft} />
-      )}
+      {step === 'duration' && <DurationStep draft={draft} onChange={setDraft} />}
 
       {step === 'environment' && (
         <ChoiceStep
@@ -155,10 +179,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           <button
             type="button"
             className="onboarding__primary"
-            onClick={handleFinish}
-            disabled={!canAdvance}
+            onClick={() => void handleFinish()}
+            disabled={!canAdvance || isSaving}
           >
-            Finish setup
+            {isSaving ? 'Saving setup…' : saveError ? 'Retry setup' : 'Finish setup'}
           </button>
         ) : (
           <button
@@ -171,6 +195,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           </button>
         )}
       </div>
+      {saveError && (
+        <p className="onboarding__save-error" role="alert">
+          {saveError}
+        </p>
+      )}
     </section>
   );
 }
@@ -259,7 +288,10 @@ function DurationStep({
         </div>
         {draft.durationMode === 'custom' && (
           <div className="onboarding__duration-custom">
-            <label className="onboarding__duration-custom-label" htmlFor="onboarding-duration-custom">
+            <label
+              className="onboarding__duration-custom-label"
+              htmlFor="onboarding-duration-custom"
+            >
               Minutes
             </label>
             <input

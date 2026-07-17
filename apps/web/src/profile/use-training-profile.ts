@@ -27,6 +27,8 @@ export interface ProfileLoadingState {
 
 export interface ProfileMissingState {
   readonly status: 'missing';
+  readonly saving: boolean;
+  readonly saveError: string | null;
 }
 
 export interface ProfileLoadedState {
@@ -42,10 +44,19 @@ export interface ProfileErrorState {
 }
 
 export type ProfileState =
-  | ProfileLoadingState
-  | ProfileMissingState
-  | ProfileLoadedState
-  | ProfileErrorState;
+  ProfileLoadingState | ProfileMissingState | ProfileLoadedState | ProfileErrorState;
+
+export function beginOnboardingSave(): ProfileMissingState {
+  return { status: 'missing', saving: true, saveError: null };
+}
+
+export function failOnboardingSave(message: string): ProfileMissingState {
+  return { status: 'missing', saving: false, saveError: message };
+}
+
+export function finishOnboardingSave(profile: TrainingProfile): ProfileLoadedState {
+  return { status: 'loaded', profile, saving: false, saveError: null };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Hook result                                                        */
@@ -82,15 +93,13 @@ export function useTrainingProfile(client: SupabaseClient): UseTrainingProfileRe
     try {
       const profile = await repo.loadProfile();
       if (profile === null) {
-        setState({ status: 'missing' });
+        setState({ status: 'missing', saving: false, saveError: null });
       } else {
         setState({ status: 'loaded', profile, saving: false, saveError: null });
       }
     } catch (err) {
       const message =
-        err instanceof ProfileRepositoryError
-          ? err.message
-          : 'Failed to load your profile.';
+        err instanceof ProfileRepositoryError ? err.message : 'Failed to load your profile.';
       setState({ status: 'error', message });
     } finally {
       loadedRef.current = true;
@@ -107,32 +116,20 @@ export function useTrainingProfile(client: SupabaseClient): UseTrainingProfileRe
     async (profile: TrainingProfile) => {
       if (savingRef.current) return;
       savingRef.current = true;
-
-      // Transition to a temporary "saving" view on the current loaded state
-      if (state.status === 'loaded') {
-        setState({ ...state, saving: true, saveError: null });
-      }
+      setState(beginOnboardingSave());
 
       try {
         await repo.upsertCompletedProfile(profile);
-        setState({ status: 'loaded', profile, saving: false, saveError: null });
-      } catch (err) {
-        const message =
-          err instanceof ProfileRepositoryError
-            ? err.message
-            : 'Failed to save your profile. Please try again.';
-        // Preserve the missing state so user stays on onboarding
-        setState({ status: 'missing' });
-        // Re-throw so the onboarding can surface the error inline
-        throw new ProfileRepositoryError(
-          'ONBOARDING_SAVE_FAILED',
-          message,
-        );
+        setState(finishOnboardingSave(profile));
+      } catch {
+        const message = 'Could not save your setup. Please try again.';
+        setState(failOnboardingSave(message));
+        throw new ProfileRepositoryError('ONBOARDING_SAVE_FAILED', message);
       } finally {
         savingRef.current = false;
       }
     },
-    [repo, state],
+    [repo],
   );
 
   const updateProfile = useCallback(
@@ -149,9 +146,7 @@ export function useTrainingProfile(client: SupabaseClient): UseTrainingProfileRe
         setState({ status: 'loaded', profile, saving: false, saveError: null });
       } catch (err) {
         const message =
-          err instanceof ProfileRepositoryError
-            ? err.message
-            : 'Failed to save changes.';
+          err instanceof ProfileRepositoryError ? err.message : 'Failed to save changes.';
         // Restore previous profile on failure
         setState({
           status: 'loaded',

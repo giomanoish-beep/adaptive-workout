@@ -77,6 +77,14 @@ describe('onboarding emits the validated profile through a callback', () => {
     expect(onboardingFlowSource).toMatch(/onComplete.*TrainingProfile/);
     expect(onboardingFlowSource).toMatch(/buildProfile/);
   });
+
+  it('awaits persistence and exposes saving, retry, and controlled error UI', () => {
+    expect(onboardingFlowSource).toMatch(/await onComplete\(profile\)/);
+    expect(onboardingFlowSource).toMatch(/Saving setup/);
+    expect(onboardingFlowSource).toMatch(/Retry setup/);
+    expect(onboardingFlowSource).toMatch(/role="alert"/);
+    expect(onboardingFlowSource).toMatch(/disabled=\{!canAdvance \|\| isSaving\}/);
+  });
 });
 
 describe('App profile lifecycle (V1-001)', () => {
@@ -124,6 +132,12 @@ describe('profile repository and hook boundary (V1-001)', () => {
     expect(profileRepoSource).toMatch(/@supabase\/supabase-js/);
     // Must have a controlled error class
     expect(profileRepoSource).toMatch(/ProfileRepositoryError/);
+  });
+
+  it('keys completed profile upserts to the authenticated user', () => {
+    expect(profileRepoSource).toMatch(/client\.auth\.getUser\(\)/);
+    expect(profileRepoSource).toMatch(/id: userId/);
+    expect(profileRepoSource).toMatch(/onConflict: 'id'/);
   });
 
   it('hook exports the expected profile states', () => {

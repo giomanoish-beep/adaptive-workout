@@ -25,24 +25,43 @@ interface Session {
 
 type Row = Record<string, unknown>;
 const store = new Map<string, Row[]>();
+let profileSaveFailuresRemaining = 0;
+let profileSaveAttempts = 0;
+let profileSaveDelayMs = 0;
 
 function getTable(n: string): Row[] {
   let r = store.get(n);
-  if (!r) { r = []; store.set(n, r); }
+  if (!r) {
+    r = [];
+    store.set(n, r);
+  }
   return r;
 }
-function genId() { return `e2e-${crypto.randomUUID()}`; }
-function nowISO() { return new Date().toISOString(); }
-function eqF(rows: Row[], c: string, v: unknown): Row[] { return rows.filter((r) => r[c] === v); }
-function inF(rows: Row[], c: string, vs: unknown[]): Row[] { return rows.filter((r) => vs.includes(r[c])); }
+function genId() {
+  return `e2e-${crypto.randomUUID()}`;
+}
+function nowISO() {
+  return new Date().toISOString();
+}
+function eqF(rows: Row[], c: string, v: unknown): Row[] {
+  return rows.filter((r) => r[c] === v);
+}
+function inF(rows: Row[], c: string, vs: unknown[]): Row[] {
+  return rows.filter((r) => vs.includes(r[c]));
+}
 function likeF(rows: Row[], c: string, p: string): Row[] {
   const prefix = p.replace(/%$/, '');
-  return rows.filter((r) => { const v = r[c]; return typeof v === 'string' && v.startsWith(prefix); });
+  return rows.filter((r) => {
+    const v = r[c];
+    return typeof v === 'string' && v.startsWith(prefix);
+  });
 }
 function selCols(row: Row, cols: string | null): Row {
   if (!cols || cols === '*') return { ...row };
   const out: Row = {};
-  for (const c of cols.split(',').map((s) => s.trim())) { if (c in row) out[c] = row[c]; }
+  for (const c of cols.split(',').map((s) => s.trim())) {
+    if (c in row) out[c] = row[c];
+  }
   return out;
 }
 
@@ -62,13 +81,33 @@ export function createE2ESupabaseClient(): SupabaseClient {
   }
 
   const auth = {
-    getSession() { return Promise.resolve({ data: { session: authenticated ? session : null }, error: null }); },
+    getSession() {
+      return Promise.resolve({ data: { session: authenticated ? session : null }, error: null });
+    },
+    getUser() {
+      return Promise.resolve({
+        data: { user: authenticated ? session.user : null },
+        error: authenticated ? null : { message: 'No authenticated test user.' },
+      });
+    },
     onAuthStateChange(cb: AuthListener) {
       listeners.add(cb);
       setTimeout(() => cb('INITIAL_SESSION', authenticated ? session : null), 0);
-      return { data: { subscription: { unsubscribe() { listeners.delete(cb); } } } };
+      return {
+        data: {
+          subscription: {
+            unsubscribe() {
+              listeners.delete(cb);
+            },
+          },
+        },
+      };
     },
-    signOut() { authenticated = false; notify('SIGNED_OUT'); return Promise.resolve({ error: null }); },
+    signOut() {
+      authenticated = false;
+      notify('SIGNED_OUT');
+      return Promise.resolve({ error: null });
+    },
   };
 
   function createQB(tableName: string) {
@@ -79,12 +118,19 @@ export function createE2ESupabaseClient(): SupabaseClient {
     let orderAscending = true;
     let selectColumns: string | null = null;
 
-    function reset() { filteredRows = rows; limitCount = null; orderColumn = null; orderAscending = true; selectColumns = null; }
+    function reset() {
+      filteredRows = rows;
+      limitCount = null;
+      orderColumn = null;
+      orderAscending = true;
+      selectColumns = null;
+    }
     function apply() {
       let r = [...filteredRows];
       if (orderColumn) {
         r.sort((a, b) => {
-          const va = a[orderColumn!], vb = b[orderColumn!];
+          const va = a[orderColumn!],
+            vb = b[orderColumn!];
           if (va == null && vb == null) return 0;
           if (va == null) return orderAscending ? 1 : -1;
           if (vb == null) return orderAscending ? -1 : 1;
@@ -94,23 +140,49 @@ export function createE2ESupabaseClient(): SupabaseClient {
       if (limitCount) r = r.slice(0, limitCount);
       return { result: r, filters: filteredRows };
     }
-    function map(r: Row) { return selCols(r, selectColumns); }
+    function map(r: Row) {
+      return selCols(r, selectColumns);
+    }
 
     const b = {
       select(cols?: string) {
         reset();
         selectColumns = cols ?? '*';
         const that = {
-          eq(c: string, v: unknown) { filteredRows = eqF(rows, c, v); return that; },
-          in(c: string, vs: unknown[]) { filteredRows = inF(rows, c, vs); return that; },
-          like(c: string, p: string) { filteredRows = likeF(rows, c, p); return that; },
-          order(c: string, o?: { ascending?: boolean }) { orderColumn = c; orderAscending = o?.ascending ?? true; return that; },
-          limit(n: number) { limitCount = n; return that; },
-          single() { const { result: r } = apply(); return Promise.resolve(r.length === 0 ? { data: null, error: null } : { data: map(r[0]!), error: null }); },
+          eq(c: string, v: unknown) {
+            filteredRows = eqF(rows, c, v);
+            return that;
+          },
+          in(c: string, vs: unknown[]) {
+            filteredRows = inF(rows, c, vs);
+            return that;
+          },
+          like(c: string, p: string) {
+            filteredRows = likeF(rows, c, p);
+            return that;
+          },
+          order(c: string, o?: { ascending?: boolean }) {
+            orderColumn = c;
+            orderAscending = o?.ascending ?? true;
+            return that;
+          },
+          limit(n: number) {
+            limitCount = n;
+            return that;
+          },
+          single() {
+            const { result: r } = apply();
+            return Promise.resolve(
+              r.length === 0 ? { data: null, error: null } : { data: map(r[0]!), error: null },
+            );
+          },
           then(resolve?: (v: { data: Row[] | null; error: null }) => void) {
             const { result: r } = apply();
             const v = { data: r.map(map), error: null };
-            if (resolve) { resolve(v); return undefined!; }
+            if (resolve) {
+              resolve(v);
+              return undefined!;
+            }
             return Promise.resolve(v);
           },
         };
@@ -120,7 +192,13 @@ export function createE2ESupabaseClient(): SupabaseClient {
         const entries = Array.isArray(row) ? row : [row];
         const now = nowISO();
         for (const entry of entries) {
-          const full: Row = { ...entry, id: genId(), user_id: E2E_USER.id, created_at: now, updated_at: now };
+          const full: Row = {
+            ...entry,
+            id: genId(),
+            user_id: E2E_USER.id,
+            created_at: now,
+            updated_at: now,
+          };
           rows.push(full);
         }
         const that: Record<string, unknown> = {
@@ -130,28 +208,77 @@ export function createE2ESupabaseClient(): SupabaseClient {
           },
           single() {
             const last = rows[rows.length - 1] ?? null;
-            return Promise.resolve({ data: last ? selCols(last, selectColumns) : null, error: null });
+            return Promise.resolve({
+              data: last ? selCols(last, selectColumns) : null,
+              error: null,
+            });
           },
         };
         return that;
       },
       upsert(row: Row, opts?: { onConflict?: string; ignoreDuplicates?: boolean }) {
-        const conflictCols = (opts?.onConflict ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+        if (tableName === 'profiles') {
+          profileSaveAttempts += 1;
+          if (profileSaveFailuresRemaining > 0) {
+            profileSaveFailuresRemaining -= 1;
+            return new Promise((resolve) => {
+              setTimeout(
+                () =>
+                  resolve({
+                    data: null,
+                    error: {
+                      code: 'E2E_PROFILE_SAVE_FAILED',
+                      message: 'Simulated private database error.',
+                    },
+                  }),
+                profileSaveDelayMs,
+              );
+            });
+          }
+        }
+        const conflictCols = (opts?.onConflict ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
         const now = nowISO();
         let idx = -1;
         for (let i = 0; i < rows.length; i++) {
-          if (conflictCols.every((col) => String(rows[i]![col]) === String(row[col]))) { idx = i; break; }
+          if (conflictCols.every((col) => String(rows[i]![col]) === String(row[col]))) {
+            idx = i;
+            break;
+          }
         }
         if (idx >= 0 && !opts?.ignoreDuplicates) {
           rows[idx] = { ...rows[idx], ...row, updated_at: now };
         } else if (idx < 0) {
-          rows.push({ ...row, id: genId(), user_id: E2E_USER.id, created_at: now, updated_at: now });
+          rows.push({
+            ...row,
+            id: row.id ?? genId(),
+            user_id: E2E_USER.id,
+            created_at: now,
+            updated_at: now,
+          });
         }
         const that: Record<string, unknown> = {
-          select(cols?: string) { if (cols) selectColumns = cols; return that; },
+          then(
+            resolve?: (value: { data: null; error: null }) => unknown,
+            reject?: (reason: unknown) => unknown,
+          ) {
+            const value = { data: null, error: null };
+            return new Promise<typeof value>((complete) => {
+              setTimeout(() => complete(value), profileSaveDelayMs);
+            }).then(resolve, reject);
+          },
+          select(cols?: string) {
+            if (cols) selectColumns = cols;
+            return that;
+          },
           single() {
             const last = rows[rows.length - 1] ?? null;
-            return Promise.resolve({ data: last ? selCols(last, selectColumns) : null, error: null });
+            return Promise.resolve({
+              data: last ? selCols(last, selectColumns) : null,
+              error: null,
+            });
           },
         };
         return that;
@@ -163,11 +290,20 @@ export function createE2ESupabaseClient(): SupabaseClient {
           if (idx >= 0) rows[idx] = { ...rows[idx], ...row, updated_at: now };
         }
         const that: Record<string, unknown> = {
-          eq(c: string, v: unknown) { filteredRows = eqF(rows, c, v); return that; },
-          select(cols?: string) { if (cols) selectColumns = cols; return that; },
+          eq(c: string, v: unknown) {
+            filteredRows = eqF(rows, c, v);
+            return that;
+          },
+          select(cols?: string) {
+            if (cols) selectColumns = cols;
+            return that;
+          },
           single() {
             const t = [...filteredRows];
-            return Promise.resolve({ data: t.length > 0 ? selCols(t[0]!, selectColumns) : null, error: null });
+            return Promise.resolve({
+              data: t.length > 0 ? selCols(t[0]!, selectColumns) : null,
+              error: null,
+            });
           },
         };
         return that;
@@ -175,17 +311,42 @@ export function createE2ESupabaseClient(): SupabaseClient {
       delete() {
         const that = {
           eq(c: string, v: unknown) {
-            for (const t of eqF(rows, c, v)) { const i = rows.indexOf(t); if (i >= 0) rows.splice(i, 1); }
-            return { then: (resolve?: (v: unknown) => void) => { const val = { data: null, error: null }; if (resolve) resolve(val); return val; } };
+            for (const t of eqF(rows, c, v)) {
+              const i = rows.indexOf(t);
+              if (i >= 0) rows.splice(i, 1);
+            }
+            return {
+              then: (resolve?: (v: unknown) => void) => {
+                const val = { data: null, error: null };
+                if (resolve) resolve(val);
+                return val;
+              },
+            };
           },
         };
         return that;
       },
-      eq(c: string, v: unknown) { filteredRows = eqF(rows, c, v); return b; },
-      in(c: string, vs: unknown[]) { filteredRows = inF(rows, c, vs); return b; },
-      like(c: string, p: string) { filteredRows = likeF(rows, c, p); return b; },
-      order(c: string, o?: { ascending?: boolean }) { orderColumn = c; orderAscending = o?.ascending ?? true; return b; },
-      limit(n: number) { limitCount = n; return b; },
+      eq(c: string, v: unknown) {
+        filteredRows = eqF(rows, c, v);
+        return b;
+      },
+      in(c: string, vs: unknown[]) {
+        filteredRows = inF(rows, c, vs);
+        return b;
+      },
+      like(c: string, p: string) {
+        filteredRows = likeF(rows, c, p);
+        return b;
+      },
+      order(c: string, o?: { ascending?: boolean }) {
+        orderColumn = c;
+        orderAscending = o?.ascending ?? true;
+        return b;
+      },
+      limit(n: number) {
+        limitCount = n;
+        return b;
+      },
     };
     return b;
   }
@@ -193,7 +354,12 @@ export function createE2ESupabaseClient(): SupabaseClient {
   return { auth, from: (t: string) => createQB(t) } as unknown as SupabaseClient;
 }
 
-export function clearE2EStore(): void { store.clear(); }
+export function clearE2EStore(): void {
+  store.clear();
+  profileSaveFailuresRemaining = 0;
+  profileSaveAttempts = 0;
+  profileSaveDelayMs = 0;
+}
 export function seedE2EStore(seeds: Record<string, Row[]>): void {
   for (const [tableName, rows] of Object.entries(seeds)) store.set(tableName, [...rows]);
 }
@@ -204,11 +370,23 @@ export function dumpE2EStore(): Record<string, Row[]> {
 }
 if (typeof window !== 'undefined') {
   const pendingSeed = (window as unknown as Record<string, unknown>).__E2E_SEED__ as
-    | Record<string, Row[]>
-    | undefined;
+    Record<string, Row[]> | undefined;
   if (pendingSeed) {
     seedE2EStore(pendingSeed);
     delete (window as unknown as Record<string, unknown>).__E2E_SEED__;
   }
-  (window as unknown as Record<string, unknown>).__E2E_STORE__ = { clear: clearE2EStore, seed: seedE2EStore, dump: dumpE2EStore };
+  (window as unknown as Record<string, unknown>).__E2E_STORE__ = {
+    clear: clearE2EStore,
+    seed: seedE2EStore,
+    dump: dumpE2EStore,
+    failNextProfileSaves(count: number) {
+      profileSaveFailuresRemaining = count;
+    },
+    setProfileSaveDelay(delayMs: number) {
+      profileSaveDelayMs = delayMs;
+    },
+    getProfileSaveAttempts() {
+      return profileSaveAttempts;
+    },
+  };
 }

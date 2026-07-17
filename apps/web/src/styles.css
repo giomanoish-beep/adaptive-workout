@@ -1457,6 +1457,13 @@ main > p:last-child {
   outline-offset: 3px;
 }
 
+.onboarding__save-error {
+  margin: 0.75rem 0 0;
+  color: #fca5a5;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .onboarding__back {
   flex: 0 0 auto;
   padding: 1rem 1.3rem;

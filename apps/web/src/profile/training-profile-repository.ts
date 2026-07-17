@@ -90,11 +90,23 @@ export function mapProfileRow(row: ProfileRow): TrainingProfile | null {
 export function validateProfileRow(row: Record<string, unknown>): readonly string[] {
   const issues: string[] = [];
 
-  const validGoals = ['build_muscle', 'lose_fat', 'gain_strength', 'improve_fitness', 'recomposition'];
+  const validGoals = [
+    'build_muscle',
+    'lose_fat',
+    'gain_strength',
+    'improve_fitness',
+    'recomposition',
+  ];
   const validExperiences = ['beginner', 'intermediate', 'advanced'];
   const validFrequencies = ['2', '3', '4', '5', 'six_plus'];
   const validEnvironments = ['commercial_gym', 'home_gym', 'minimal_equipment', 'bodyweight'];
-  const validProgramPreferences = ['app_decide', 'push_pull_legs', 'upper_lower', 'full_body', 'other'];
+  const validProgramPreferences = [
+    'app_decide',
+    'push_pull_legs',
+    'upper_lower',
+    'full_body',
+    'other',
+  ];
 
   if (row.goal !== null && !validGoals.includes(row.goal as string)) {
     issues.push('goal');
@@ -102,13 +114,22 @@ export function validateProfileRow(row: Record<string, unknown>): readonly strin
   if (row.experience !== null && !validExperiences.includes(row.experience as string)) {
     issues.push('experience');
   }
-  if (row.training_frequency !== null && !validFrequencies.includes(row.training_frequency as string)) {
+  if (
+    row.training_frequency !== null &&
+    !validFrequencies.includes(row.training_frequency as string)
+  ) {
     issues.push('training_frequency');
   }
-  if (row.training_environment !== null && !validEnvironments.includes(row.training_environment as string)) {
+  if (
+    row.training_environment !== null &&
+    !validEnvironments.includes(row.training_environment as string)
+  ) {
     issues.push('training_environment');
   }
-  if (row.program_preference !== null && !validProgramPreferences.includes(row.program_preference as string)) {
+  if (
+    row.program_preference !== null &&
+    !validProgramPreferences.includes(row.program_preference as string)
+  ) {
     issues.push('program_preference');
   }
 
@@ -120,6 +141,20 @@ export function validateProfileRow(row: Record<string, unknown>): readonly strin
 /* ------------------------------------------------------------------ */
 
 export function createTrainingProfileRepository(client: SupabaseClient) {
+  async function requireAuthenticatedUserId(): Promise<string> {
+    const { data, error } = await client.auth.getUser();
+    const userId = data.user?.id;
+
+    if (error || !userId) {
+      throw new ProfileRepositoryError(
+        'PROFILE_AUTH_REQUIRED',
+        'Your session is unavailable. Sign in again and retry.',
+      );
+    }
+
+    return userId;
+  }
+
   /**
    * Loads the authenticated user's profile.
    *
@@ -129,9 +164,13 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
    * - throws ProfileRepositoryError on load failure
    */
   async function loadProfile(): Promise<TrainingProfile | null> {
+    const userId = await requireAuthenticatedUserId();
     const { data, error } = await client
       .from('profiles')
-      .select('id,goal,experience,training_frequency,typical_duration_minutes,training_environment,program_preference,has_current_discomfort,onboarding_completed')
+      .select(
+        'id,goal,experience,training_frequency,typical_duration_minutes,training_environment,program_preference,has_current_discomfort,onboarding_completed',
+      )
+      .eq('id', userId)
       .single();
 
     if (error) {
@@ -141,7 +180,7 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
       }
       throw new ProfileRepositoryError(
         'PROFILE_LOAD_FAILED',
-        `Failed to load profile: ${error.message}`,
+        'Failed to load your profile. Please try again.',
       );
     }
 
@@ -158,9 +197,10 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
    * and sets onboarding_completed = true. Used only at onboarding completion.
    */
   async function upsertCompletedProfile(profile: TrainingProfile): Promise<void> {
-    const { error } = await client
-      .from('profiles')
-      .upsert({
+    const userId = await requireAuthenticatedUserId();
+    const { error } = await client.from('profiles').upsert(
+      {
+        id: userId,
         goal: profile.goal,
         experience: profile.experience,
         training_frequency: profile.frequency,
@@ -169,12 +209,14 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
         program_preference: profile.programPreference,
         has_current_discomfort: profile.hasCurrentDiscomfort,
         onboarding_completed: true,
-      });
+      },
+      { onConflict: 'id' },
+    );
 
     if (error) {
       throw new ProfileRepositoryError(
         'PROFILE_SAVE_FAILED',
-        `Failed to save profile: ${error.message}`,
+        'Failed to save your setup. Please try again.',
       );
     }
   }
@@ -186,6 +228,7 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
    * The caller must have an existing completed profile.
    */
   async function updateProfile(profile: TrainingProfile): Promise<void> {
+    const userId = await requireAuthenticatedUserId();
     const { error } = await client
       .from('profiles')
       .update({
@@ -197,12 +240,13 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
         program_preference: profile.programPreference,
         has_current_discomfort: profile.hasCurrentDiscomfort,
       })
+      .eq('id', userId)
       .eq('onboarding_completed', true);
 
     if (error) {
       throw new ProfileRepositoryError(
         'PROFILE_UPDATE_FAILED',
-        `Failed to update profile: ${error.message}`,
+        'Failed to save changes. Please try again.',
       );
     }
   }

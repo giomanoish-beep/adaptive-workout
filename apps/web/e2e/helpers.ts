@@ -16,11 +16,7 @@
  */
 
 import { expect, type Page } from '@playwright/test';
-import {
-  installE2ERouteMocks,
-  type E2EMockConfig,
-  type E2EMockTracker,
-} from './route-mocks';
+import { installE2ERouteMocks, type E2EMockConfig, type E2EMockTracker } from './route-mocks';
 
 /**
  * Tracks pages that have already had route mocks installed, so repeated calls
@@ -53,8 +49,8 @@ export async function resetE2EState(page: Page): Promise<void> {
   // Clear the store before the app mounts on the next navigation.
   await page.goto('about:blank');
   await page.evaluate(() => {
-    const api = (window as unknown as Record<string, unknown>)
-      .__E2E_STORE__ as { clear: () => void } | undefined;
+    const api = (window as unknown as Record<string, unknown>).__E2E_STORE__ as
+      { clear: () => void } | undefined;
     api?.clear();
   });
 }
@@ -77,17 +73,13 @@ export async function setupE2ETest(page: Page): Promise<void> {
  * Recomposition → Intermediate → 4 days → 90 min → Commercial gym →
  * Let the app decide → No current discomfort → Finish setup.
  */
-export async function completeOnboarding(page: Page): Promise<void> {
+export async function reachOnboardingReview(page: Page): Promise<void> {
   // Step 1: Goal — Recomposition
-  await page
-    .getByRole('button', { name: 'Recomposition' })
-    .click();
+  await page.getByRole('button', { name: 'Recomposition' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 2: Experience — Intermediate
-  await page
-    .getByRole('button', { name: 'Intermediate' })
-    .click();
+  await page.getByRole('button', { name: 'Intermediate' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 3: Frequency — 4 days
@@ -99,24 +91,22 @@ export async function completeOnboarding(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 5: Environment — Commercial gym
-  await page
-    .getByRole('button', { name: 'Commercial gym' })
-    .click();
+  await page.getByRole('button', { name: 'Commercial gym' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 6: Program preference — Let the app decide
-  await page
-    .getByRole('button', { name: 'Let the app decide' })
-    .click();
+  await page.getByRole('button', { name: 'Let the app decide' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 7: Discomfort — No current discomfort
-  await page
-    .getByRole('button', { name: 'No current discomfort' })
-    .click();
+  await page.getByRole('button', { name: 'No current discomfort' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // Step 8: Review
+}
+
+export async function completeOnboarding(page: Page): Promise<void> {
+  await reachOnboardingReview(page);
   await page.getByRole('button', { name: 'Finish setup' }).click();
 }
 
@@ -132,10 +122,7 @@ export interface SetupOptions {
  * @param page Playwright page
  * @param options `{ initialize: false }` if `setupE2ETest` has already run
  */
-export async function setupWorkoutFlow(
-  page: Page,
-  options: SetupOptions = {},
-): Promise<void> {
+export async function setupWorkoutFlow(page: Page, options: SetupOptions = {}): Promise<void> {
   if (options.initialize !== false) {
     await setupE2ETest(page);
   }
@@ -158,16 +145,16 @@ export async function setupActiveWorkout(page: Page): Promise<void> {
   await setupWorkoutFlow(page, { initialize: false });
 
   await page.getByRole('button', { name: 'Generate workout' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Chest + Back' }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible({
+    timeout: 10_000,
+  });
   await page.getByRole('button', { name: 'Start workout' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Chest + Back' }),
-  ).toBeVisible({ timeout: 10_000 });
-  await expect(
-    page.getByRole('heading', { name: 'Dumbbell Bench Press' }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByRole('heading', { name: 'Dumbbell Bench Press' })).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 /**
@@ -178,8 +165,8 @@ export async function setupActiveWorkout(page: Page): Promise<void> {
 export async function preserveStoreAndReload(page: Page): Promise<void> {
   // Dump the store
   const storeData = await page.evaluate(() => {
-    const api = (window as unknown as Record<string, unknown>)
-      .__E2E_STORE__ as { dump: () => Record<string, unknown[]> } | undefined;
+    const api = (window as unknown as Record<string, unknown>).__E2E_STORE__ as
+      { dump: () => Record<string, unknown[]> } | undefined;
     return api?.dump() ?? {};
   });
 
@@ -192,13 +179,10 @@ export async function preserveStoreAndReload(page: Page): Promise<void> {
 }
 
 /** Read the in-memory adapter only for assertions that UI cannot distinguish. */
-export async function readE2EStore(
-  page: Page,
-): Promise<Record<string, Record<string, unknown>[]>> {
+export async function readE2EStore(page: Page): Promise<Record<string, Record<string, unknown>[]>> {
   return page.evaluate(() => {
     const api = (window as unknown as Record<string, unknown>).__E2E_STORE__ as
-      | { dump: () => Record<string, Record<string, unknown>[]> }
-      | undefined;
+      { dump: () => Record<string, Record<string, unknown>[]> } | undefined;
     return api?.dump() ?? {};
   });
 }
