@@ -2,3 +2,5 @@ node_modules
 dist
 coverage
 package-lock.json
+supabase/functions/generate-workout/index.bundle.ts
+supabase/functions/refresh-progression/index.bundle.ts
