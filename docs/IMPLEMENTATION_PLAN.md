@@ -47,9 +47,12 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | WEB_APP-003            | Build workout request and review flow                        | DONE   | WEB_APP-002, WORKOUT_ENGINE-007                              |
 | WEB_APP-004            | Build active workout and set logging                         | DONE   | WEB_APP-002, DATABASE-004                                    |
 | ONBOARDING-001         | Add training profile onboarding                              | DONE   | WEB_APP-002                                                  |
+| DEPLOY-001             | Finalize Edge Function bundling and deployment path          | DONE   | WORKOUT_ENGINE-007, WEB_APP-003                              |
 | WEB_APP-005            | Build history and progression views                          | TODO   | WEB_APP-004, PROGRESSION_ENGINE-005                          |
 | WEB_APP-006            | Build discomfort report and follow-up flow                   | TODO   | WEB_APP-002, PAIN_SAFETY-005                                 |
 | HARDENING-001          | Add end-to-end critical-flow tests                           | TODO   | WEB_APP-003, WEB_APP-004, WEB_APP-006                        |
 | HARDENING-002          | Add observability and secret-redaction controls              | TODO   | AI-006, WORKOUT_ENGINE-007                                   |
 | HARDENING-003          | Run accessibility and mobile performance audits              | TODO   | HARDENING-001                                                |
 | HARDENING-004          | Complete security and data-retention review                  | TODO   | DATABASE-007, HARDENING-002                                  |
+| V1-005                 | Remediate executable V1 validation and production safeguards | DONE   | WEB_APP-003, WEB_APP-004, ONBOARDING-001                     |
+| V1-006                 | Deploy V1 and verify iPhone PWA installation readiness       | BLOCKED | V1-005                                                      |

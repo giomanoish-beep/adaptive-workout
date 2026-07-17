@@ -16,6 +16,7 @@ import {
 } from './allocation.js';
 import type { WorkoutEngineInput, WorkoutExerciseCandidate } from './contracts.js';
 import type { WorkoutCandidateScoringRuleSet } from './scoring.js';
+import type { TrainingGoalRuleProfile } from './training-goal-rules.js';
 
 export interface WorkoutDurationRuleSet {
   readonly contractVersion: ContractVersion;
@@ -28,6 +29,41 @@ export interface WorkoutDurationRuleSet {
   readonly targetDurationUtilization: number;
   readonly minimumExpansionBudgetSeconds: number;
   readonly preferredVolumeExpansionMultiplier: number;
+}
+
+/**
+ * Baseline training-goal multipliers. The engine owns this baseline so it
+ * stays decoupled from web onboarding types. The default profile in
+ * `training-goal-rules.ts` mirrors these values, so normalizing a resolved
+ * goal profile against this baseline yields 1.0 for both `undefined` and the
+ * default profile — preserving existing behavior exactly.
+ */
+const DEFAULT_GOAL_MULTIPLIERS = {
+  volumeMultiplier: 1.6,
+  diversityTendency: 1.0,
+  expansionAggressiveness: 1.0,
+} as const;
+
+/**
+ * Derives normalized, baseline-relative multipliers from an optional training
+ * goal profile. Returns identity (1.0) multipliers when no profile is supplied
+ * or when the profile matches the default baseline, so callers without a goal
+ * observe unchanged engine output.
+ */
+function resolveGoalMultipliers(goalProfile: TrainingGoalRuleProfile | undefined): {
+  readonly volumeFactor: number;
+  readonly expansionFactor: number;
+  readonly diversityFactor: number;
+} {
+  if (goalProfile === undefined) {
+    return { volumeFactor: 1, expansionFactor: 1, diversityFactor: 1 };
+  }
+  return {
+    volumeFactor: goalProfile.volumeMultiplier / DEFAULT_GOAL_MULTIPLIERS.volumeMultiplier,
+    expansionFactor:
+      goalProfile.expansionAggressiveness / DEFAULT_GOAL_MULTIPLIERS.expansionAggressiveness,
+    diversityFactor: goalProfile.diversityTendency / DEFAULT_GOAL_MULTIPLIERS.diversityTendency,
+  };
 }
 
 export const workoutDurationValidationCodes = [
@@ -213,6 +249,7 @@ export function constructDurationFittedWorkout(
   scoringRuleSet: WorkoutCandidateScoringRuleSet,
   allocationRuleSet: WorkoutAllocationRuleSet,
   durationRuleSet: WorkoutDurationRuleSet,
+  goalProfile?: TrainingGoalRuleProfile,
 ): DurationFittedWorkoutResult {
   const durationIssues = validateWorkoutDurationRuleSet(
     durationRuleSet,
@@ -223,6 +260,21 @@ export function constructDurationFittedWorkout(
       reasonCodes: durationIssues.map(({ code }) => code.toLocaleLowerCase('en-US')),
     });
   }
+
+  // Apply training-goal influence as baseline-relative multipliers. When no
+  // profile is supplied (or it matches the default baseline) these are 1.0 and
+  // the effective rule set is identical to the supplied one.
+  const goalMultipliers = resolveGoalMultipliers(goalProfile);
+  const effectiveDurationRuleSet: WorkoutDurationRuleSet = {
+    ...durationRuleSet,
+    targetDurationUtilization: clamp(
+      durationRuleSet.targetDurationUtilization * goalMultipliers.expansionFactor,
+      0,
+      durationRuleSet.targetDurationUtilization,
+    ),
+    preferredVolumeExpansionMultiplier:
+      durationRuleSet.preferredVolumeExpansionMultiplier * goalMultipliers.volumeFactor,
+  };
 
   const allocation = allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRuleSet);
   if (allocation.status === 'failure') {
@@ -309,8 +361,9 @@ export function constructDurationFittedWorkout(
     candidates,
     input,
     allocationRuleSet,
-    durationRuleSet,
+    effectiveDurationRuleSet,
     maximumDurationSeconds,
+    goalMultipliers.diversityFactor,
   );
   exercises = [...expanded.exercises];
   decisions.push(...expanded.decisions);
@@ -366,6 +419,7 @@ function expandToUseDurationBudget(
   allocationRuleSet: WorkoutAllocationRuleSet,
   durationRuleSet: WorkoutDurationRuleSet,
   maximumDurationSeconds: number,
+  diversityFactor: number,
 ): {
   readonly exercises: readonly MutableFittedExercise[];
   readonly decisions: readonly WorkoutDurationDecision[];
@@ -477,12 +531,20 @@ function expandToUseDurationBudget(
 
       const selectedExerciseIds = new Set(exercises.map(({ selected }) => selected.exerciseId));
       const selectedFamilyIds = new Set(exercises.map(({ selected }) => selected.exerciseFamilyId));
-      const expansionCandidates = allocation.scoring.rankedCandidates.filter(
-        ({ candidate }) =>
-          !selectedExerciseIds.has(candidate.exerciseId) &&
-          !selectedFamilyIds.has(candidate.exerciseFamilyId) &&
-          calculateExerciseMuscleSetContribution(candidate, target.muscleId, allocationRuleSet) > 0,
-      );
+      // New-family expansion is gated by the training goal's diversity tendency.
+      // Goals with below-baseline diversity (e.g. gain_strength) skip adding
+      // brand-new exercises during budget expansion, keeping the selection
+      // focused on fewer movement families.
+      const expansionCandidates =
+        diversityFactor >= 1
+          ? allocation.scoring.rankedCandidates.filter(
+              ({ candidate }) =>
+                !selectedExerciseIds.has(candidate.exerciseId) &&
+                !selectedFamilyIds.has(candidate.exerciseFamilyId) &&
+                calculateExerciseMuscleSetContribution(candidate, target.muscleId, allocationRuleSet) >
+                  0,
+            )
+          : [];
 
       for (const scored of expansionCandidates) {
         const newSelection: SelectedWorkoutExercise = {
@@ -985,6 +1047,10 @@ function durationFailure(
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
 }
 
 function isNonNegativeInteger(value: number): boolean {

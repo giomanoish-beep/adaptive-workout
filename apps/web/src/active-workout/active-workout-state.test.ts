@@ -9,6 +9,7 @@ import {
   completedSetCount,
   currentExercise,
   editCompletedSet,
+  restoreActiveWorkoutState,
   extendRest,
   finishWorkout,
   hasIncompleteSets,
@@ -39,6 +40,17 @@ function setAt(state: ReturnType<typeof built>, exerciseIndex: number, setNumber
 
 /** Logged value used across these tests. */
 const logged = { weight: 20, reps: 8, rir: 2 } as const;
+
+it('restores persisted completed sets without starting a rest timer', () => {
+  const state = restoreActiveWorkoutState(workoutReviewFixture, [
+    { exerciseIndex: 0, setNumber: 1, logged: { weight: 22.5, reps: 9, rir: 0 } },
+  ]);
+  expect(setAt(state, 0, 1)).toMatchObject({
+    status: 'completed',
+    logged: { weight: 22.5, reps: 9, rir: 0 },
+  });
+  expect(state.rest).toBeNull();
+});
 
 describe('fixture build', () => {
   it('creates 16 planned sets across the four exercises', () => {

@@ -7,12 +7,13 @@ import restSource from './active-workout-rest.ts?raw';
 import viewSource from './ActiveWorkout.tsx?raw';
 
 /**
- * WEB_APP-004 guard: the browser active-workout flow must not import any
- * server-only package, AI provider, decision persistence, workout-engine
- * invocation, or Supabase client, and must not persist workout/fitness data in
- * the browser (docs/ARCHITECTURE.md, docs/PRODUCT.md). This reads committed
- * source so it fails the build the moment a forbidden import is introduced,
- * with no DOM or bundle execution required.
+ * V1-003 guard: the browser active-workout flow may import the Supabase client
+ * type (needed for cloud session persistence), but must NOT import server-only
+ * packages, AI providers, workout-engine, or decision persistence.
+ *
+ * The ActiveWorkout component uses `useWorkoutSession` which bridges the
+ * cloud repository. This is the intended V1 architecture — no in-memory
+ * fixture, no browser storage.
  */
 const activeWorkoutSources: ReadonlyArray<readonly [string, string]> = [
   ['active-workout-validation', validationSource],
@@ -21,7 +22,8 @@ const activeWorkoutSources: ReadonlyArray<readonly [string, string]> = [
   ['ActiveWorkout', viewSource],
 ];
 
-const forbiddenPatterns = [
+// Server-only and engine patterns still forbidden
+const forbiddenServerPatterns = [
   /@adaptive-workout\/ai-glm-provider/,
   /@adaptive-workout\/ai-deepseek-provider/,
   /@adaptive-workout\/ai-router/,
@@ -32,26 +34,61 @@ const forbiddenPatterns = [
   /@adaptive-workout\/progression-decision-persistence/,
   /@adaptive-workout\/pain-safety/,
   /@adaptive-workout\/workout-engine/,
-  /@supabase\/supabase-js/,
   /@supabase\/functions-js/,
   /indexedDB/,
   /from ['"]dexie['"]/,
 ];
 
+// The Supabase client type import is allowed ONLY in ActiveWorkout (view)
+// because it needs it for the persistence hook. Pure state/validation/rest
+// files still forbid it.
+const supabasePattern = /@supabase\/supabase-js/;
+
 describe('active-workout source hygiene', () => {
-  it.each(activeWorkoutSources)(
-    '%s imports no server-only, engine, or persistence packages',
-    (_name, source) => {
-      for (const pattern of forbiddenPatterns) {
+  it('pure modules import no server-only, engine, or persistence packages', () => {
+    const pureSources = [
+      validationSource,
+      stateSource,
+      restSource,
+    ];
+    for (const source of pureSources) {
+      for (const pattern of forbiddenServerPatterns) {
         expect(source).not.toMatch(pattern);
       }
-    },
-  );
+      // Pure files still forbid Supabase
+      expect(source).not.toMatch(supabasePattern);
+    }
+  });
+
+  it('ActiveWorkout view may import Supabase for persistence but not server packages', () => {
+    // Allow Supabase client (needed for useWorkoutSession)
+    expect(viewSource).toMatch(supabasePattern);
+    // But still forbid server-only packages
+    for (const pattern of forbiddenServerPatterns) {
+      expect(viewSource).not.toMatch(pattern);
+    }
+  });
 
   it('introduces no local workout-data persistence in active-workout modules', () => {
     const allSources = activeWorkoutSources.map(([, source]) => source).join('\n');
     expect(allSources).not.toMatch(/localStorage\.setItem/);
     expect(allSources).not.toMatch(/sessionStorage\.setItem/);
     expect(allSources).not.toMatch(/indexedDB/);
+  });
+
+  it('does not import the workout-generation-gateway (generation is upstream)', () => {
+    // Workout generation happens in AppNav/WorkoutFlow; ActiveWorkout only
+    // receives the review result and starts a session.
+    expect(viewSource).not.toMatch(/workout-generation-gateway/);
+  });
+
+  it('uses no workout import fixture in production view', () => {
+    // ActiveWorkout must not import workoutReviewFixture for state initialization.
+    expect(viewSource).not.toMatch(/workoutReviewFixture/);
+  });
+
+  it('uses the cloud session hook (useWorkoutSession)', () => {
+    // V1-003: ActiveWorkout persists through useWorkoutSession, not pure in-memory.
+    expect(viewSource).toMatch(/useWorkoutSession/);
   });
 });

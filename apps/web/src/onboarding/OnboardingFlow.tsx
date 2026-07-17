@@ -77,7 +77,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       <p className="eyebrow onboarding__eyebrow">
         Setup {progress.current} of {progress.total}
       </p>
-      <div className="onboarding__progress" role="progressbar" aria-valuenow={progress.current} aria-valuemin={1} aria-valuemax={progress.total}>
+      <div className="onboarding__progress" role="progressbar" aria-label="Onboarding progress" aria-valuenow={progress.current} aria-valuemin={1} aria-valuemax={progress.total}>
         <span
           className="onboarding__progress-fill"
           style={{ width: `${(progress.current / progress.total) * 100}%` }}

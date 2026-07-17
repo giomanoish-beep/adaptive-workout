@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer } from 'react';
+import { useCallback, useReducer } from 'react';
 import {
   beginWorkoutGeneration,
   completeWorkoutGeneration,
@@ -8,30 +8,31 @@ import {
   type WorkoutFlowState,
 } from './workout-flow';
 import { isWorkoutRequestValid, type WorkoutRequestDraft } from './workout-request';
-import { workoutReviewFixture, type WorkoutReview } from './workout-review';
+import { type WorkoutReview } from './workout-review';
 import { WorkoutRequestForm } from './WorkoutRequestForm';
 import { WorkoutReview as WorkoutReviewView } from './WorkoutReview';
 
 /**
- * Orchestrates the Workout request and review flow (WEB_APP-003). Holds the
- * pure flow state in a reducer and renders the request form or the review
- * screen. Generation is UI-only in this task: an injected async function
- * resolves the deterministic review fixture (immediately by default). No engine,
- * Supabase, or AI calls occur in the browser (docs/ARCHITECTURE.md).
+ * Orchestrates the Workout request and review flow (V1-002).
  *
- * Navigation stays owned by the parent: `onStartWorkout` is emitted so AppNav
- * can route to the existing `active_workout` focused-flow route.
+ * Production path: receives a `generateReview` resolver injected by the parent
+ * (AppNav) which calls the deployed Edge Function via the browser-safe gateway.
+ * No engine, Supabase service-role, or AI calls in the browser.
+ * The fixture is NOT used in production; it is only retained for E2E test seams.
+ *
+ * Navigation stays owned by the parent.
  */
 export interface WorkoutFlowProps {
-  /** Resolves the review for a valid draft. Defaults to the local fixture. */
-  readonly generateReview?: (draft: WorkoutRequestDraft) => Promise<WorkoutReview>;
-  readonly onStartWorkout: () => void;
+  /** Resolver injected by the parent. In production, calls the real gateway. */
+  readonly generateReview: (draft: WorkoutRequestDraft) => Promise<WorkoutReview>;
+  readonly onStartWorkout: (review: WorkoutReview) => void;
 }
 
 type FlowAction =
   | { readonly type: 'updateDraft'; readonly draft: WorkoutRequestDraft }
   | { readonly type: 'begin' }
   | { readonly type: 'complete'; readonly review: WorkoutReview }
+  | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'edit' }
   | { readonly type: 'toggleReplace'; readonly position: number };
 
@@ -43,6 +44,8 @@ function flowReducer(state: WorkoutFlowState, action: FlowAction): WorkoutFlowSt
       return beginWorkoutGeneration(state);
     case 'complete':
       return completeWorkoutGeneration(state, action.review);
+    case 'error':
+      return { ...state, stage: 'idle', generationError: action.message };
     case 'edit':
       return editWorkoutRequest(state);
     case 'toggleReplace':
@@ -52,10 +55,6 @@ function flowReducer(state: WorkoutFlowState, action: FlowAction): WorkoutFlowSt
 
 export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps) {
   const [state, dispatch] = useReducer(flowReducer, initialWorkoutFlowState);
-  const resolveReview = useMemo(
-    () => generateReview ?? defaultGenerateReview,
-    [generateReview],
-  );
 
   const handleDraftChange = useCallback((draft: WorkoutRequestDraft) => {
     dispatch({ type: 'updateDraft', draft });
@@ -64,10 +63,16 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
   const handleGenerate = useCallback(() => {
     if (!isWorkoutRequestValid(state.draft)) return;
     dispatch({ type: 'begin' });
-    void resolveReview(state.draft).then((review) => {
-      dispatch({ type: 'complete', review });
-    });
-  }, [resolveReview, state.draft]);
+
+    void generateReview(state.draft).then(
+      (review) => dispatch({ type: 'complete', review }),
+      () =>
+        dispatch({
+          type: 'error',
+          message: 'Workout generation failed. Please try again.',
+        }),
+    );
+  }, [generateReview, state.draft]);
 
   const handleEdit = useCallback(() => {
     dispatch({ type: 'edit' });
@@ -83,28 +88,39 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
     );
   }
 
-  if (state.stage === 'review') {
+  if (state.stage === 'review' && state.review) {
+    const handleStart = () => onStartWorkout(state.review!);
     return (
       <WorkoutReviewView
         review={state.review}
         replacingPosition={state.replacingPosition}
         onReplaceExercise={(position) => dispatch({ type: 'toggleReplace', position })}
-        onStartWorkout={onStartWorkout}
+        onStartWorkout={handleStart}
         onEditRequest={handleEdit}
       />
     );
   }
 
-  return (
-    <WorkoutRequestForm
-      draft={state.draft}
-      onChange={handleDraftChange}
-      onGenerate={handleGenerate}
-    />
-  );
-}
+  // Show error state inline above the form
+  const idleState =
+    state.stage === 'idle' ? (state as { generationError?: string }) : null;
+  const generationError = idleState?.generationError;
 
-/** Default generator resolves the deterministic local review fixture. */
-async function defaultGenerateReview(_draft: WorkoutRequestDraft): Promise<WorkoutReview> {
-  return workoutReviewFixture;
+  return (
+    <div>
+      {generationError && (
+        <div className="workout-flow__error" role="alert">
+          <p>{generationError}</p>
+          <button type="button" className="workout-flow__retry-btn" onClick={handleGenerate}>
+            Retry
+          </button>
+        </div>
+      )}
+      <WorkoutRequestForm
+        draft={state.draft}
+        onChange={handleDraftChange}
+        onGenerate={handleGenerate}
+      />
+    </div>
+  );
 }

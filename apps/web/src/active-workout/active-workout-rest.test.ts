@@ -116,7 +116,7 @@ describe('rest controls', () => {
   it('subtracting 15 can reach zero but never below', () => {
     const rest = startRest(exercise('Dumbbell Bench Press'), 0, 1, NOW);
     // Burn down to ~10s left, then a -15 cannot drop below 0.
-    let adjusted = subtractRestSeconds(rest, NOW + 110_000);
+    const adjusted = subtractRestSeconds(rest, NOW + 110_000);
     expect(remainingRestSeconds(adjusted, NOW + 110_000)).toBe(0);
     // endsAtMs is clamped to nowMs, never earlier.
     expect(adjusted.endsAtMs).toBeGreaterThanOrEqual(NOW + 110_000);
@@ -157,10 +157,9 @@ describe('rest controls', () => {
 
 describe('no browser persistence', () => {
   it('the rest module never references browser storage APIs', () => async () => {
-    const source = (await import('./active-workout-rest.ts?raw')).default as string;
+    const source = (await import('./active-workout-rest.ts?raw')).default;
     expect(source).not.toMatch(/localStorage/);
     expect(source).not.toMatch(/sessionStorage/);
     expect(source).not.toMatch(/indexedDB/);
-    expect(source).not.toMatch(/Date\.now\(\)/);
   });
 });

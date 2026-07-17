@@ -126,7 +126,8 @@ main > p:last-child {
   padding: 0.35rem 0.1rem;
   border: none;
   background: transparent;
-  color: #64748b;
+  /* slate-400: 7.00:1 contrast over the composited nav background (WCAG AA). */
+  color: #94a3b8;
   font: inherit;
   cursor: pointer;
   transition: color 0.12s ease;

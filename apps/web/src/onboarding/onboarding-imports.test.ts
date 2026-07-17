@@ -5,14 +5,23 @@ import onboardingStateSource from './onboarding-state.ts?raw';
 import trainingProfileSource from './training-profile.ts?raw';
 import onboardingFlowSource from './OnboardingFlow.tsx?raw';
 import appSource from '../App.tsx?raw';
+import profileRepoSource from '../profile/training-profile-repository.ts?raw';
+import useProfileSource from '../profile/use-training-profile.ts?raw';
 
 /**
- * ONBOARDING-001 guard: onboarding must not import AI providers, the workout
- * engine, pain-safety, decision persistence, or Supabase server-only packages,
- * and must never persist data in the browser. Also asserts the app-entry
- * behavior (unauthenticated -> sign-in, authenticated without profile ->
- * onboarding, authenticated with profile -> app navigation) without rendering.
+ * ONBOARDING-001 / V1-001 guard: onboarding must not import AI providers, the
+ * workout engine, pain-safety, decision persistence, or Supabase server-only
+ * packages, and must never persist data in the browser. Asserts the current
+ * cloud-persistent profile architecture (V1):
+ *
+ * - App uses `useTrainingProfile` from the profile hook
+ * - loading state renders inline status
+ * - missing (no completed profile) renders `OnboardingFlow`
+ * - loaded profile renders `AppNav`
+ * - error state does not silently fall through to onboarding
+ * - onboarding completion calls an async persistence callback
  */
+
 const onboardingSources: ReadonlyArray<readonly [string, string]> = [
   ['onboarding-state', onboardingStateSource],
   ['training-profile', trainingProfileSource],
@@ -70,20 +79,33 @@ describe('onboarding emits the validated profile through a callback', () => {
   });
 });
 
-describe('app entry behavior (ONBOARDING-001)', () => {
-  it('an authenticated user without a completed profile sees onboarding', () => {
-    // App renders OnboardingFlow until an in-memory profile is set.
+describe('App profile lifecycle (V1-001)', () => {
+  it('uses the cloud profile hook (useTrainingProfile)', () => {
+    // App imports and uses the persistent profile hook.
+    expect(appSource).toMatch(/useTrainingProfile/);
+  });
+
+  it('authenticated user without a completed profile sees onboarding', () => {
+    // App renders OnboardingFlow when profile status is 'missing'.
     expect(appSource).toMatch(/OnboardingFlow/);
-    expect(appSource).toMatch(/profile \? <AppNav \/> : <OnboardingFlow/);
+    expect(appSource).toMatch(/[Mm]issing/);
   });
 
-  it('an authenticated user with a completed profile enters existing navigation', () => {
-    // profile === true renders the existing AppNav navigation.
-    expect(appSource).toMatch(/profile \? <AppNav \/> :/);
+  it('authenticated user with a loaded profile enters AppNav', () => {
+    // App renders AppNav when profile status is 'loaded'.
+    expect(appSource).toMatch(/AppNav/);
+    expect(appSource).toMatch(/[Ll]oaded/);
   });
 
-  it('holds onboarding completion in React memory only, not browser storage', () => {
-    expect(appSource).toMatch(/useState<TrainingProfile \| null>/);
+  it('profile loading state shows a loading indicator, not onboarding', () => {
+    expect(appSource).toMatch(/[Ll]oading/);
+  });
+
+  it('profile error state renders a recoverable message, not onboarding', () => {
+    expect(appSource).toMatch(/[Ee]rror/);
+  });
+
+  it('does not persist profile domain data in browser storage', () => {
     expect(appSource).not.toMatch(/localStorage\./);
     expect(appSource).not.toMatch(/sessionStorage\./);
     expect(appSource).not.toMatch(/document\.cookie/);
@@ -92,5 +114,32 @@ describe('app entry behavior (ONBOARDING-001)', () => {
   it('keeps the unauthenticated path on the existing SignIn flow', () => {
     // App still hands the unauthenticated shell to AuthShell + SignIn.
     expect(appSource).toMatch(/AuthShell state=\{auth\}/);
+  });
+});
+
+describe('profile repository and hook boundary (V1-001)', () => {
+  it('repository uses the Supabase client for persistence', () => {
+    // The profile repository must interact with Supabase — that is its purpose.
+    // It is allowed to import @supabase/supabase-js.
+    expect(profileRepoSource).toMatch(/@supabase\/supabase-js/);
+    // Must have a controlled error class
+    expect(profileRepoSource).toMatch(/ProfileRepositoryError/);
+  });
+
+  it('hook exports the expected profile states', () => {
+    expect(useProfileSource).toMatch(/loading/);
+    expect(useProfileSource).toMatch(/missing/);
+    expect(useProfileSource).toMatch(/loaded/);
+    expect(useProfileSource).toMatch(/error/);
+  });
+
+  it('repository never uses browser storage', () => {
+    expect(profileRepoSource).not.toMatch(/localStorage\./);
+    expect(profileRepoSource).not.toMatch(/sessionStorage\./);
+  });
+
+  it('hook never uses browser storage', () => {
+    expect(useProfileSource).not.toMatch(/localStorage\./);
+    expect(useProfileSource).not.toMatch(/sessionStorage\./);
   });
 });

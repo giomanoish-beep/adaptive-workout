@@ -104,7 +104,7 @@ describe('advancement gating', () => {
 
 describe('back navigation preserves answers', () => {
   it('returns to the previous step without dropping selections', () => {
-    let draft = completeDraft();
+    const draft = completeDraft();
     // Simulate reaching the review step with all answers intact.
     expect(previousStep('review')).toBe('discomfort');
     expect(previousStep('goal')).toBe('goal'); // first step stays put

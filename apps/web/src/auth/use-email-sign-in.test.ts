@@ -11,7 +11,7 @@ function mockClient(error: { readonly message: string } | null): {
   readonly signInWithOtp: ReturnType<typeof vi.fn>;
 } {
   const signInWithOtp = vi
-    .fn<[credentials: { readonly email: string }], Promise<{ readonly data: unknown; readonly error: { readonly message: string } | null }>>()
+    .fn()
     .mockResolvedValue({ data: {}, error });
   const client = { auth: { signInWithOtp } } as unknown as SupabaseClient;
   return { client, signInWithOtp };

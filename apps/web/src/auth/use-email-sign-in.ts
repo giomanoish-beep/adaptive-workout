@@ -36,7 +36,7 @@ type SignInAction =
   | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'reset' };
 
-function signInReducer(state: EmailSignInState, action: SignInAction): EmailSignInState {
+function signInReducer(_state: EmailSignInState, action: SignInAction): EmailSignInState {
   switch (action.type) {
     case 'submit':
       return { stage: 'submitting', email: action.email, errorMessage: null };

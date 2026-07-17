@@ -29,6 +29,8 @@ export type WorkoutFlowStage = (typeof workoutFlowStages)[number];
 export interface WorkoutFlowIdle {
   readonly stage: 'idle';
   readonly draft: WorkoutRequestDraft;
+  /** Non-empty when a server generation attempt failed. */
+  readonly generationError?: string | undefined;
 }
 
 export interface WorkoutFlowGenerating {

@@ -5,6 +5,7 @@ export * from './duration.js';
 export * from './filtering.js';
 export * from './scoring.js';
 export * from './substitution.js';
+export * from './training-goal-rules.js';
 export * from './validation.js';
 
 export const packageName = '@adaptive-workout/workout-engine';

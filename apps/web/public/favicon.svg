@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Adaptive Workout">
+  <!-- Original placeholder mark: dark rounded square with a white dumbbell.
+       No third-party brand assets. Content sits within the central 80% for
+       maskable safe-zone compliance. -->
+  <rect width="512" height="512" rx="112" fill="#0b1120" />
+  <!-- Dumbbell: two weighted plates joined by a bar, centered vertically. -->
+  <g fill="#f1f5f9">
+    <!-- Left plates -->
+    <rect x="96" y="176" width="40" height="160" rx="14" />
+    <rect x="140" y="200" width="28" height="112" rx="10" />
+    <!-- Right plates -->
+    <rect x="344" y="200" width="28" height="112" rx="10" />
+    <rect x="376" y="176" width="40" height="160" rx="14" />
+    <!-- Bar -->
+    <rect x="168" y="240" width="176" height="32" rx="16" />
+  </g>
+</svg>

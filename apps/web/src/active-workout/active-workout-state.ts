@@ -43,7 +43,7 @@ export interface ActiveSet {
   readonly logged: LoggedSetValue | null;
 }
 
-export const activeWorkoutStages = ['active', 'finished'] as const;
+export const activeWorkoutStages = ['loading', 'active', 'error', 'finished'] as const;
 export type ActiveWorkoutStage = (typeof activeWorkoutStages)[number];
 
 export interface ActiveWorkoutState {
@@ -65,11 +65,53 @@ export interface ActiveWorkoutState {
    * Timestamp-based (see active-workout-rest.ts); no browser persistence.
    */
   readonly rest: RestTimerState | null;
+  /** Surface message when the session entered an error stage. */
+  readonly errorMessage: string | null;
 }
 
 export interface ActiveWorkoutSummary {
   readonly completedSets: number;
   readonly totalSets: number;
+}
+
+/**
+ * Loading state used while a cloud session is being created. Carries no
+ * exercises until the session resolves into an `active` state.
+ */
+export function buildLoadingState(): ActiveWorkoutState {
+  return {
+    stage: 'loading',
+    title: '',
+    estimatedDurationMinutes: 0,
+    exercises: [],
+    sets: [],
+    currentExerciseIndex: 0,
+    confirmingFinish: false,
+    summary: null,
+    rest: null,
+    errorMessage: null,
+  };
+}
+
+/**
+ * Transitions into the `active` stage by building the in-memory workout state
+ * from a review fixture. The `sessionId` is informational; it is not part of
+ * the pure workout state but is accepted so callers can thread it through.
+ */
+export function setSession(
+  _state: ActiveWorkoutState,
+  review: WorkoutReview,
+  _sessionId: string,
+): ActiveWorkoutState {
+  return { ...buildActiveWorkoutState(review), errorMessage: null };
+}
+
+/** Transitions into the `error` stage with a controlled surface message. */
+export function setSessionError(
+  _state: ActiveWorkoutState,
+  message: string,
+): ActiveWorkoutState {
+  return { ...buildLoadingState(), stage: 'error', errorMessage: message };
 }
 
 /** Builds the initial in-memory active-workout state from a review fixture. */
@@ -94,6 +136,35 @@ export function buildActiveWorkoutState(review: WorkoutReview): ActiveWorkoutSta
     confirmingFinish: false,
     summary: null,
     rest: null,
+    errorMessage: null,
+  };
+}
+
+export interface RestoredCompletedSet {
+  readonly exerciseIndex: number;
+  readonly setNumber: number;
+  readonly logged: LoggedSetValue;
+}
+
+/** Restores persisted completed sets without synthesizing a new rest timer. */
+export function restoreActiveWorkoutState(
+  review: WorkoutReview,
+  completedSets: readonly RestoredCompletedSet[],
+): ActiveWorkoutState {
+  const state = buildActiveWorkoutState(review);
+  const restoredByKey = new Map(
+    completedSets.map((set) => [`${set.exerciseIndex}:${set.setNumber}`, set.logged]),
+  );
+  return {
+    ...state,
+    sets: state.sets.map((exerciseSets, exerciseIndex) =>
+      exerciseSets.map((set) => {
+        const logged = restoredByKey.get(`${exerciseIndex}:${set.setNumber}`);
+        return logged
+          ? { ...set, status: 'completed' as const, logged }
+          : set;
+      }),
+    ),
   };
 }
 

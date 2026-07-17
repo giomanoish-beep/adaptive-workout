@@ -12,3 +12,27 @@ schema_paths = []
 [db.seed]
 enabled = false
 sql_paths = []
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**"]
+
+# Edge Functions configuration.
+#
+# Both functions import internal workspace packages via relative paths that
+# the Supabase/Deno bundler cannot resolve outside the function directory.
+# The esbuild step (`npm run edge-fn:build` or `npm run edge-fn:build:refresh`)
+# inlines those dependencies into a single self-contained file, index.bundle.ts,
+# which we declare as the deploy entrypoint. The raw index.ts must never be deployed.
+#
+# verify_jwt is disabled because the handlers perform their own bearer-token
+# verification via `authClient.auth.getUser(token)` and return controlled
+# UNAUTHENTICATED / INVALID_REQUEST / GENERATION_FAILED responses rather than
+# the gateway's default rejection.
+[functions.generate-workout]
+entrypoint = "functions/generate-workout/index.bundle.ts"
+verify_jwt = false
+
+[functions.refresh-progression]
+entrypoint = "functions/refresh-progression/index.bundle.ts"
+verify_jwt = false

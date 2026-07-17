@@ -9,11 +9,14 @@ import reviewViewSource from './WorkoutReview.tsx?raw';
 import flowViewSource from './WorkoutFlow.tsx?raw';
 
 /**
- * WEB_APP-003 guard: the browser workout flow must not import any server-only
- * package, AI provider, decision persistence, or workout engine invocation,
- * and must not persist workout/fitness data in the browser (docs/ARCHITECTURE.md,
- * docs/PRODUCT.md). This reads committed source so it fails the build the moment
- * a forbidden import is introduced, with no DOM or bundle execution required.
+ * WEB_APP-003 / V1-002 guard: the browser workout flow must not import any
+ * server-only package, AI provider, decision persistence, or workout-engine
+ * modules, and must not persist workout/fitness data in the browser
+ * (docs/ARCHITECTURE.md, docs/PRODUCT.md).
+ *
+ * DI architecture: WorkoutFlow receives `generateReview` as a function prop
+ * and does NOT import Supabase, the gateway, or any server packages.
+ * The gateway is constructed by AppNav and injected into WorkoutFlow.
  */
 const workoutSources: ReadonlyArray<readonly [string, string]> = [
   ['workout-request', requestSource],
@@ -34,6 +37,7 @@ const forbiddenPatterns = [
   /@adaptive-workout\/workout-decision-persistence/,
   /@adaptive-workout\/progression-decision-persistence/,
   /@adaptive-workout\/pain-safety/,
+  /@adaptive-workout\/workout-engine/,
   /@supabase\/supabase-js/,
   /@supabase\/functions-js/,
   /indexedDB/,
@@ -53,9 +57,20 @@ describe('workout source hygiene', () => {
     expect(allSources).not.toMatch(/sessionStorage\.setItem/);
   });
 
-  it('workout-flow does not import the workout-engine package', () => {
+  it('WorkoutFlow receives generation as a dependency-injected function', () => {
+    // WorkoutFlow's props include generateReview, a function prop — not a
+    // direct Supabase or gateway import.
+    expect(flowViewSource).toMatch(/generateReview/);
+  });
+
+  it('WorkoutFlow does NOT import the workout-engine package', () => {
     // The pure flow module must not depend on engine types; the review fixture
     // is a local presentational model that stands in for server generation.
     expect(flowSource).not.toMatch(/@adaptive-workout\/workout-engine/);
+  });
+
+  it('WorkoutFlow does NOT import workout-generation-gateway directly', () => {
+    // The gateway is injected by AppNav, not imported by WorkoutFlow.
+    expect(flowViewSource).not.toMatch(/workout-generation-gateway/);
   });
 });
