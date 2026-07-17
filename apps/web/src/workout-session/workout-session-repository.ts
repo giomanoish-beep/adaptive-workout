@@ -139,12 +139,26 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
   async function createSession(
     review: WorkoutReview,
   ): Promise<{ sessionId: string; exercises: readonly SessionExerciseRow[] }> {
+    // Derive authenticated user ID from the Supabase client.
+    // Never accept ownership from the WorkoutReview or arbitrary caller input.
+    const {
+      data: { user },
+      error: authError,
+    } = await client.auth.getUser();
+
+    if (authError || !user) {
+      throw new WorkoutSessionError('AUTH_REQUIRED', 'You must be signed in to start a workout.');
+    }
+
+    const userId = user.id;
     const now = new Date().toISOString();
 
-    // 1. Insert session
+    // 1. Insert session — include the authenticated user_id so RLS
+    //    WITH CHECK (user_id = auth.uid()) passes.
     const { data: sessionData, error: sessionError } = await client
       .from('workout_sessions')
       .insert({
+        user_id: userId,
         title: review.title,
         origin: 'generated',
         status: 'in_progress',
@@ -159,7 +173,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
     if (sessionError || !sessionData) {
       throw new WorkoutSessionError(
         'SESSION_CREATE_FAILED',
-        `Failed to create workout session: ${sessionError?.message ?? 'unknown'}`,
+        "We couldn't start your workout. Please try again.",
       );
     }
 
@@ -183,7 +197,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
         await client.from('workout_sessions').delete().eq('id', sessionId);
         throw new WorkoutSessionError(
           'EXERCISE_CREATE_FAILED',
-          `Failed to create session exercise: ${exerciseError?.message ?? 'unknown'}`,
+          "We couldn't start your workout. Please try again.",
         );
       }
 
@@ -207,7 +221,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
     if (sessionError) {
       throw new WorkoutSessionError(
         'SESSION_LOAD_FAILED',
-        `Failed to load active session: ${sessionError.message}`,
+        "We couldn't load your workout session. Please try again.",
       );
     }
 
@@ -224,7 +238,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
     if (exerciseError) {
       throw new WorkoutSessionError(
         'EXERCISES_LOAD_FAILED',
-        `Failed to load exercises: ${exerciseError.message}`,
+        "We couldn't load your workout session. Please try again.",
       );
     }
 
@@ -245,7 +259,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
       if (setError) {
         throw new WorkoutSessionError(
           'SET_LOGS_LOAD_FAILED',
-          `Failed to load set logs: ${setError.message}`,
+          "We couldn't load your workout session. Please try again.",
         );
       }
 
@@ -296,7 +310,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
     if (upsertResult.error || !upsertResult.data) {
       throw new WorkoutSessionError(
         'SET_LOG_UPSERT_FAILED',
-        `Failed to save set: ${upsertResult.error?.message ?? 'unknown'}`,
+        "We couldn't save your set. Please try again.",
       );
     }
 
@@ -325,7 +339,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
     if (finishResult.error || !finishResult.data) {
       throw new WorkoutSessionError(
         'SESSION_FINISH_FAILED',
-        `Failed to finish session: ${finishResult.error?.message ?? 'unknown'}`,
+        "We couldn't finish your workout. Please try again.",
       );
     }
 
