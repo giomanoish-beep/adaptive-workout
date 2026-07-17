@@ -61,7 +61,13 @@ type RepositoryDeps = {
 
 type Action =
   | { readonly type: 'setState'; readonly state: ActiveWorkoutState }
-  | { readonly type: 'complete'; readonly exerciseIndex: number; readonly setNumber: number; readonly input: LoggedSetValue; readonly nowMs: number }
+  | {
+      readonly type: 'complete';
+      readonly exerciseIndex: number;
+      readonly setNumber: number;
+      readonly input: LoggedSetValue;
+      readonly nowMs: number;
+    }
   | { readonly type: 'edit'; readonly exerciseIndex: number; readonly setNumber: number }
   | { readonly type: 'move'; readonly delta: number }
   | { readonly type: 'requestFinish' }
@@ -72,12 +78,9 @@ type Action =
   | { readonly type: 'skipRest'; readonly nowMs: number }
   | { readonly type: 'clearRest' };
 
-export function useWorkoutSession(
-  client: SupabaseClient,
-  userId: string,
-): WorkoutSessionHook {
+export function useWorkoutSession(client: SupabaseClient, userId: string): WorkoutSessionHook {
   const repo = useMemo(() => createWorkoutSessionRepository(client), [client]);
-   
+
   const [state, dispatch] = useReducer(stateReducer, undefined, buildLoadingState);
 
   // Holds the current loaded session data for set persistence lookups.
@@ -87,9 +90,11 @@ export function useWorkoutSession(
 
   const startSession = useCallback(
     async (review: WorkoutReview) => {
-      dispatch({ type: 'setState',
-         
-        state: buildLoadingState() });
+      dispatch({
+        type: 'setState',
+
+        state: buildLoadingState(),
+      });
       try {
         const { sessionId, exercises } = await repo.createSession(review);
         sessionIdRef.current = sessionId;
@@ -101,15 +106,14 @@ export function useWorkoutSession(
         };
         dispatch({
           type: 'setState',
-           
+
           state: setSession(buildLoadingState(), review, sessionId),
         });
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to start workout session.';
+        const message = err instanceof Error ? err.message : 'Failed to start workout session.';
         dispatch({
           type: 'setState',
-           
+
           state: setSessionError(buildLoadingState(), message),
         });
         // Re-throw so AppNav can catch and remain on review screen

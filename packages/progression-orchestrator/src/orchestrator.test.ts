@@ -9,20 +9,14 @@ import { describe, it, expect } from 'vitest';
 import {
   assembleHistory,
   collectDistinctExerciseIds,
+  loadProgressionEngine,
   mapExposuresForExercise,
 } from './orchestrator.js';
-import type {
-  SessionRow,
-  SessionExerciseRow,
-  SetLogRow,
-} from './contracts.js';
+import type { SessionRow, SessionExerciseRow, SetLogRow } from './contracts.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function session(
-  id: string,
-  overrides: Partial<SessionRow> = {},
-): SessionRow {
+function session(id: string, overrides: Partial<SessionRow> = {}): SessionRow {
   return {
     id,
     status: 'completed',
@@ -55,11 +49,7 @@ function sessionExercise(
   };
 }
 
-function setLog(
-  id: string,
-  exerciseId: string,
-  overrides: Partial<SetLogRow> = {},
-): SetLogRow {
+function setLog(id: string, exerciseId: string, overrides: Partial<SetLogRow> = {}): SetLogRow {
   return {
     id,
     workout_session_exercise_id: exerciseId,
@@ -75,6 +65,16 @@ function setLog(
   };
 }
 
+describe('loadProgressionEngine', () => {
+  it('throws a controlled error when the engine loader returns null', async () => {
+    await expect(loadProgressionEngine(() => Promise.resolve(null))).rejects.toMatchObject({
+      name: 'ProgressionEngineUnavailableError',
+      code: 'PROGRESSION_ENGINE_UNAVAILABLE',
+      message: 'Progression engine is unavailable.',
+    });
+  });
+});
+
 // ── History assembly ───────────────────────────────────────────────
 
 describe('assembleHistory', () => {
@@ -84,10 +84,7 @@ describe('assembleHistory', () => {
       sessionExercise('se1', 's1', 'ex1'),
       sessionExercise('se2', 's1', 'ex2'),
     ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1'),
-      setLog('sl2', 'se2'),
-    ];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1'), setLog('sl2', 'se2')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
 
@@ -157,12 +154,8 @@ describe('mapExposuresForExercise', () => {
 
   it('preserves decimal weight', () => {
     const sessions: SessionRow[] = [session('s1')];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1', { weight: 52.5 }),
-    ];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1', { weight: 52.5 })];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
     const exposures = mapExposuresForExercise('ex1', assembly);
@@ -172,15 +165,9 @@ describe('mapExposuresForExercise', () => {
 
   it('preserves null RIR distinct from zero', () => {
     const sessions: SessionRow[] = [session('s1')];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
-    const nullRirSet: SetLogRow[] = [
-      setLog('sl1', 'se1', { rir: null }),
-    ];
-    const zeroRirSet: SetLogRow[] = [
-      setLog('sl2', 'se2', { rir: 0 }),
-    ];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
+    const nullRirSet: SetLogRow[] = [setLog('sl1', 'se1', { rir: null })];
+    const zeroRirSet: SetLogRow[] = [setLog('sl2', 'se2', { rir: 0 })];
 
     // Null RIR
     const assembly1 = assembleHistory(sessions, exercises, nullRirSet);
@@ -188,9 +175,7 @@ describe('mapExposuresForExercise', () => {
     expect(exposures1[0]!.sets[0]!.rir).toBe(null);
 
     // Zero RIR (different session exercise)
-    const exercises2: SessionExerciseRow[] = [
-      sessionExercise('se2', 's1', 'ex1'),
-    ];
+    const exercises2: SessionExerciseRow[] = [sessionExercise('se2', 's1', 'ex1')];
     const assembly2 = assembleHistory(sessions, exercises2, zeroRirSet);
     const exposures2 = mapExposuresForExercise('ex1', assembly2);
     expect(exposures2[0]!.sets[0]!.rir).toBe(0);
@@ -198,9 +183,7 @@ describe('mapExposuresForExercise', () => {
 
   it('excludes warm-up sets from working sets', () => {
     const sessions: SessionRow[] = [session('s1')];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
     const setLogs: SetLogRow[] = [
       setLog('sl1', 'se1', { classification: 'warm_up', reps: 20 }),
       setLog('sl2', 'se1', { classification: 'working', reps: 10 }),
@@ -216,9 +199,7 @@ describe('mapExposuresForExercise', () => {
 
   it('handles skipped and incomplete sets', () => {
     const sessions: SessionRow[] = [session('s1')];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
     const setLogs: SetLogRow[] = [
       setLog('sl1', 'se1', { status: 'completed', reps: 10 }),
       setLog('sl2', 'se1', { status: 'skipped', reps: null, weight: null, rir: null }),
@@ -235,18 +216,12 @@ describe('mapExposuresForExercise', () => {
   });
 
   it('excludes abandoned/unstarted sessions', () => {
-    const sessions: SessionRow[] = [
-      session('s1'),
-      session('s2', { status: 'in_progress' as any }),
-    ];
+    const sessions: SessionRow[] = [session('s1'), session('s2', { status: 'in_progress' })];
     const exercises: SessionExerciseRow[] = [
       sessionExercise('se1', 's1', 'ex1'),
       sessionExercise('se2', 's2', 'ex1'),
     ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1'),
-      setLog('sl2', 'se2'),
-    ];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1'), setLog('sl2', 'se2')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
     const exposures = mapExposuresForExercise('ex1', assembly);
@@ -262,9 +237,7 @@ describe('mapExposuresForExercise', () => {
     const exercises: SessionExerciseRow[] = [
       sessionExercise('se1', 's1', 'ex1', { status: 'skipped' }),
     ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1', { reps: 5 }),
-    ];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1', { reps: 5 })];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
     const exposures = mapExposuresForExercise('ex1', assembly);
@@ -273,15 +246,9 @@ describe('mapExposuresForExercise', () => {
   });
 
   it('marks deload exposures', () => {
-    const sessions: SessionRow[] = [
-      session('s1', { was_deload: true }),
-    ];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1'),
-    ];
+    const sessions: SessionRow[] = [session('s1', { was_deload: true })];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
     const exposures = mapExposuresForExercise('ex1', assembly);
@@ -299,14 +266,9 @@ describe('mapExposuresForExercise', () => {
     const setLogs: SetLogRow[] = [setLog('sl1', 'se1')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
-    const exposures = mapExposuresForExercise(
-      'e0000000-0000-0000-0000-000000000001',
-      assembly,
-    );
+    const exposures = mapExposuresForExercise('e0000000-0000-0000-0000-000000000001', assembly);
 
-    expect(exposures[0]!.exerciseId).toBe(
-      'e0000000-0000-0000-0000-000000000001',
-    );
+    expect(exposures[0]!.exerciseId).toBe('e0000000-0000-0000-0000-000000000001');
   });
 });
 
@@ -315,9 +277,7 @@ describe('mapExposuresForExercise', () => {
 describe('insufficient data handling', () => {
   it('returns empty exposures for exercise with no history', () => {
     const sessions: SessionRow[] = [session('s1')];
-    const exercises: SessionExerciseRow[] = [
-      sessionExercise('se1', 's1', 'ex1'),
-    ];
+    const exercises: SessionExerciseRow[] = [sessionExercise('se1', 's1', 'ex1')];
     const setLogs: SetLogRow[] = [setLog('sl1', 'se1')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
@@ -362,11 +322,7 @@ describe('deterministic ordering', () => {
       sessionExercise('se2', 's2', 'ex1'),
       sessionExercise('se3', 's3', 'ex1'),
     ];
-    const setLogs: SetLogRow[] = [
-      setLog('sl1', 'se1'),
-      setLog('sl2', 'se2'),
-      setLog('sl3', 'se3'),
-    ];
+    const setLogs: SetLogRow[] = [setLog('sl1', 'se1'), setLog('sl2', 'se2'), setLog('sl3', 'se3')];
 
     const assembly = assembleHistory(sessions, exercises, setLogs);
     const exposures = mapExposuresForExercise('ex1', assembly);

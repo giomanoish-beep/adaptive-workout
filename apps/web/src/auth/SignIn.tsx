@@ -59,7 +59,11 @@ export function SignIn({ client }: SignInProps) {
           disabled={submitting}
         />
       </label>
-      {errorMessage && <p className="sign-in__error" role="alert">{errorMessage}</p>}
+      {errorMessage && (
+        <p className="sign-in__error" role="alert">
+          {errorMessage}
+        </p>
+      )}
       <button type="submit" className="sign-in__primary" disabled={submitting}>
         {submitting ? 'Sending…' : 'Continue with email'}
       </button>

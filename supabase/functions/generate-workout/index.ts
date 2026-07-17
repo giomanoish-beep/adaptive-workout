@@ -20,9 +20,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.5';
 // the orchestrator is imported from the workspace monorepo.
 // In the deployed Edge Function, use import maps or bundlers.
 import { generateWorkout } from '../../../packages/workout-gen-orchestrator/src/orchestrator.ts';
-import {
-  ConsoleSink,
-} from '../../../packages/observability/src/sinks.ts';
+import { ConsoleSink } from '../../../packages/observability/src/sinks.ts';
 import type {
   GenerateWorkoutRequest,
   CatalogLoader,
@@ -43,9 +41,18 @@ import type {
 
 const equipmentContextMap: EquipmentContextMap = {
   'full-gym': [
-    'barbell', 'dumbbell', 'cable', 'bench', 'smith-machine',
-    'leg-press', 'hack-squat', 'plate-loaded-machine', 'selectorized-machine',
-    'bodyweight', 'pull-up-station', 'dip-station',
+    'barbell',
+    'dumbbell',
+    'cable',
+    'bench',
+    'smith-machine',
+    'leg-press',
+    'hack-squat',
+    'plate-loaded-machine',
+    'selectorized-machine',
+    'bodyweight',
+    'pull-up-station',
+    'dip-station',
   ],
   'dumbbells-only': ['dumbbell', 'bench', 'bodyweight'],
   'cables-only': ['cable', 'bodyweight'],
@@ -101,12 +108,8 @@ function createSupabaseCatalogLoader(
           .select('id, slug, name, is_active')
           .eq('is_active', true)
           .order('id'),
-        client
-          .from('exercise_muscles')
-          .select('exercise_id, muscle_id, role, contribution'),
-        client
-          .from('exercise_equipment')
-          .select('exercise_id, equipment_id, requirement'),
+        client.from('exercise_muscles').select('exercise_id, muscle_id, role, contribution'),
+        client.from('exercise_equipment').select('exercise_id, equipment_id, requirement'),
         client
           .from('equipment')
           .select('id, slug, name, is_active')
@@ -116,8 +119,10 @@ function createSupabaseCatalogLoader(
 
       if (exercisesResult.error) throw new Error(`exercises: ${exercisesResult.error.message}`);
       if (musclesResult.error) throw new Error(`muscles: ${musclesResult.error.message}`);
-      if (exerciseMusclesResult.error) throw new Error(`exercise_muscles: ${exerciseMusclesResult.error.message}`);
-      if (exerciseEquipmentResult.error) throw new Error(`exercise_equipment: ${exerciseEquipmentResult.error.message}`);
+      if (exerciseMusclesResult.error)
+        throw new Error(`exercise_muscles: ${exerciseMusclesResult.error.message}`);
+      if (exerciseEquipmentResult.error)
+        throw new Error(`exercise_equipment: ${exerciseEquipmentResult.error.message}`);
       if (equipmentResult.error) throw new Error(`equipment: ${equipmentResult.error.message}`);
 
       // We need exercise family slugs — join from the exercises query
@@ -132,43 +137,53 @@ function createSupabaseCatalogLoader(
         familySlugMap.set(f.id as string, f.slug as string);
       }
 
-      const exercises: CatalogExerciseRow[] = (exercisesResult.data ?? []).map((row: Record<string, unknown>) => ({
-        id: row['id'] as string,
-        slug: row['slug'] as string,
-        name: row['name'] as string,
-        exerciseFamilyId: row['exercise_family_id'] as string,
-        exerciseFamilySlug: familySlugMap.get(row['exercise_family_id'] as string) ?? 'unknown',
-        isActive: row['is_active'] as boolean,
-        version: row['version'] as number,
-      }));
+      const exercises: CatalogExerciseRow[] = (exercisesResult.data ?? []).map(
+        (row: Record<string, unknown>) => ({
+          id: row['id'] as string,
+          slug: row['slug'] as string,
+          name: row['name'] as string,
+          exerciseFamilyId: row['exercise_family_id'] as string,
+          exerciseFamilySlug: familySlugMap.get(row['exercise_family_id'] as string) ?? 'unknown',
+          isActive: row['is_active'] as boolean,
+          version: row['version'] as number,
+        }),
+      );
 
-      const muscles: CatalogMuscleRow[] = (musclesResult.data ?? []).map((row: Record<string, unknown>) => ({
-        id: row['id'] as string,
-        slug: row['slug'] as string,
-        name: row['name'] as string,
-        isActive: row['is_active'] as boolean,
-      }));
+      const muscles: CatalogMuscleRow[] = (musclesResult.data ?? []).map(
+        (row: Record<string, unknown>) => ({
+          id: row['id'] as string,
+          slug: row['slug'] as string,
+          name: row['name'] as string,
+          isActive: row['is_active'] as boolean,
+        }),
+      );
 
-      const exerciseMuscles: CatalogExerciseMuscleRow[] = (exerciseMusclesResult.data ?? []).map((row: Record<string, unknown>) => ({
-        exerciseId: row['exercise_id'] as string,
-        muscleId: row['muscle_id'] as string,
-        role: row['role'] as 'primary' | 'secondary' | 'stabilizer',
-        contribution: row['contribution'] as number,
-      }));
+      const exerciseMuscles: CatalogExerciseMuscleRow[] = (exerciseMusclesResult.data ?? []).map(
+        (row: Record<string, unknown>) => ({
+          exerciseId: row['exercise_id'] as string,
+          muscleId: row['muscle_id'] as string,
+          role: row['role'] as 'primary' | 'secondary' | 'stabilizer',
+          contribution: row['contribution'] as number,
+        }),
+      );
 
-      const exerciseEquipment: CatalogExerciseEquipmentRow[] = (exerciseEquipmentResult.data ?? []).map((row: Record<string, unknown>) => ({
+      const exerciseEquipment: CatalogExerciseEquipmentRow[] = (
+        exerciseEquipmentResult.data ?? []
+      ).map((row: Record<string, unknown>) => ({
         exerciseId: row['exercise_id'] as string,
         equipmentId: row['equipment_id'] as string,
         equipmentSlug: '', // Not needed for candidate mapping
         requirement: row['requirement'] as 'required' | 'optional',
       }));
 
-      const equipment: CatalogEquipmentRow[] = (equipmentResult.data ?? []).map((row: Record<string, unknown>) => ({
-        id: row['id'] as string,
-        slug: row['slug'] as string,
-        name: row['name'] as string,
-        isActive: row['is_active'] as boolean,
-      }));
+      const equipment: CatalogEquipmentRow[] = (equipmentResult.data ?? []).map(
+        (row: Record<string, unknown>) => ({
+          id: row['id'] as string,
+          slug: row['slug'] as string,
+          name: row['name'] as string,
+          isActive: row['is_active'] as boolean,
+        }),
+      );
 
       return { exercises, muscles, exerciseMuscles, exerciseEquipment, equipment };
     },
@@ -191,11 +206,7 @@ function createSupabaseProfileLoader(
 
   return {
     async loadProfile(userId: string): Promise<ServerTrainingProfile | null> {
-      const { data, error } = await client
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const { data, error } = await client.from('profiles').select('*').eq('id', userId).single();
 
       if (error) {
         if (error.code === 'PGRST116') return null; // Not found
@@ -290,7 +301,7 @@ serve(async (req: Request) => {
   // Parse request body
   let body: GenerateWorkoutRequest;
   try {
-    body = await req.json() as GenerateWorkoutRequest;
+    body = (await req.json()) as GenerateWorkoutRequest;
   } catch {
     return jsonResponse(400, {
       status: 'error',
@@ -306,17 +317,21 @@ serve(async (req: Request) => {
   const sink = new ConsoleSink();
 
   // Generate
-  const result = await generateWorkout(body, userId, {
-    profileLoader,
-    catalogLoader,
-    equipmentContextMap,
-    muscleIdMap,
-  }, sink);
+  const result = await generateWorkout(
+    body,
+    userId,
+    {
+      profileLoader,
+      catalogLoader,
+      equipmentContextMap,
+      muscleIdMap,
+    },
+    sink,
+  );
 
   if (result.status === 'error') {
-    const statusCode = result.code === 'UNAUTHENTICATED' ? 401
-      : result.code === 'INVALID_REQUEST' ? 400
-      : 500;
+    const statusCode =
+      result.code === 'UNAUTHENTICATED' ? 401 : result.code === 'INVALID_REQUEST' ? 400 : 500;
     return jsonResponse(statusCode, result);
   }
 

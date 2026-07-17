@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { defaultRoute, isFocusedFlow, type AppRoute } from './routes';
 import { BottomNav } from './BottomNav';
@@ -46,17 +46,17 @@ export function AppNav({
   const [route, setRoute] = useState<AppRoute>(initialRoute);
   const focused = isFocusedFlow(route);
   // Store the last review so ActiveWorkout can start a session
-  const reviewRef = useRef<WorkoutReview | undefined>(undefined);
+  const [activeReview, setActiveReview] = useState<WorkoutReview | undefined>();
   // userId is derived from the Supabase client session, used as identity for
   // session persistence lookups. Stored in ref to avoid re-deriving on every render.
-  const userIdRef = useRef<string>('');
+  const [activeUserId, setActiveUserId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     void client.auth.getSession().then(async ({ data }) => {
       const userId = data.session?.user.id;
       if (!userId) return;
-      userIdRef.current = userId;
+      setActiveUserId(userId);
       const active = await createWorkoutSessionRepository(client).loadActiveSession(userId);
       if (!cancelled && active) setRoute('active_workout');
     });
@@ -90,11 +90,11 @@ export function AppNav({
 
   const handleStartWorkout = useCallback(
     async (review: WorkoutReview) => {
-      reviewRef.current = review;
+      setActiveReview(review);
       // Derive userId from the client session before entering the workout
       const { data } = await client.auth.getSession();
       if (data.session?.user.id) {
-        userIdRef.current = data.session.user.id;
+        setActiveUserId(data.session.user.id);
       }
       setRoute('active_workout');
     },
@@ -116,13 +116,13 @@ export function AppNav({
         {route === 'workout' ? (
           <WorkoutFlow
             generateReview={generateReview}
-            onStartWorkout={handleStartWorkout}
+            onStartWorkout={(review) => void handleStartWorkout(review)}
           />
         ) : route === 'active_workout' ? (
           <ActiveWorkout
             client={client}
-            userId={userIdRef.current}
-            initialReview={reviewRef.current}
+            userId={activeUserId}
+            initialReview={activeReview}
             onExit={handleExit}
           />
         ) : route === 'progress' ? (

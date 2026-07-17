@@ -134,9 +134,7 @@ const defaultProfile: TrainingGoalRuleProfile = {
  * profile preserves existing engine behavior — equivalent to the
  * pre-goal default.
  */
-export function resolveTrainingGoalRules(
-  goal: TrainingGoal | undefined,
-): TrainingGoalRuleProfile {
+export function resolveTrainingGoalRules(goal: TrainingGoal | undefined): TrainingGoalRuleProfile {
   if (goal === undefined) {
     return defaultProfile;
   }

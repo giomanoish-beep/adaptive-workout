@@ -122,9 +122,7 @@ export interface WorkoutRequestValidationResult {
  * input resolves to a null {@link WorkoutRequestDraft.durationMinutes}, so an
  * empty, decimal, or out-of-range entry is rejected without silent coercion.
  */
-export function validateWorkoutRequest(
-  draft: WorkoutRequestDraft,
-): WorkoutRequestValidationResult {
+export function validateWorkoutRequest(draft: WorkoutRequestDraft): WorkoutRequestValidationResult {
   const issues: WorkoutRequestValidationIssue[] = [];
 
   if (draft.muscleIds.length === 0) {

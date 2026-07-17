@@ -26,12 +26,7 @@ import type {
   RefreshProgressionErrorResponse,
   SupabaseServiceClient,
 } from './contracts.js';
-import {
-  engineName,
-  engineVersion,
-  ruleSetVersion,
-  defaultPrescription,
-} from './contracts.js';
+import { engineName, engineVersion, ruleSetVersion, defaultPrescription } from './contracts.js';
 
 // ── Observability factory ──────────────────────────────────────────
 
@@ -41,9 +36,7 @@ export function createNoopSink(): ObservabilitySink {
 
 // ── History loading ────────────────────────────────────────────────
 
-export async function loadCompletedSessions(
-  client: any,
-): Promise<readonly SessionRow[]> {
+export async function loadCompletedSessions(client: any): Promise<readonly SessionRow[]> {
   const { data, error } = await client
     .from('workout_sessions')
     .select('id,status,started_at,completed_at,title,was_deload')
@@ -171,8 +164,7 @@ export function mapExposuresForExercise(
       const sets: MappedSet[] = rawSets.map((sl) => ({
         setId: sl.id,
         setNumber: sl.set_number,
-        classification:
-          sl.classification === 'warm_up' ? 'warm_up' : 'working',
+        classification: sl.classification === 'warm_up' ? 'warm_up' : 'working',
         status:
           sl.status === 'completed'
             ? 'completed'
@@ -180,10 +172,7 @@ export function mapExposuresForExercise(
               ? 'skipped'
               : 'incomplete',
         load: sl.weight,
-        loadUnit:
-          sl.weight_unit === 'kg' || sl.weight_unit === 'lb'
-            ? sl.weight_unit
-            : null,
+        loadUnit: sl.weight_unit === 'kg' || sl.weight_unit === 'lb' ? sl.weight_unit : null,
         reps: sl.reps,
         rir: sl.rir,
         performedAt: sl.logged_at,
@@ -207,8 +196,7 @@ export function mapExposuresForExercise(
             }
           : null;
 
-      const occurredAt =
-        session.completed_at ?? session.started_at ?? new Date(0).toISOString();
+      const occurredAt = session.completed_at ?? session.started_at ?? new Date(0).toISOString();
 
       exposures.push({
         exposureId: se.id,
@@ -223,25 +211,53 @@ export function mapExposuresForExercise(
     }
   }
 
-  exposures.sort(
-    (a, b) =>
-      new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime(),
-  );
+  exposures.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
   return exposures;
 }
 
 // ── Progression computing ──────────────────────────────────────────
 
-let _progressionEngine: {
+type ProgressionEngineModule = {
   recommendProgression: (input: any, ruleSet: any) => any;
-} | null = null;
+};
 
-async function getProgressionEngine() {
+export type ProgressionEngineLoader = () => Promise<ProgressionEngineModule | null>;
+
+export class ProgressionEngineUnavailableError extends Error {
+  readonly code = 'PROGRESSION_ENGINE_UNAVAILABLE';
+
+  constructor() {
+    super('Progression engine is unavailable.');
+    this.name = 'ProgressionEngineUnavailableError';
+  }
+}
+
+let _progressionEngine: ProgressionEngineModule | null = null;
+
+async function importProgressionEngine(): Promise<ProgressionEngineModule> {
   if (_progressionEngine === null) {
-    _progressionEngine = await import('@adaptive-workout/progression-engine');
+    const loadedEngine = await import('@adaptive-workout/progression-engine');
+    _progressionEngine = loadedEngine;
   }
   return _progressionEngine;
+}
+
+export async function loadProgressionEngine(
+  loader: ProgressionEngineLoader = importProgressionEngine,
+): Promise<ProgressionEngineModule> {
+  try {
+    const engine = await loader();
+    if (engine === null) {
+      throw new ProgressionEngineUnavailableError();
+    }
+    return engine;
+  } catch (error) {
+    if (error instanceof ProgressionEngineUnavailableError) {
+      throw error;
+    }
+    throw new ProgressionEngineUnavailableError();
+  }
 }
 
 function toEngineExposure(exposure: MappedExposure): Record<string, unknown> {
@@ -330,8 +346,7 @@ function mapResultToDto(
 ): ProgressionRefreshDto {
   const isSuccess = result.status === 'success';
 
-  let recommendation: ProgressionRefreshDto['recommendation'] =
-    'insufficient_data';
+  let recommendation: ProgressionRefreshDto['recommendation'] = 'insufficient_data';
   if (isSuccess) {
     recommendation = result.action;
   }
@@ -375,13 +390,9 @@ function mapResultToDto(
     suggestedNextWeight,
     reasonCodes: isSuccess ? (result.reasonCodes ?? []) : [],
     sourceExposureCount,
-    calculatedAt: isSuccess
-      ? result.calculatedAt
-      : new Date().toISOString(),
+    calculatedAt: isSuccess ? result.calculatedAt : new Date().toISOString(),
     engineVersion: isSuccess ? result.version.engineVersion : engineVersion,
-    ruleSetVersion: isSuccess
-      ? result.version.ruleSetVersion
-      : ruleSetVersion,
+    ruleSetVersion: isSuccess ? result.version.ruleSetVersion : ruleSetVersion,
     insufficientData: !isSuccess,
   };
 }
@@ -411,27 +422,20 @@ function buildPerformanceStateUpsert(
     (e) =>
       e.status === 'completed' &&
       e.sets.some(
-        (s) =>
-          s.status === 'completed' &&
-          s.classification === 'working' &&
-          s.reps !== null,
+        (s) => s.status === 'completed' && s.classification === 'working' && s.reps !== null,
       ),
   );
 
   const lastExposure = usableExposures[usableExposures.length - 1];
   const lastWorkingSets =
     lastExposure?.sets.filter(
-      (s) =>
-        s.status === 'completed' &&
-        s.classification === 'working' &&
-        s.reps !== null,
+      (s) => s.status === 'completed' && s.classification === 'working' && s.reps !== null,
     ) ?? [];
 
   const lastSet = lastWorkingSets[lastWorkingSets.length - 1];
   const watermarkSetId = lastSet?.setId;
 
-  const earliestTs =
-    exposures.length > 0 ? exposures[0]!.occurredAt : calculatedAt;
+  const earliestTs = exposures.length > 0 ? exposures[0]!.occurredAt : calculatedAt;
   const latestTs = lastExposure?.occurredAt ?? calculatedAt;
 
   return {
@@ -446,9 +450,7 @@ function buildPerformanceStateUpsert(
     completed_exposure_count: usableExposures.length,
     last_weight: lastSet?.load ?? undefined,
     last_weight_unit:
-      lastSet?.loadUnit === 'kg' || lastSet?.loadUnit === 'lb'
-        ? lastSet.loadUnit
-        : undefined,
+      lastSet?.loadUnit === 'kg' || lastSet?.loadUnit === 'lb' ? lastSet.loadUnit : undefined,
     last_reps: lastSet?.reps ?? undefined,
     last_rir: lastSet?.rir ?? undefined,
     engine_version: engineVersion,
@@ -469,9 +471,7 @@ export async function persistPerformanceState(
     .select();
 
   if (error) {
-    throw new Error(
-      `Failed to persist progression state: ${error.message}`,
-    );
+    throw new Error(`Failed to persist progression state: ${error.message}`);
   }
 }
 
@@ -498,14 +498,13 @@ export interface RefreshProgressionContext {
   readonly serviceClient: SupabaseServiceClient;
   readonly correlationId: string;
   readonly sink: ObservabilitySink;
+  readonly progressionEngineLoader?: ProgressionEngineLoader;
 }
 
 export async function refreshProgression(
   ctx: RefreshProgressionContext,
-): Promise<
-  RefreshProgressionSuccessResponse | RefreshProgressionErrorResponse
-> {
-  const { userId, anonClient, serviceClient, correlationId, sink } = ctx;
+): Promise<RefreshProgressionSuccessResponse | RefreshProgressionErrorResponse> {
+  const { userId, anonClient, serviceClient, correlationId, sink, progressionEngineLoader } = ctx;
   const startTime = Date.now();
 
   sink.emit({
@@ -553,7 +552,10 @@ export async function refreshProgression(
     const distinctExerciseIds = collectDistinctExerciseIds(sessionExercises);
     const exerciseNames = await loadExerciseNames(anonClient, distinctExerciseIds);
 
-    const engine = await getProgressionEngine();
+    const engine =
+      progressionEngineLoader === undefined
+        ? await loadProgressionEngine()
+        : await loadProgressionEngine(progressionEngineLoader);
     const ruleSet = defaultRuleSet();
     const calculatedAt = new Date().toISOString();
 
@@ -568,7 +570,7 @@ export async function refreshProgression(
       if (exposures.length === 0) continue;
 
       const input = buildEngineInput(userId, exerciseId, exposures, calculatedAt);
-      const result = (engine.recommendProgression as any)(input, ruleSet);
+      const result = engine.recommendProgression(input, ruleSet);
 
       if (result.status !== 'success') {
         insufficientCount += 1;
@@ -645,15 +647,19 @@ export async function refreshProgression(
       correlationId,
     };
   } catch (err) {
+    const engineUnavailable = err instanceof ProgressionEngineUnavailableError;
+    const errorCode = engineUnavailable ? err.code : 'REFRESH_FAILED';
     sink.emit({
       kind: 'refresh.progression.persistence_failed',
       correlationId,
-      metadata: { errorCode: 'REFRESH_FAILED' },
+      metadata: { errorCode },
     });
     return {
       status: 'error',
-      code: 'REFRESH_FAILED',
-      message: 'Progression refresh failed. Please try again.',
+      code: errorCode,
+      message: engineUnavailable
+        ? 'Progression engine is unavailable. Please try again.'
+        : 'Progression refresh failed. Please try again.',
     };
   }
 }

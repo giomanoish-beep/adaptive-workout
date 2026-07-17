@@ -53,9 +53,7 @@ async function goToSignInScreen(page: import('@playwright/test').Page) {
   await completeOnboarding(page);
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(
-    page.getByRole('textbox', { name: 'Email' }),
-  ).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
 }
 
 /** Shared setup: complete onboarding, navigate to Workout, generate Chest+Back.
@@ -74,9 +72,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await expect(
-      page.getByRole('heading', { name: "What's your main goal?" }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: "What's your main goal?" })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -100,9 +96,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await selectAndContinue('Let the app decide');
     await selectAndContinue('No current discomfort');
 
-    await expect(
-      page.getByRole('heading', { name: 'Review your setup' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your setup' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -114,9 +108,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await completeOnboarding(page);
 
     await page.getByRole('button', { name: 'Workout' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Build your session' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Build your session' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -128,9 +120,9 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await setupWorkoutFlow(page);
     await page.getByRole('button', { name: 'Generate workout' }).click();
 
-    await expect(
-      page.getByRole('heading', { name: 'Chest + Back' }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible({
+      timeout: 10_000,
+    });
 
     await a11yScan(page);
   });
@@ -140,9 +132,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     // setupActiveWorkout self-initializes mocks and lands on the active screen.
     await setupActiveWorkout(page);
 
-    await expect(
-      page.getByRole('heading', { name: 'Chest + Back' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -158,11 +148,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
 
     // Click the Complete button scoped to Set 1 — the first set in the
     // ordered list (semantically "Set 1").
-    await page
-      .locator('.active-set')
-      .first()
-      .getByRole('button', { name: 'Complete' })
-      .click();
+    await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 
     // Rest panel should appear
     await expect(page.locator('.rest-panel')).toBeVisible();
@@ -177,9 +163,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await completeOnboarding(page);
 
     await page.getByRole('button', { name: 'Progress' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Your training' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your training' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'History' })).toBeVisible();
 
     await a11yScan(page);
@@ -206,9 +190,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await completeOnboarding(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Training profile' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -222,9 +204,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Edit training goal' }).click();
 
-    await expect(
-      page.getByRole('radio', { name: 'Recomposition' }),
-    ).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Recomposition' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -236,15 +216,9 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     // Click Finish workout without completing any sets
     await page.getByRole('button', { name: 'Finish workout' }).click();
 
-    await expect(
-      page.locator('.active-workout__finish--confirming'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Finish' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Keep logging' }),
-    ).toBeVisible();
+    await expect(page.locator('.active-workout__finish--confirming')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Finish' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Keep logging' })).toBeVisible();
 
     await a11yScan(page);
   });

@@ -142,8 +142,7 @@ export interface RefreshProgressionErrorResponse {
 }
 
 export type RefreshProgressionResponse =
-  | RefreshProgressionSuccessResponse
-  | RefreshProgressionErrorResponse;
+  RefreshProgressionSuccessResponse | RefreshProgressionErrorResponse;
 
 // ── Observability ──────────────────────────────────────────────────
 
@@ -178,7 +177,7 @@ export interface SupabaseServiceClient {
   from(table: 'workout_decisions'): {
     insert(row: Record<string, unknown>): {
       select(columns: string): {
-        single(): PromiseLike<{ data: unknown | null; error: { message: string } | null }>;
+        single(): PromiseLike<{ data: unknown; error: { message: string } | null }>;
       };
     };
   };

@@ -44,11 +44,14 @@ function errorResult(message: string): ProgressLoadError {
 export function useProgressData(client: SupabaseClient): UseProgressDataResult {
   const repo = useMemo(() => createProgressRepository(client), [client]);
 
-  const [history, setHistory] = useState<ProgressHistoryResult>(() => ({
-    status: 'loaded',
-    summary: { totalWorkouts: 0, totalWorkingSets: 0, streakWeeks: 0 },
-    recentWorkouts: [],
-  } satisfies ProgressHistoryData));
+  const [history, setHistory] = useState<ProgressHistoryResult>(
+    () =>
+      ({
+        status: 'loaded',
+        summary: { totalWorkouts: 0, totalWorkingSets: 0, streakWeeks: 0 },
+        recentWorkouts: [],
+      }) satisfies ProgressHistoryData,
+  );
   const [progression, setProgression] = useState<ProgressProgressionResult>(
     () =>
       ({
@@ -128,8 +131,7 @@ export function useProgressData(client: SupabaseClient): UseProgressDataResult {
         }
         progressionLoaded.current = true;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load progression data.';
+        const message = err instanceof Error ? err.message : 'Failed to load progression data.';
         setProgression(errorResult(message));
       } finally {
         setIsProgressionLoading(false);
@@ -154,17 +156,14 @@ export function useProgressData(client: SupabaseClient): UseProgressDataResult {
       // 1. Call the server-side refresh
       const refreshResult = await refreshProgressionGateway(client);
       if (!refreshResult.ok) {
-        setProgressionRefreshError(
-          refreshResult.message ?? 'Progression refresh failed.',
-        );
+        setProgressionRefreshError(refreshResult.message ?? 'Progression refresh failed.');
         return;
       }
       // 2. Reload from DB (server has now written fresh state)
       progressionLoadingRef.current = false;
       await loadProgressionInternal(true);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Progression refresh failed.';
+      const message = err instanceof Error ? err.message : 'Progression refresh failed.';
       setProgressionRefreshError(message);
     } finally {
       setIsProgressionRefreshing(false);

@@ -37,9 +37,9 @@ function expectValidDuration(
     equipmentId,
   };
   expect(isWorkoutRequestValid(draft)).toBe(true);
-  expect(
-    validateWorkoutRequest(draft).issues.some((i) => i.code === 'INVALID_DURATION'),
-  ).toBe(false);
+  expect(validateWorkoutRequest(draft).issues.some((i) => i.code === 'INVALID_DURATION')).toBe(
+    false,
+  );
 }
 
 describe('workout request options', () => {

@@ -7,11 +7,7 @@ export type ObservabilityEventLevel = 'debug' | 'info' | 'warn' | 'error';
  * Controlled event domains.
  */
 export type ObservabilityEventDomain =
-  | 'ai'
-  | 'workout_decision'
-  | 'progression_decision'
-  | 'persistence'
-  | 'system';
+  'ai' | 'workout_decision' | 'progression_decision' | 'persistence' | 'system';
 
 /**
  * Serializable metadata type. Only plain JSON-serializable values are allowed.

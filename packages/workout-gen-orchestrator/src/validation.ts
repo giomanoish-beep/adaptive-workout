@@ -23,8 +23,16 @@ export type EquipmentContextId = (typeof equipmentContextIds)[number];
 
 /** Controlled muscle option IDs. */
 export const muscleOptionIds = [
-  'chest', 'back', 'shoulders', 'biceps', 'triceps',
-  'quads', 'hamstrings', 'glutes', 'calves', 'core',
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'quads',
+  'hamstrings',
+  'glutes',
+  'calves',
+  'core',
 ] as const;
 export type MuscleOptionId = (typeof muscleOptionIds)[number];
 
@@ -43,9 +51,7 @@ export interface ValidationResult {
  *
  * Pure: identical requests yield identical results.
  */
-export function validateGenerateWorkoutRequest(
-  request: GenerateWorkoutRequest,
-): ValidationResult {
+export function validateGenerateWorkoutRequest(request: GenerateWorkoutRequest): ValidationResult {
   // At least one target muscle
   if (!request.targetMuscles || request.targetMuscles.length === 0) {
     return {
@@ -162,7 +168,10 @@ export function validateGenerateWorkoutRequest(
   }
 
   // Bounded unavailable equipment
-  if (request.unavailableEquipment && request.unavailableEquipment.length > MAX_UNAVAILABLE_EQUIPMENT) {
+  if (
+    request.unavailableEquipment &&
+    request.unavailableEquipment.length > MAX_UNAVAILABLE_EQUIPMENT
+  ) {
     return {
       ok: false,
       error: {

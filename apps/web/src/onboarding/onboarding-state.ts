@@ -155,7 +155,10 @@ export function buildProfile(draft: OnboardingDraft): TrainingProfile | null {
 /* ---------- Progress ---------- */
 
 /** One-based progress position (e.g. 2 of 8). Review counts as a step. */
-export function stepProgress(step: OnboardingStep): { readonly current: number; readonly total: number } {
+export function stepProgress(step: OnboardingStep): {
+  readonly current: number;
+  readonly total: number;
+} {
   const current = onboardingSteps.indexOf(step) + 1;
   return { current, total: onboardingSteps.length };
 }
@@ -205,10 +208,7 @@ export function setExperience(
 ): OnboardingDraft {
   return { ...draft, experience };
 }
-export function setFrequency(
-  draft: OnboardingDraft,
-  frequency: ProfileFrequency,
-): OnboardingDraft {
+export function setFrequency(draft: OnboardingDraft, frequency: ProfileFrequency): OnboardingDraft {
   return { ...draft, frequency };
 }
 export function setEnvironment(
@@ -265,7 +265,8 @@ export function setCustomDurationInput(draft: OnboardingDraft, input: string): O
   return {
     ...draft,
     customDurationInput: input,
-    typicalDurationMinutes: draft.durationMode === 'custom' ? minutes : draft.typicalDurationMinutes,
+    typicalDurationMinutes:
+      draft.durationMode === 'custom' ? minutes : draft.typicalDurationMinutes,
   };
 }
 

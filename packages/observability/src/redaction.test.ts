@@ -76,7 +76,10 @@ describe('redactSensitiveValues', () => {
 
   it('sensitive key inside array object is redacted', () => {
     const input = {
-      items: [{ name: 'item1', token: 'tok1' }, { name: 'item2', token: 'tok2' }],
+      items: [
+        { name: 'item1', token: 'tok1' },
+        { name: 'item2', token: 'tok2' },
+      ],
     };
     const result = redactSensitiveValues(input);
     expect(result).toEqual({

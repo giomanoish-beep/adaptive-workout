@@ -84,12 +84,20 @@ export async function generateWorkout(
 
   if (!profile) {
     obs.emitProfileLoadFailed({ correlationId, reason: 'profile_missing' });
-    return mapErrorToReview('PROFILE_MISSING', 'Complete your training profile first.', correlationId);
+    return mapErrorToReview(
+      'PROFILE_MISSING',
+      'Complete your training profile first.',
+      correlationId,
+    );
   }
 
   if (!profile.goal || !profile.experience) {
     obs.emitProfileLoadFailed({ correlationId, reason: 'profile_invalid' });
-    return mapErrorToReview('PROFILE_INVALID', 'Training profile is incomplete. Please update your settings.', correlationId);
+    return mapErrorToReview(
+      'PROFILE_INVALID',
+      'Training profile is incomplete. Please update your settings.',
+      correlationId,
+    );
   }
 
   // 3. Profile mapping
@@ -113,7 +121,11 @@ export async function generateWorkout(
     catalog = await deps.catalogLoader.loadActiveCatalog();
   } catch {
     obs.emitCatalogLoadFailed({ correlationId, reason: 'load_error' });
-    return mapErrorToReview('CATALOG_UNAVAILABLE', 'Exercise catalog is unavailable. Please try again.', correlationId);
+    return mapErrorToReview(
+      'CATALOG_UNAVAILABLE',
+      'Exercise catalog is unavailable. Please try again.',
+      correlationId,
+    );
   }
 
   if (!catalog || !catalog.exercises || catalog.exercises.length === 0) {
@@ -239,12 +251,7 @@ export async function generateWorkout(
     latencyMs,
   });
 
-  return mapEngineResultToReview(
-    engineResult,
-    catalogResult,
-    goalProfile,
-    correlationId,
-  );
+  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId);
 }
 
 function mapEngineFailureToErrorCode(code: string): 'NO_FEASIBLE_WORKOUT' | 'GENERATION_FAILED' {

@@ -127,7 +127,7 @@ describe('computeStreakWeeks', () => {
     const mondays: string[] = [];
     for (let i = 0; i < 3; i++) {
       const d = new Date(now);
-      d.setDate(d.getDate() - i * 7 - (d.getDay() + 6) % 7);
+      d.setDate(d.getDate() - i * 7 - ((d.getDay() + 6) % 7));
       mondays.push(d.toISOString());
     }
     expect(computeStreakWeeks(mondays)).toBeGreaterThanOrEqual(1);

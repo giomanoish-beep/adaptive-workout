@@ -109,7 +109,8 @@ export function useTrainingProfile(client: SupabaseClient): UseTrainingProfileRe
   // Load on mount / client change
   useEffect(() => {
     loadedRef.current = false;
-    void doLoad();
+    const id = window.setTimeout(() => void doLoad(), 0);
+    return () => window.clearTimeout(id);
   }, [doLoad]);
 
   const completeOnboarding = useCallback(

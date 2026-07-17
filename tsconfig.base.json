@@ -8,7 +8,34 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "@adaptive-workout/domain": ["./packages/domain/src/index.ts"]
+      "@adaptive-workout/ai": ["./packages/ai/src/index.ts"],
+      "@adaptive-workout/ai-decision-explanation": [
+        "./packages/ai-decision-explanation/src/index.ts"
+      ],
+      "@adaptive-workout/ai-deepseek-provider": ["./packages/ai-deepseek-provider/src/index.ts"],
+      "@adaptive-workout/ai-discomfort-extraction": [
+        "./packages/ai-discomfort-extraction/src/index.ts"
+      ],
+      "@adaptive-workout/ai-glm-provider": ["./packages/ai-glm-provider/src/index.ts"],
+      "@adaptive-workout/ai-router": ["./packages/ai-router/src/index.ts"],
+      "@adaptive-workout/ai-workout-intent": ["./packages/ai-workout-intent/src/index.ts"],
+      "@adaptive-workout/domain": ["./packages/domain/src/index.ts"],
+      "@adaptive-workout/observability": ["./packages/observability/src/index.ts"],
+      "@adaptive-workout/pain-safety": ["./packages/pain-safety/src/index.ts"],
+      "@adaptive-workout/progression-decision-persistence": [
+        "./packages/progression-decision-persistence/src/index.ts"
+      ],
+      "@adaptive-workout/progression-engine": ["./packages/progression-engine/src/index.ts"],
+      "@adaptive-workout/progression-orchestrator": [
+        "./packages/progression-orchestrator/src/index.ts"
+      ],
+      "@adaptive-workout/workout-decision-persistence": [
+        "./packages/workout-decision-persistence/src/index.ts"
+      ],
+      "@adaptive-workout/workout-engine": ["./packages/workout-engine/src/index.ts"],
+      "@adaptive-workout/workout-gen-orchestrator": [
+        "./packages/workout-gen-orchestrator/src/index.ts"
+      ]
     },
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,

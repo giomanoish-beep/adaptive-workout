@@ -13,9 +13,7 @@ test.describe('V1-005 — Critical Journey', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(
-      page.getByRole('heading', { name: "What's your main goal?" }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: "What's your main goal?" })).toBeVisible();
     await completeOnboarding(page);
     await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
 
@@ -28,9 +26,9 @@ test.describe('V1-005 — Critical Journey', () => {
     await page.getByRole('button', { name: 'Generate workout' }).click();
 
     // Review screen
-    await expect(
-      page.getByRole('heading', { name: 'Chest + Back' }),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator('.workout-review')).toContainText('Dumbbell Bench Press');
     await expect(page.locator('.workout-review')).toContainText('Lat Pulldown');
 
@@ -39,35 +37,28 @@ test.describe('V1-005 — Critical Journey', () => {
 
     // The active workout screen should show something (header, exercise, or loading -> active)
     // Wait for active workout content to appear (either exercise name or workout title)
-    await expect(
-      page.locator('.active-workout'),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.active-workout')).toBeVisible({ timeout: 10_000 });
 
     // Bottom nav hidden during active workout
     await expect(page.locator('.bottom-nav')).not.toBeVisible();
 
     // Should show the first exercise
-    await expect(
-      page.getByText('Dumbbell Bench Press'),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Dumbbell Bench Press')).toBeVisible({ timeout: 10_000 });
 
     // Log a set
     await page.getByLabel('Set 1 weight').fill('32');
     await page.getByLabel('Set 1 reps').fill('10');
-    await page
-      .locator('.active-set')
-      .first()
-      .getByRole('button', { name: 'Complete' })
-      .click();
+    await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 
     // Completed set shows data
     await expect(page.locator('.active-set--completed')).toContainText('32 kg');
 
     // Finish workout
     await page.getByRole('button', { name: 'Finish workout' }).click();
-    await expect(
-      page.locator('.active-workout__finish--confirming'),
-    ).toContainText('Some sets are incomplete', { timeout: 5_000 });
+    await expect(page.locator('.active-workout__finish--confirming')).toContainText(
+      'Some sets are incomplete',
+      { timeout: 5_000 },
+    );
 
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.locator('.active-workout--finished')).toBeVisible({ timeout: 5_000 });
@@ -76,9 +67,7 @@ test.describe('V1-005 — Critical Journey', () => {
 
     // Progress shows completed session
     await page.getByRole('button', { name: 'Progress' }).click();
-    await expect(
-      page.getByText('Chest + Back'),
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Chest + Back')).toBeVisible({ timeout: 10_000 });
 
     // Settings + goal change
     await page.getByRole('button', { name: 'Settings' }).click();

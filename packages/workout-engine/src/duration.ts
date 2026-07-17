@@ -541,8 +541,11 @@ function expandToUseDurationBudget(
               ({ candidate }) =>
                 !selectedExerciseIds.has(candidate.exerciseId) &&
                 !selectedFamilyIds.has(candidate.exerciseFamilyId) &&
-                calculateExerciseMuscleSetContribution(candidate, target.muscleId, allocationRuleSet) >
-                  0,
+                calculateExerciseMuscleSetContribution(
+                  candidate,
+                  target.muscleId,
+                  allocationRuleSet,
+                ) > 0,
             )
           : [];
 

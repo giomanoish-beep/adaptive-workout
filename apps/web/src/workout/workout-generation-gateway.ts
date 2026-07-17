@@ -172,7 +172,7 @@ export async function generateWorkoutViaGateway(
     if (!response.ok) {
       // Try to parse error from response body
       try {
-        const errorBody = await response.json() as GatewayErrorResponse;
+        const errorBody = (await response.json()) as GatewayErrorResponse;
         return {
           status: 'error',
           generationId: errorBody.generationId ?? null,
@@ -184,14 +184,15 @@ export async function generateWorkoutViaGateway(
           status: 'error',
           generationId: null,
           code: response.status === 401 ? 'UNAUTHENTICATED' : 'GENERATION_FAILED',
-          message: response.status === 401
-            ? 'Session expired. Please sign in again.'
-            : `Server error (${response.status}).`,
+          message:
+            response.status === 401
+              ? 'Session expired. Please sign in again.'
+              : `Server error (${response.status}).`,
         };
       }
     }
 
-    const result = await response.json() as GatewayReviewResponse;
+    const result = (await response.json()) as GatewayReviewResponse;
     return result;
   } catch {
     return {
@@ -207,9 +208,7 @@ export async function generateWorkoutViaGateway(
  * Maps the gateway success response to the existing WorkoutReview shape
  * so the rest of the app (WorkoutReview, ActiveWorkout) works unchanged.
  */
-export function mapGatewayToWorkoutReview(
-  gateway: GatewayReviewSuccess,
-) {
+export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess) {
   return {
     title: gateway.title,
     estimatedDurationMinutes: gateway.estimatedDurationMinutes,

@@ -15,9 +15,7 @@ const DIST_ASSETS = join(import.meta.dirname, '..', 'dist', 'assets');
 
 function getAssetFiles(): string[] {
   try {
-    return readdirSync(DIST_ASSETS).filter(
-      (f) => f.endsWith('.js') || f.endsWith('.js.map'),
-    );
+    return readdirSync(DIST_ASSETS).filter((f) => f.endsWith('.js') || f.endsWith('.js.map'));
   } catch {
     return [];
   }
@@ -35,7 +33,6 @@ function readAllJsContent(): string {
     })
     .join('\n');
 }
-
 
 test.describe('HARDENING-003 — bundle hygiene', () => {
   test('production browser assets contain no service-role or API provider secret identifiers', () => {

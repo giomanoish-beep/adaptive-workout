@@ -95,10 +95,7 @@ function formatDateLabel(isoTimestamp: string): string {
   });
 }
 
-function computeDurationMinutes(
-  startedAt: string | null,
-  completedAt: string | null,
-): number {
+function computeDurationMinutes(startedAt: string | null, completedAt: string | null): number {
   if (startedAt === null || completedAt === null) return 0;
   const start = Date.parse(startedAt);
   const end = Date.parse(completedAt);
@@ -159,9 +156,8 @@ export function computeStreakWeeks(finishedTimestamps: readonly string[]): numbe
   const now = new Date();
   const { year: currentYear, week: currentWeek } = getIsoWeek(now);
   const currentKey = isoWeekKey(currentYear, currentWeek);
-  const prevKey = currentWeek === 1
-    ? isoWeekKey(currentYear - 1, 53)
-    : isoWeekKey(currentYear, currentWeek - 1);
+  const prevKey =
+    currentWeek === 1 ? isoWeekKey(currentYear - 1, 53) : isoWeekKey(currentYear, currentWeek - 1);
 
   // Determine the anchor week for the streak
   let anchorKey: number;
@@ -292,10 +288,7 @@ export function createProgressRepository(client: SupabaseClient) {
       for (const set of completedSetRows) {
         const sessionId = exerciseToSession.get(set.workout_session_exercise_id);
         if (sessionId !== undefined) {
-          sessionCompletedCount.set(
-            sessionId,
-            (sessionCompletedCount.get(sessionId) ?? 0) + 1,
-          );
+          sessionCompletedCount.set(sessionId, (sessionCompletedCount.get(sessionId) ?? 0) + 1);
         }
       }
       sessionCompletedMap = sessionCompletedCount;
@@ -342,10 +335,7 @@ export function createProgressRepository(client: SupabaseClient) {
     recentWorkouts: readonly RecentWorkout[],
   ): ProgressSummary {
     const totalWorkouts = allFinishedTimestamps.length;
-    const totalWorkingSets = recentWorkouts.reduce(
-      (sum, w) => sum + w.completedSets,
-      0,
-    );
+    const totalWorkingSets = recentWorkouts.reduce((sum, w) => sum + w.completedSets, 0);
     const streakWeeks = computeStreakWeeks(allFinishedTimestamps);
     return { totalWorkouts, totalWorkingSets, streakWeeks };
   }
@@ -426,7 +416,11 @@ export function createProgressRepository(client: SupabaseClient) {
     // 4. Map to ExerciseProgression DTOs
     const exerciseProgressions: ExerciseProgression[] = perfRows.map((perf) => {
       const decision = latestDecisionByExercise.get(perf.exercise_id);
-      return mapProgressionRow(perf, decision, nameById.get(perf.exercise_id) ?? 'Unknown Exercise');
+      return mapProgressionRow(
+        perf,
+        decision,
+        nameById.get(perf.exercise_id) ?? 'Unknown Exercise',
+      );
     });
 
     return { exerciseProgressions };
@@ -453,15 +447,11 @@ export function mapProgressionRow(
   // Extract recommendation from decision, or fall back to performance state
   const action = decision?.decision_output['action'] as string | undefined;
   const recommendedLoad = decision?.decision_output['recommendedLoad'] as
-    | { value: number; unit: string }
-    | null
-    | undefined;
+    { value: number; unit: string } | null | undefined;
 
   // Trend from decision trace evidence, or infer from performance state
   const evidence = decision?.decision_trace?.['evidence'] as Record<string, unknown> | undefined;
-  const performanceTrend = evidence?.['performanceTrend'] as
-    | { direction: string }
-    | undefined;
+  const performanceTrend = evidence?.['performanceTrend'] as { direction: string } | undefined;
   const trendDirection = performanceTrend?.direction;
 
   return {
@@ -485,9 +475,7 @@ export function mapProgressionRow(
   };
 }
 
-function mapTrendDirection(
-  direction: string | undefined,
-): ProgressionTrendLabel | null {
+function mapTrendDirection(direction: string | undefined): ProgressionTrendLabel | null {
   switch (direction) {
     case 'improving':
       return 'Improving';
@@ -500,9 +488,7 @@ function mapTrendDirection(
   }
 }
 
-function mapRecommendationAction(
-  action: string | undefined,
-): ProgressionRecommendationLabel {
+function mapRecommendationAction(action: string | undefined): ProgressionRecommendationLabel {
   switch (action) {
     case 'increase_load':
       return 'Increase load';

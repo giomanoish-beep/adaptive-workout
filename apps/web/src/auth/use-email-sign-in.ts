@@ -71,8 +71,7 @@ export function useEmailSignIn(client: SupabaseClient): UseEmailSignInResult {
       if (!result.ok) {
         dispatch({
           type: 'error',
-          message:
-            result.code === 'EMPTY' ? 'Enter your email.' : 'Enter a valid email.',
+          message: result.code === 'EMPTY' ? 'Enter your email.' : 'Enter a valid email.',
         });
         return false;
       }
@@ -107,5 +106,5 @@ export async function requestEmailSignIn(
   email: string,
 ): Promise<{ readonly error: string | null }> {
   const { error } = await client.auth.signInWithOtp({ email });
-  return { error: error === null ? null : error.message ?? 'Unable to send sign-in link.' };
+  return { error: error === null ? null : (error.message ?? 'Unable to send sign-in link.') };
 }

@@ -27,9 +27,7 @@ export interface ProfileMappingResult {
  * - If hasCurrentDiscomfort is true, the result flags discomfortReviewRequired
  *   so the orchestrator can return DISCOMFORT_REVIEW_REQUIRED.
  */
-export function mapProfileToGoalRules(
-  profile: ServerTrainingProfile,
-): ProfileMappingResult {
+export function mapProfileToGoalRules(profile: ServerTrainingProfile): ProfileMappingResult {
   const goal = mapGoal(profile.goal);
   const goalProfile = resolveTrainingGoalRules(goal);
 

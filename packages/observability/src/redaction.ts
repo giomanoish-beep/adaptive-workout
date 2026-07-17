@@ -34,10 +34,7 @@ function isSensitiveKey(key: string): boolean {
  * - Maximum depth is bounded; beyond it, deeper content is replaced with
  *   `[MAX_DEPTH]`.
  */
-export function redactSensitiveValues(
-  value: unknown,
-  maxDepth = DEFAULT_MAX_DEPTH,
-): unknown {
+export function redactSensitiveValues(value: unknown, maxDepth = DEFAULT_MAX_DEPTH): unknown {
   return redactImpl(value, 0, maxDepth);
 }
 

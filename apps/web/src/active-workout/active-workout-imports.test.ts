@@ -46,11 +46,7 @@ const supabasePattern = /@supabase\/supabase-js/;
 
 describe('active-workout source hygiene', () => {
   it('pure modules import no server-only, engine, or persistence packages', () => {
-    const pureSources = [
-      validationSource,
-      stateSource,
-      restSource,
-    ];
+    const pureSources = [validationSource, stateSource, restSource];
     for (const source of pureSources) {
       for (const pattern of forbiddenServerPatterns) {
         expect(source).not.toMatch(pattern);

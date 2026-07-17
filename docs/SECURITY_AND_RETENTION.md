@@ -10,13 +10,13 @@ This document is an engineering inventory. It is **not** a legal compliance cert
 
 ## 1. Trust Boundaries
 
-| Boundary | Description |
-|----------|-------------|
-| Browser ↔ Supabase | HTTPS via Supabase JS client using anon key only. No service-role or AI keys in browser code. |
-| Browser ↔ Vite dev server | Development only. Environment variables injected at build time via `VITE_` prefix. |
-| Supabase Edge Functions ↔ AI Providers | Service-role and AI provider keys exist only in Edge Function secrets (not implemented yet in this prototype). |
-| Supabase PostgreSQL ↔ Browser | Mediated by PostgREST with RLS on every table. Anonymous role has no table access. |
-| Browser localStorage | Supabase Auth session token only (via `persistSession: true`). No workout, profile, pain, or history data is stored in browser storage. |
+| Boundary                               | Description                                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser ↔ Supabase                     | HTTPS via Supabase JS client using anon key only. No service-role or AI keys in browser code.                                           |
+| Browser ↔ Vite dev server              | Development only. Environment variables injected at build time via `VITE_` prefix.                                                      |
+| Supabase Edge Functions ↔ AI Providers | Service-role and AI provider keys exist only in Edge Function secrets (not implemented yet in this prototype).                          |
+| Supabase PostgreSQL ↔ Browser          | Mediated by PostgREST with RLS on every table. Anonymous role has no table access.                                                      |
+| Browser localStorage                   | Supabase Auth session token only (via `persistSession: true`). No workout, profile, pain, or history data is stored in browser storage. |
 
 ---
 
@@ -24,13 +24,13 @@ This document is an engineering inventory. It is **not** a legal compliance cert
 
 ### 2.1 Environment Variables
 
-| Variable | Scope | Prefix | Status |
-|----------|-------|--------|--------|
-| `VITE_SUPABASE_URL` | Browser | `VITE_` | ✅ Browser-safe |
-| `VITE_SUPABASE_ANON_KEY` | Browser | `VITE_` | ✅ Browser-safe |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server only | None | ✅ No `VITE_` prefix |
-| `ZAI_API_KEY` | Server only | None | ✅ No `VITE_` prefix |
-| `DEEPSEEK_API_KEY` | Server only | None | ✅ No `VITE_` prefix |
+| Variable                    | Scope       | Prefix  | Status               |
+| --------------------------- | ----------- | ------- | -------------------- |
+| `VITE_SUPABASE_URL`         | Browser     | `VITE_` | ✅ Browser-safe      |
+| `VITE_SUPABASE_ANON_KEY`    | Browser     | `VITE_` | ✅ Browser-safe      |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | None    | ✅ No `VITE_` prefix |
+| `ZAI_API_KEY`               | Server only | None    | ✅ No `VITE_` prefix |
+| `DEEPSEEK_API_KEY`          | Server only | None    | ✅ No `VITE_` prefix |
 
 ### 2.2 Findings
 
@@ -88,30 +88,30 @@ This document is an engineering inventory. It is **not** a legal compliance cert
 
 All 22 application tables have RLS enabled and anonymous privileges revoked:
 
-| Table | RLS | Anon Revoked | Authenticated Grants | Owner Check |
-|-------|-----|--------------|---------------------|-------------|
-| `profiles` | ✅ | ✅ | select, insert, update | `id = auth.uid()` |
-| `muscles` | ✅ | ✅ | select | Shared catalog |
-| `equipment` | ✅ | ✅ | select | Shared catalog |
-| `exercise_families` | ✅ | ✅ | select | Shared catalog |
-| `exercises` | ✅ | ✅ | select | Shared catalog (active) |
-| `exercise_muscles` | ✅ | ✅ | select | Shared catalog join |
-| `exercise_equipment` | ✅ | ✅ | select | Shared catalog join |
-| `exercise_substitutions` | ✅ | ✅ | select | Shared catalog |
-| `programs` | ✅ | ✅ | select, insert, update, delete | Owner or shared |
-| `program_workouts` | ✅ | ✅ | select, insert, update, delete | Via program owner |
-| `program_workout_exercises` | ✅ | ✅ | select, insert, update, delete | Via program owner |
-| `workout_sessions` | ✅ | ✅ | select, insert, update, delete | `user_id = auth.uid()` |
-| `workout_session_exercises` | ✅ | ✅ | select, insert, update, delete | Via session owner |
-| `set_logs` | ✅ | ✅ | select, insert, update, delete | Via session owner |
-| `exercise_performance_state` | ✅ | ✅ | select only | `user_id = auth.uid()` |
-| `muscle_training_state` | ✅ | ✅ | select only | `user_id = auth.uid()` |
-| `pain_events` | ✅ | ✅ | select, insert | `user_id = auth.uid()` |
-| `pain_event_observations` | ✅ | ✅ | select, insert | `user_id = auth.uid()` |
-| `pain_exercise_associations` | ✅ | ✅ | select only | Via pain event owner |
-| `user_exercise_preferences` | ✅ | ✅ | select, insert, update, delete | `user_id = auth.uid()` |
-| `workout_decisions` | ✅ | ✅ | select only | `user_id = auth.uid()` |
-| `ai_interactions` | ✅ | ✅ | select only | `user_id = auth.uid()` |
+| Table                        | RLS | Anon Revoked | Authenticated Grants           | Owner Check             |
+| ---------------------------- | --- | ------------ | ------------------------------ | ----------------------- |
+| `profiles`                   | ✅  | ✅           | select, insert, update         | `id = auth.uid()`       |
+| `muscles`                    | ✅  | ✅           | select                         | Shared catalog          |
+| `equipment`                  | ✅  | ✅           | select                         | Shared catalog          |
+| `exercise_families`          | ✅  | ✅           | select                         | Shared catalog          |
+| `exercises`                  | ✅  | ✅           | select                         | Shared catalog (active) |
+| `exercise_muscles`           | ✅  | ✅           | select                         | Shared catalog join     |
+| `exercise_equipment`         | ✅  | ✅           | select                         | Shared catalog join     |
+| `exercise_substitutions`     | ✅  | ✅           | select                         | Shared catalog          |
+| `programs`                   | ✅  | ✅           | select, insert, update, delete | Owner or shared         |
+| `program_workouts`           | ✅  | ✅           | select, insert, update, delete | Via program owner       |
+| `program_workout_exercises`  | ✅  | ✅           | select, insert, update, delete | Via program owner       |
+| `workout_sessions`           | ✅  | ✅           | select, insert, update, delete | `user_id = auth.uid()`  |
+| `workout_session_exercises`  | ✅  | ✅           | select, insert, update, delete | Via session owner       |
+| `set_logs`                   | ✅  | ✅           | select, insert, update, delete | Via session owner       |
+| `exercise_performance_state` | ✅  | ✅           | select only                    | `user_id = auth.uid()`  |
+| `muscle_training_state`      | ✅  | ✅           | select only                    | `user_id = auth.uid()`  |
+| `pain_events`                | ✅  | ✅           | select, insert                 | `user_id = auth.uid()`  |
+| `pain_event_observations`    | ✅  | ✅           | select, insert                 | `user_id = auth.uid()`  |
+| `pain_exercise_associations` | ✅  | ✅           | select only                    | Via pain event owner    |
+| `user_exercise_preferences`  | ✅  | ✅           | select, insert, update, delete | `user_id = auth.uid()`  |
+| `workout_decisions`          | ✅  | ✅           | select only                    | `user_id = auth.uid()`  |
+| `ai_interactions`            | ✅  | ✅           | select only                    | `user_id = auth.uid()`  |
 
 ### 4.2 Server-Written Tables
 
@@ -141,52 +141,52 @@ The following tables are written only by edge functions or trusted server-side c
 
 ### 5.1 Public/Shared
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Exercise catalog | Reference taxonomy | `exercises`, `muscles`, `equipment`, `exercise_families` | Seed migrations / admin | All authenticated | Indefinite (deactivate, not delete) |
-| Exercise substitutions | Directed replacement rules | `exercise_substitutions` | Seed migrations / admin | All authenticated | Indefinite |
-| Shared programs | Curated program templates | `programs` (owner_user_id IS NULL) | Admin | All authenticated | Indefinite |
+| Data Class             | Purpose                    | Authoritative Store                                      | Writers                 | Readers           | Retention                           |
+| ---------------------- | -------------------------- | -------------------------------------------------------- | ----------------------- | ----------------- | ----------------------------------- |
+| Exercise catalog       | Reference taxonomy         | `exercises`, `muscles`, `equipment`, `exercise_families` | Seed migrations / admin | All authenticated | Indefinite (deactivate, not delete) |
+| Exercise substitutions | Directed replacement rules | `exercise_substitutions`                                 | Seed migrations / admin | All authenticated | Indefinite                          |
+| Shared programs        | Curated program templates  | `programs` (owner_user_id IS NULL)                       | Admin                   | All authenticated | Indefinite                          |
 
 ### 5.2 Account Data
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Supabase user ID | Identity | `auth.users` (Supabase) | Supabase Auth | Owner (via RLS) | Until account deletion |
-| Email | Auth credential | `auth.users` (Supabase) | Supabase Auth | Owner (via Supabase Auth) | Until account deletion |
-| Profile metadata | Training preferences | `profiles` | Owner | Owner | Until account deletion |
+| Data Class       | Purpose              | Authoritative Store     | Writers       | Readers                   | Retention              |
+| ---------------- | -------------------- | ----------------------- | ------------- | ------------------------- | ---------------------- |
+| Supabase user ID | Identity             | `auth.users` (Supabase) | Supabase Auth | Owner (via RLS)           | Until account deletion |
+| Email            | Auth credential      | `auth.users` (Supabase) | Supabase Auth | Owner (via Supabase Auth) | Until account deletion |
+| Profile metadata | Training preferences | `profiles`              | Owner         | Owner                     | Until account deletion |
 
 ### 5.3 Training Profile
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Goal, experience, frequency, duration, environment, program preference | Workout personalization | `profiles` (planned) | Owner | Owner | Until account deletion |
+| Data Class                                                             | Purpose                 | Authoritative Store  | Writers | Readers | Retention              |
+| ---------------------------------------------------------------------- | ----------------------- | -------------------- | ------- | ------- | ---------------------- |
+| Goal, experience, frequency, duration, environment, program preference | Workout personalization | `profiles` (planned) | Owner   | Owner   | Until account deletion |
 
 ### 5.4 Workout Data
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Workout sessions | Session metadata | `workout_sessions` | Owner (via app) | Owner | Until user deletion |
-| Session exercises | Exercise prescriptions/snapshots | `workout_session_exercises` | Owner (via app) | Owner | Until user deletion |
-| Set logs | Load, reps, RIR, completion | `set_logs` | Owner (via app) | Owner | Until user deletion |
-| Progression state | Derived performance state | `exercise_performance_state` | Server (rebuildable) | Owner | Delete with user |
+| Data Class        | Purpose                          | Authoritative Store          | Writers              | Readers | Retention           |
+| ----------------- | -------------------------------- | ---------------------------- | -------------------- | ------- | ------------------- |
+| Workout sessions  | Session metadata                 | `workout_sessions`           | Owner (via app)      | Owner   | Until user deletion |
+| Session exercises | Exercise prescriptions/snapshots | `workout_session_exercises`  | Owner (via app)      | Owner   | Until user deletion |
+| Set logs          | Load, reps, RIR, completion      | `set_logs`                   | Owner (via app)      | Owner   | Until user deletion |
+| Progression state | Derived performance state        | `exercise_performance_state` | Server (rebuildable) | Owner   | Delete with user    |
 
 ### 5.5 Potentially Sensitive Fitness/Discomfort Data
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Pain/discomfort reports | User-reported wording | `pain_events.report_text` | Owner | Owner | Until user deletion |
-| Structured observations | Severity, location, onset, triggers | `pain_event_observations` | Owner | Owner | Until user deletion |
-| Exercise associations | Event-to-exercise links | `pain_exercise_associations` | Server (rule-derived) | Owner | Until user deletion |
-| Safety classification | GREEN/ADAPT/STOP decision | `pain_events` | Server | Owner | Until user deletion |
+| Data Class              | Purpose                             | Authoritative Store          | Writers               | Readers | Retention           |
+| ----------------------- | ----------------------------------- | ---------------------------- | --------------------- | ------- | ------------------- |
+| Pain/discomfort reports | User-reported wording               | `pain_events.report_text`    | Owner                 | Owner   | Until user deletion |
+| Structured observations | Severity, location, onset, triggers | `pain_event_observations`    | Owner                 | Owner   | Until user deletion |
+| Exercise associations   | Event-to-exercise links             | `pain_exercise_associations` | Server (rule-derived) | Owner   | Until user deletion |
+| Safety classification   | GREEN/ADAPT/STOP decision           | `pain_events`                | Server                | Owner   | Until user deletion |
 
 ### 5.6 Operational/Audit Data
 
-| Data Class | Purpose | Authoritative Store | Writers | Readers | Retention |
-|------------|---------|---------------------|---------|---------|-----------|
-| Workout decisions | Immutable engine audit | `workout_decisions` | Server only | Owner | Cascade with user |
-| Progression decisions | Immutable engine audit | `workout_decisions` | Server only | Owner | Cascade with user |
-| AI interactions | Provider metadata, structured I/O | `ai_interactions` | Server only | Owner | 30 days (recommended, not enforced) |
-| Observability events | Development logs | In-memory/console | Server code | Developers | Ephemeral (no persistence) |
+| Data Class            | Purpose                           | Authoritative Store | Writers     | Readers    | Retention                           |
+| --------------------- | --------------------------------- | ------------------- | ----------- | ---------- | ----------------------------------- |
+| Workout decisions     | Immutable engine audit            | `workout_decisions` | Server only | Owner      | Cascade with user                   |
+| Progression decisions | Immutable engine audit            | `workout_decisions` | Server only | Owner      | Cascade with user                   |
+| AI interactions       | Provider metadata, structured I/O | `ai_interactions`   | Server only | Owner      | 30 days (recommended, not enforced) |
+| Observability events  | Development logs                  | In-memory/console   | Server code | Developers | Ephemeral (no persistence)          |
 
 ---
 
@@ -212,16 +212,16 @@ The `pain_events.report_text` column stores user-provided discomfort wording (up
 
 ### 7.1 Intended Retention Rules
 
-| Category | Retention Rule | Enforcement Status |
-|----------|---------------|-------------------|
-| Account/profile data | Until account deletion | ✅ CASCADE from `auth.users` |
-| Workout sessions/set logs | Until user deletion | ✅ CASCADE from `auth.users` |
-| Derived performance/muscle state | Delete with user; rebuildable | ✅ CASCADE from `auth.users` |
-| Pain/discomfort events | Until user deletion | ✅ CASCADE from `auth.users` |
-| Immutable decision audit records | Cascade with user | ✅ CASCADE from `auth.users` |
-| AI interaction metadata | 30 days recommended | ❌ Not enforced — no timestamp index or cleanup function exists |
-| Observability logs | Ephemeral (no guaranteed persistence) | ✅ In-memory/console only |
-| E2E/test data | Non-production, disposable | ✅ Test-only |
+| Category                         | Retention Rule                        | Enforcement Status                                              |
+| -------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| Account/profile data             | Until account deletion                | ✅ CASCADE from `auth.users`                                    |
+| Workout sessions/set logs        | Until user deletion                   | ✅ CASCADE from `auth.users`                                    |
+| Derived performance/muscle state | Delete with user; rebuildable         | ✅ CASCADE from `auth.users`                                    |
+| Pain/discomfort events           | Until user deletion                   | ✅ CASCADE from `auth.users`                                    |
+| Immutable decision audit records | Cascade with user                     | ✅ CASCADE from `auth.users`                                    |
+| AI interaction metadata          | 30 days recommended                   | ❌ Not enforced — no timestamp index or cleanup function exists |
+| Observability logs               | Ephemeral (no guaranteed persistence) | ✅ In-memory/console only                                       |
+| E2E/test data                    | Non-production, disposable            | ✅ Test-only                                                    |
 
 ### 7.2 AI Interaction Retention Gap
 
@@ -230,6 +230,7 @@ The `pain_events.report_text` column stores user-provided discomfort wording (up
 **Decision for prototype:** A cleanup function is defined below but not deployed as an automated job. It is documented here as an explicit operational requirement before production. The current prototype does not implement scheduled cleanup, and this gap is documented as a pre-production requirement.
 
 **Recommended cleanup SQL (server-only, not implemented):**
+
 ```sql
 -- ai_interactions_cleanup: delete AI interaction records older than N days
 -- for a specific user. Requires service_role or owner check.
@@ -251,6 +252,7 @@ SET search_path = '';
 ```
 
 **Status:** SQL provided as documentation. Not implemented as a migration because:
+
 1. No automated scheduler (pg_cron) is configured.
 2. The cleanup should be invoked by a trusted Edge Function, not a direct client call.
 3. Adding the function without a scheduler would create a false sense of enforcement.
@@ -311,15 +313,16 @@ CATALOG (NOT CASCADED):
 
 ## 9. Export / Deletion Product Gaps
 
-| Feature | Status | Classification |
-|---------|--------|----------------|
-| User-facing data export | Not implemented | Required before production |
-| Selective workout deletion UI | Not implemented | Recommended after MVP |
-| Pain-event deletion UI | Not implemented | Recommended after MVP |
-| Account deletion UI | Not implemented | Required before production |
-| Automated AI audit cleanup | Not implemented | Required before production |
+| Feature                       | Status          | Classification             |
+| ----------------------------- | --------------- | -------------------------- |
+| User-facing data export       | Not implemented | Required before production |
+| Selective workout deletion UI | Not implemented | Recommended after MVP      |
+| Pain-event deletion UI        | Not implemented | Recommended after MVP      |
+| Account deletion UI           | Not implemented | Required before production |
+| Automated AI audit cleanup    | Not implemented | Required before production |
 
 **Current prototype capabilities:**
+
 - User can sign out (clears local auth session).
 - No self-service data deletion or export exists.
 - Server-side deletion is possible via Supabase dashboard or SQL (admin only).
@@ -335,11 +338,11 @@ CATALOG (NOT CASCADED):
 
 ### 10.2 Runtime Dependencies
 
-| Package | Version | Purpose |
-|---------|---------|---------|
+| Package                 | Version  | Purpose                 |
+| ----------------------- | -------- | ----------------------- |
 | `@supabase/supabase-js` | ^2.110.5 | Supabase browser client |
-| `react` | ^19.2.7 | UI framework |
-| `react-dom` | ^19.2.7 | DOM renderer |
+| `react`                 | ^19.2.7  | UI framework            |
+| `react-dom`             | ^19.2.7  | DOM renderer            |
 
 ### 10.3 Assessment
 
@@ -357,14 +360,14 @@ The Vite prototype does not currently define deployment security headers. The bu
 
 ### 11.2 Recommended Headers for Production Deployment
 
-| Header | Recommended Value | Rationale |
-|--------|------------------|-----------|
-| `Content-Security-Policy` | `default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none';` | Allows Supabase API connections; blocks third-party scripts, frames, and inline scripts |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limits referrer leakage to origin only |
-| `X-Content-Type-Options` | `nosniff` | Prevents MIME type sniffing |
-| `X-Frame-Options` | `DENY` | Prevents clickjacking (redundant with frame-ancestors CSP) |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | Denies all non-essential permissions |
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Enforce HTTPS (set at hosting/CDN layer, not app) |
+| Header                      | Recommended Value                                                                                                                                                                   | Rationale                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `Content-Security-Policy`   | `default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none';` | Allows Supabase API connections; blocks third-party scripts, frames, and inline scripts |
+| `Referrer-Policy`           | `strict-origin-when-cross-origin`                                                                                                                                                   | Limits referrer leakage to origin only                                                  |
+| `X-Content-Type-Options`    | `nosniff`                                                                                                                                                                           | Prevents MIME type sniffing                                                             |
+| `X-Frame-Options`           | `DENY`                                                                                                                                                                              | Prevents clickjacking (redundant with frame-ancestors CSP)                              |
+| `Permissions-Policy`        | `camera=(), microphone=(), geolocation=()`                                                                                                                                          | Denies all non-essential permissions                                                    |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload`                                                                                                                                      | Enforce HTTPS (set at hosting/CDN layer, not app)                                       |
 
 ### 11.3 Implementation
 
@@ -377,6 +380,7 @@ Security headers are configured in `vercel.json` for production deployment. See 
 ### 12.1 Static Tests Added (HARDENING-004)
 
 `packages/domain/src/security-hardening.test.ts` provides deterministic checks:
+
 - `.env.example` placeholder validation
 - VITE_ prefix audit
 - `.gitignore` coverage verification
@@ -401,17 +405,17 @@ Security headers are configured in `vercel.json` for production deployment. See 
 
 ## 13. Known Gaps Before Production
 
-| Gap | Severity | Status |
-|-----|----------|--------|
-| No user-facing data export | High | Documented, not implemented |
-| No account deletion UI | High | Documented, not implemented |
-| No AI interaction cleanup enforcement | Medium | SQL defined, not implemented |
-| No automated RLS runtime tests (pgTAP) | Medium | Docker unavailable for review |
-| No deployment security headers | Medium | Recommendations documented |
-| No pain-event deletion UI | Low | Documented |
-| No selective workout deletion UI | Low | Documented |
-| Profile data not persisted (in-memory only) | High | Pre-existing architecture limitation (ONBOARDING-001) |
-| AI providers not connected (Edge Functions not implemented) | Info | Pre-existing architecture limitation |
+| Gap                                                         | Severity | Status                                                |
+| ----------------------------------------------------------- | -------- | ----------------------------------------------------- |
+| No user-facing data export                                  | High     | Documented, not implemented                           |
+| No account deletion UI                                      | High     | Documented, not implemented                           |
+| No AI interaction cleanup enforcement                       | Medium   | SQL defined, not implemented                          |
+| No automated RLS runtime tests (pgTAP)                      | Medium   | Docker unavailable for review                         |
+| No deployment security headers                              | Medium   | Recommendations documented                            |
+| No pain-event deletion UI                                   | Low      | Documented                                            |
+| No selective workout deletion UI                            | Low      | Documented                                            |
+| Profile data not persisted (in-memory only)                 | High     | Pre-existing architecture limitation (ONBOARDING-001) |
+| AI providers not connected (Edge Functions not implemented) | Info     | Pre-existing architecture limitation                  |
 
 ---
 
@@ -440,4 +444,4 @@ The HARDENING-004 review assessed all 12 review areas against the current protot
 
 ---
 
-*This document is an engineering security inventory, not a legal compliance certification.*
+_This document is an engineering security inventory, not a legal compliance certification._

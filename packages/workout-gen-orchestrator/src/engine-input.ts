@@ -72,11 +72,10 @@ export function buildEngineInput(
   }
 
   // Excluded muscles
-  const excludedMuscleIds: MuscleId[] = (request.excludedMuscles ?? [])
-    .map((optionId) => {
-      const slug = muscleOptionMap[optionId] ?? optionId;
-      return findMuscleIdBySlug(catalogResult.muscleIdToSlug, slug);
-    });
+  const excludedMuscleIds: MuscleId[] = (request.excludedMuscles ?? []).map((optionId) => {
+    const slug = muscleOptionMap[optionId] ?? optionId;
+    return findMuscleIdBySlug(catalogResult.muscleIdToSlug, slug);
+  });
 
   // Equipment context → available equipment IDs
   const availableSlugs = equipmentContextMap[request.equipmentContext] ?? [];
@@ -151,10 +150,7 @@ export function buildEngineInput(
   };
 }
 
-function findMuscleIdBySlug(
-  muscleIdToSlug: ReadonlyMap<string, string>,
-  slug: string,
-): MuscleId {
+function findMuscleIdBySlug(muscleIdToSlug: ReadonlyMap<string, string>, slug: string): MuscleId {
   for (const [id, muscleSlug] of muscleIdToSlug) {
     if (muscleSlug === slug) return id as MuscleId;
   }

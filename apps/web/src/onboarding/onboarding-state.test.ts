@@ -89,10 +89,7 @@ describe('advancement gating', () => {
 
   it('prevents advancing when any subsequent step is invalid', () => {
     // experience selected but frequency not — cannot leave frequency
-    const draft = setExperience(
-      setGoal(initialOnboardingDraft, 'lose_fat'),
-      'beginner',
-    );
+    const draft = setExperience(setGoal(initialOnboardingDraft, 'lose_fat'), 'beginner');
     expect(isStepValid('frequency', draft)).toBe(false);
     expect(nextStep('frequency', draft)).toBe('frequency');
   });

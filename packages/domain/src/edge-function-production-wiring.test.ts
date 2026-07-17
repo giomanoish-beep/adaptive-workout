@@ -18,7 +18,9 @@ const progressionSource = readFileSync(
 
 describe('production Edge Function RLS wiring', () => {
   it('forwards the verified bearer token to generate-workout database reads', () => {
-    expect(generateSource).toContain('global: { headers: { Authorization: `Bearer ${accessToken}` } }');
+    expect(generateSource).toContain(
+      'global: { headers: { Authorization: `Bearer ${accessToken}` } }',
+    );
     expect(generateSource).toContain('createSupabaseCatalogLoader(supabaseUrl, anonKey, token)');
     expect(generateSource).toContain('createSupabaseProfileLoader(supabaseUrl, anonKey, token)');
   });
@@ -36,7 +38,9 @@ describe('production Edge Function RLS wiring', () => {
   });
 
   it('does not log raw database error messages', () => {
-    expect(progressionSource).not.toContain("console.error('Decision persistence failed:', error.message)");
+    expect(progressionSource).not.toContain(
+      "console.error('Decision persistence failed:', error.message)",
+    );
     expect(progressionSource).not.toContain('metadata: { errorMessage: message }');
   });
 });

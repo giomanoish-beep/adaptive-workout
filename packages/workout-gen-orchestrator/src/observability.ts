@@ -45,9 +45,7 @@ export interface GenerationObservability {
   }): void;
 }
 
-export function createGenerationObservability(
-  sink: ObservabilitySink,
-): GenerationObservability {
+export function createGenerationObservability(sink: ObservabilitySink): GenerationObservability {
   const emitEvent = createEmitter({ sink: safeSink(sink) });
 
   return {

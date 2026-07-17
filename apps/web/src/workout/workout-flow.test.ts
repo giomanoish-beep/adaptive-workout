@@ -10,7 +10,11 @@ import {
   toggleReplaceExercise,
   updateWorkoutFlowDraft,
 } from './workout-flow';
-import { setWorkoutRequestDuration, setWorkoutRequestEquipment, toggleWorkoutRequestMuscle } from './workout-request';
+import {
+  setWorkoutRequestDuration,
+  setWorkoutRequestEquipment,
+  toggleWorkoutRequestMuscle,
+} from './workout-request';
 import { workoutReviewFixture } from './workout-review';
 
 function requestedDraft() {

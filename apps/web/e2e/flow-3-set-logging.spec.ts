@@ -26,9 +26,7 @@ test.describe('Flow 3 — Set logging → rest timer → incomplete finish', () 
     await page.getByRole('button', { name: 'Generate workout' }).click();
     await page.getByRole('button', { name: 'Start workout' }).click();
 
-    await expect(
-      page.getByRole('heading', { name: 'Dumbbell Bench Press' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dumbbell Bench Press' })).toBeVisible();
   });
 
   test('logs set, exercises rest timer, navigates, and finishes with incomplete sets', async ({
@@ -38,11 +36,7 @@ test.describe('Flow 3 — Set logging → rest timer → incomplete finish', () 
     await page.getByLabel('Set 1 weight').fill('32');
     await page.getByLabel('Set 1 reps').fill('10');
 
-    await page
-      .locator('.active-set')
-      .first()
-      .getByRole('button', { name: 'Complete' })
-      .click();
+    await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 
     await expect(page.locator('.active-set--completed')).toContainText('32 kg');
     await expect(page.locator('.active-set--completed')).toContainText('10 reps');
@@ -61,43 +55,33 @@ test.describe('Flow 3 — Set logging → rest timer → incomplete finish', () 
 
     // -- Navigate Next → Previous --
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Lat Pulldown' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lat Pulldown' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Previous' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Dumbbell Bench Press' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dumbbell Bench Press' })).toBeVisible();
 
     // Completed set preserved
     await expect(page.locator('.active-set--completed')).toContainText('32 kg');
 
     // -- Finish workout --
     await page.getByRole('button', { name: 'Finish workout' }).click();
-    await expect(
-      page.locator('.active-workout__finish--confirming'),
-    ).toContainText('Some sets are incomplete. Finish anyway?');
+    await expect(page.locator('.active-workout__finish--confirming')).toContainText(
+      'Some sets are incomplete. Finish anyway?',
+    );
 
     // Cancel
     await page.getByRole('button', { name: 'Keep logging' }).click();
-    await expect(
-      page.locator('.active-workout__finish--confirming'),
-    ).not.toBeVisible();
+    await expect(page.locator('.active-workout__finish--confirming')).not.toBeVisible();
 
     // Finish again + confirm
     await page.getByRole('button', { name: 'Finish workout' }).click();
     await page.getByRole('button', { name: 'Finish' }).click();
 
     await expect(page.locator('.active-workout--finished')).toBeVisible();
-    await expect(page.locator('.active-workout--finished')).toContainText(
-      'Session complete',
-    );
+    await expect(page.locator('.active-workout--finished')).toContainText('Session complete');
 
     // Done
     await page.getByRole('button', { name: 'Done' }).click();
-    await expect(
-      page.getByRole('button', { name: 'Today' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
   });
 });

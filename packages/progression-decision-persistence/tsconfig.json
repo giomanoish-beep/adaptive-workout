@@ -2,11 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "@adaptive-workout/domain": ["../domain/src/index.ts"],
-      "@adaptive-workout/progression-engine": ["../progression-engine/src/index.ts"]
-    }
+    "resolveJsonModule": true
   },
   "include": ["src"]
 }

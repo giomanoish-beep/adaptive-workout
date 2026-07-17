@@ -89,7 +89,8 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
   }
 
   if (state.stage === 'review' && state.review) {
-    const handleStart = () => onStartWorkout(state.review!);
+    const review = state.review;
+    const handleStart = () => onStartWorkout(review);
     return (
       <WorkoutReviewView
         review={state.review}
@@ -102,8 +103,7 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
   }
 
   // Show error state inline above the form
-  const idleState =
-    state.stage === 'idle' ? (state as { generationError?: string }) : null;
+  const idleState = state.stage === 'idle' ? (state as { generationError?: string }) : null;
   const generationError = idleState?.generationError;
 
   return (

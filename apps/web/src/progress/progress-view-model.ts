@@ -75,8 +75,5 @@ const validViewModes: readonly ProgressViewMode[] = ['history', 'progression'];
  * Returns true if the value is a recognised ProgressViewMode.
  */
 export function isProgressViewMode(value: unknown): value is ProgressViewMode {
-  return (
-    typeof value === 'string' &&
-    (validViewModes as readonly string[]).includes(value)
-  );
+  return typeof value === 'string' && (validViewModes as readonly string[]).includes(value);
 }

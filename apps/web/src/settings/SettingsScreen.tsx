@@ -204,9 +204,7 @@ function DiscomfortSection({ hasCurrentDiscomfort }: DiscomfortSectionProps) {
       >
         {discomfortStatusLabel(hasCurrentDiscomfort)}
       </p>
-      {hasCurrentDiscomfort && (
-        <p className="settings-card__detail">{discomfortDetailText()}</p>
-      )}
+      {hasCurrentDiscomfort && <p className="settings-card__detail">{discomfortDetailText()}</p>}
     </div>
   );
 }
@@ -222,9 +220,7 @@ function DataStatusSection({ saving, saveError }: DataStatusSectionProps) {
   return (
     <div className="settings-card settings-card--muted">
       <h3 className="settings-card__title">Data & save status</h3>
-      {saving && (
-        <p className="settings-card__detail">Saving profile changes…</p>
-      )}
+      {saving && <p className="settings-card__detail">Saving profile changes…</p>}
       {saveError && (
         <p className="settings-card__error" role="alert">
           {saveError}
@@ -232,8 +228,8 @@ function DataStatusSection({ saving, saveError }: DataStatusSectionProps) {
       )}
       {!saving && !saveError && (
         <p className="settings-card__detail">
-          Your training profile is persisted to the cloud. Changes appear here
-          after a successful save.
+          Your training profile is persisted to the cloud. Changes appear here after a successful
+          save.
         </p>
       )}
     </div>
@@ -258,8 +254,7 @@ function SignOutSection({ signOut }: SignOutSectionProps) {
         // Auth state change is handled by the parent useAuth listener.
       })
       .catch((err: unknown) => {
-        const message =
-          err instanceof Error ? err.message : 'Sign out failed. Please try again.';
+        const message = err instanceof Error ? err.message : 'Sign out failed. Please try again.';
         setError(message);
         setSubmitting(false);
       });

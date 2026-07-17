@@ -16,10 +16,10 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// packages/progression-engine/dist/contracts.js
+// packages/progression-engine/src/contracts.ts
 var progressionLoadUnits, progressionSetClassifications, progressionExposureStatuses, progressionRecommendationActions, progressionRecommendationReasonCodes, progressionFailureCodes, progressionValidationReasonCodes;
 var init_contracts = __esm({
-  "packages/progression-engine/dist/contracts.js"() {
+  "packages/progression-engine/src/contracts.ts"() {
     "use strict";
     progressionLoadUnits = ["kg", "lb"];
     progressionSetClassifications = ["warm_up", "working"];
@@ -2283,7 +2283,7 @@ var init_src = __esm({
   }
 });
 
-// packages/progression-engine/dist/validation.js
+// packages/progression-engine/src/validation.ts
 function validateProgressionRuleSet(ruleSet, expectedRuleSetVersion) {
   const issues = [];
   if (!parseVersionIdentifier(ruleSet.contractVersion, "contract").ok) {
@@ -2397,7 +2397,11 @@ function validateProgressionInput(input, ruleSet) {
     collector.add("NO_USABLE_COMPLETED_WORKING_SETS", "no_completed_working_sets");
   }
   if (history.usableExposureIds.length > 0 && history.usableExposureIds.length < ruleSet.minimumUsableExposureCount) {
-    collector.add("INSUFFICIENT_USABLE_HISTORY", "usable_history_below_minimum", history.usableExposureIds);
+    collector.add(
+      "INSUFFICIENT_USABLE_HISTORY",
+      "usable_history_below_minimum",
+      history.usableExposureIds
+    );
   }
   validateLoadUnits(input, history.usableCompletedWorkingSets, collector);
   const failure2 = collector.failure();
@@ -2457,7 +2461,11 @@ function validateExposureHistory(input, collector) {
     validateExposureIdentity(exposure, input.exerciseId, collector);
     const occurredAt = Date.parse(exposure.occurredAt);
     if (!Number.isFinite(occurredAt) || occurredAt < previousOccurredAt) {
-      collector.add("MALFORMED_EXPOSURE_CHRONOLOGY", Number.isFinite(occurredAt) ? "exposure_order_invalid" : "timestamp_invalid", [exposure.exposureId]);
+      collector.add(
+        "MALFORMED_EXPOSURE_CHRONOLOGY",
+        Number.isFinite(occurredAt) ? "exposure_order_invalid" : "timestamp_invalid",
+        [exposure.exposureId]
+      );
     }
     previousOccurredAt = occurredAt;
     if (Number.isFinite(occurredAt) && occurredAt > Date.parse(input.calculatedAt)) {
@@ -2487,7 +2495,10 @@ function validateExposureIdentity(exposure, expectedExerciseId, collector) {
     collector.add("INVALID_INPUT", "historical_prescription_invalid", [exposure.exposureId]);
   }
   const prescription = exposure.prescription;
-  if (prescription !== null && (!Number.isInteger(prescription.plannedWorkingSets) || prescription.plannedWorkingSets <= 0 || prescription.targetRepRange !== null && (!isValidRepRange(prescription.targetRepRange.minimum, prescription.targetRepRange.maximum) || prescription.targetRepRange.minimum <= 0) || prescription.targetRirRange !== null && (!isBoundedRir(prescription.targetRirRange.minimum) || !isBoundedRir(prescription.targetRirRange.maximum) || prescription.targetRirRange.maximum < prescription.targetRirRange.minimum))) {
+  if (prescription !== null && (!Number.isInteger(prescription.plannedWorkingSets) || prescription.plannedWorkingSets <= 0 || prescription.targetRepRange !== null && (!isValidRepRange(
+    prescription.targetRepRange.minimum,
+    prescription.targetRepRange.maximum
+  ) || prescription.targetRepRange.minimum <= 0) || prescription.targetRirRange !== null && (!isBoundedRir(prescription.targetRirRange.minimum) || !isBoundedRir(prescription.targetRirRange.maximum) || prescription.targetRirRange.maximum < prescription.targetRirRange.minimum))) {
     collector.add("INVALID_INPUT", "historical_prescription_invalid", [exposure.exposureId]);
   }
   if (exposure.substitution !== null && (!isUuid(exposure.substitution.plannedExerciseId) || exposure.substitution.plannedExerciseId === exposure.exerciseId || !/^[a-z][a-z0-9_]{0,63}$/.test(exposure.substitution.reasonCode))) {
@@ -2511,12 +2522,22 @@ function validateSets(exposure, setIds, collector) {
     }
     previousSetNumber = set.setNumber;
     if (!progressionSetClassifications.includes(set.classification)) {
-      collector.add("INVALID_INPUT", "completed_set_data_invalid", [exposure.exposureId], [set.setId]);
+      collector.add(
+        "INVALID_INPUT",
+        "completed_set_data_invalid",
+        [exposure.exposureId],
+        [set.setId]
+      );
     }
     if (set.status === "completed") {
       const performedAt = validateCompletedSet(set, exposure, collector);
       if (performedAt < previousPerformedAt) {
-        collector.add("MALFORMED_EXPOSURE_CHRONOLOGY", "set_order_invalid", [exposure.exposureId], [set.setId]);
+        collector.add(
+          "MALFORMED_EXPOSURE_CHRONOLOGY",
+          "set_order_invalid",
+          [exposure.exposureId],
+          [set.setId]
+        );
       }
       previousPerformedAt = performedAt;
       if (set.classification === "working" && exposure.status === "completed" && set.reps !== null) {
@@ -2532,13 +2553,23 @@ function validateCompletedSet(set, exposure, collector) {
   const performedAt = Date.parse(set.performedAt);
   const loadPairValid = set.load === null && set.loadUnit === null || set.load !== null && isNonNegativeFinite(set.load) && isLoadUnit(set.loadUnit);
   if (!Number.isFinite(performedAt) || performedAt > Date.parse(exposure.occurredAt) || !loadPairValid || set.reps !== null && (!Number.isInteger(set.reps) || set.reps < 0) || set.rir !== null && !isBoundedRir(set.rir)) {
-    collector.add("INVALID_INPUT", Number.isFinite(performedAt) ? "completed_set_data_invalid" : "timestamp_invalid", [exposure.exposureId], [set.setId]);
+    collector.add(
+      "INVALID_INPUT",
+      Number.isFinite(performedAt) ? "completed_set_data_invalid" : "timestamp_invalid",
+      [exposure.exposureId],
+      [set.setId]
+    );
   }
   return performedAt;
 }
 function validateUnusableSet(set, exposure, collector) {
   if (set.load !== null || set.loadUnit !== null || set.reps !== null || set.rir !== null || set.performedAt !== null) {
-    collector.add("INVALID_INPUT", "unusable_set_contains_performance", [exposure.exposureId], [set.setId]);
+    collector.add(
+      "INVALID_INPUT",
+      "unusable_set_contains_performance",
+      [exposure.exposureId],
+      [set.setId]
+    );
   }
 }
 function validateLoadUnits(input, usableSets, collector) {
@@ -2583,7 +2614,7 @@ function isStrictlyIncreasing(values) {
 }
 var progressionRuleSetValidationCodes, FailureCollector, failurePriority, progressionValidationReasonOrder;
 var init_validation = __esm({
-  "packages/progression-engine/dist/validation.js"() {
+  "packages/progression-engine/src/validation.ts"() {
     "use strict";
     init_src();
     init_contracts();
@@ -2684,7 +2715,7 @@ var init_validation = __esm({
   }
 });
 
-// packages/progression-engine/dist/analysis.js
+// packages/progression-engine/src/analysis.ts
 function analyzeProgressionEvidence(input, ruleSet) {
   const validation = validateProgressionInput(input, ruleSet);
   if (!validation.ok) {
@@ -2693,7 +2724,9 @@ function analyzeProgressionEvidence(input, ruleSet) {
   const windowStart = Math.max(0, input.exposures.length - ruleSet.analysisWindowExposureCount);
   const windowExposures = input.exposures.slice(windowStart);
   const exposures = windowExposures.map((exposure) => analyzeExposure(exposure, input, ruleSet));
-  const trendEligible = exposures.filter(({ usableWorkingSetCount, wasDeload }) => usableWorkingSetCount > 0 && !wasDeload);
+  const trendEligible = exposures.filter(
+    ({ usableWorkingSetCount, wasDeload }) => usableWorkingSetCount > 0 && !wasDeload
+  );
   return {
     status: "success",
     contractVersion: progressionEvidenceContractVersion,
@@ -2703,10 +2736,16 @@ function analyzeProgressionEvidence(input, ruleSet) {
     excludedOlderExposureIds: input.exposures.slice(0, windowStart).map(({ exposureId }) => exposureId),
     exposures,
     performanceTrend: performanceTrend(trendEligible),
-    loadTrend: directionalTrend(trendEligible.map(({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value ?? null)),
+    loadTrend: directionalTrend(
+      trendEligible.map(({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value ?? null)
+    ),
     rirTrend: rirTrend(trendEligible),
-    topRangeExposureCount: trendEligible.filter(({ allSetsAtOrAboveTargetMaximum }) => allSetsAtOrAboveTargetMaximum).length,
-    belowRangeExposureCount: trendEligible.filter(({ allSetsBelowTargetMinimum }) => allSetsBelowTargetMinimum).length,
+    topRangeExposureCount: trendEligible.filter(
+      ({ allSetsAtOrAboveTargetMaximum }) => allSetsAtOrAboveTargetMaximum
+    ).length,
+    belowRangeExposureCount: trendEligible.filter(
+      ({ allSetsBelowTargetMinimum }) => allSetsBelowTargetMinimum
+    ).length,
     deloadExposureIds: exposures.filter(({ wasDeload }) => wasDeload).map(({ exposureId }) => exposureId),
     version: input.version,
     ruleSetContractVersion: ruleSet.contractVersion,
@@ -2721,12 +2760,23 @@ function recommendProgression(input, ruleSet) {
   const deload = analyzeDeloadEvidence(coreRecommendation.evidence.analysis, ruleSet);
   if (deload.qualifiesForDeloadReview) {
     const reviewExposureIdSet2 = new Set(deload.reviewExposureIds);
-    const reviewExposures2 = coreRecommendation.evidence.analysis.exposures.filter(({ exposureId }) => reviewExposureIdSet2.has(exposureId));
-    return recommendation(input, coreRecommendation.evidence.analysis, reviewExposures2, "review_deload", null, [
-      ...deload.degradationSignal ? ["PERFORMANCE_DECLINING"] : [],
-      ...deload.highEffortSignal ? ["REPEATED_HIGH_EFFORT"] : [],
-      "DELOAD_REVIEW_SIGNAL"
-    ], void 0, deload);
+    const reviewExposures2 = coreRecommendation.evidence.analysis.exposures.filter(
+      ({ exposureId }) => reviewExposureIdSet2.has(exposureId)
+    );
+    return recommendation(
+      input,
+      coreRecommendation.evidence.analysis,
+      reviewExposures2,
+      "review_deload",
+      null,
+      [
+        ...deload.degradationSignal ? ["PERFORMANCE_DECLINING"] : [],
+        ...deload.highEffortSignal ? ["REPEATED_HIGH_EFFORT"] : [],
+        "DELOAD_REVIEW_SIGNAL"
+      ],
+      void 0,
+      deload
+    );
   }
   const recommendationWithDeloadEvidence = {
     ...coreRecommendation,
@@ -2744,26 +2794,43 @@ function recommendProgression(input, ruleSet) {
   }
   const reviewExposureIds = plateau.qualifiesForSubstitutionReview ? plateau.substitutionReviewExposureIds : plateau.plateauExposureIds;
   const reviewExposureIdSet = new Set(reviewExposureIds);
-  const reviewExposures = coreRecommendation.evidence.analysis.exposures.filter(({ exposureId }) => reviewExposureIdSet.has(exposureId));
-  return recommendation(input, coreRecommendation.evidence.analysis, reviewExposures, plateau.qualifiesForSubstitutionReview ? "consider_substitution" : "maintain_load", plateau.qualifiesForSubstitutionReview ? null : input.prescription.currentPlannedLoad, [
-    ...coreRecommendation.reasonCodes,
-    ...plateau.qualifiesAsPlateau ? ["PLATEAU_SIGNAL"] : [],
-    ...plateau.qualifiesForSubstitutionReview ? ["SUBSTITUTION_REVIEW_SIGNAL"] : []
-  ], plateau, deload);
+  const reviewExposures = coreRecommendation.evidence.analysis.exposures.filter(
+    ({ exposureId }) => reviewExposureIdSet.has(exposureId)
+  );
+  return recommendation(
+    input,
+    coreRecommendation.evidence.analysis,
+    reviewExposures,
+    plateau.qualifiesForSubstitutionReview ? "consider_substitution" : "maintain_load",
+    plateau.qualifiesForSubstitutionReview ? null : input.prescription.currentPlannedLoad,
+    [
+      ...coreRecommendation.reasonCodes,
+      ...plateau.qualifiesAsPlateau ? ["PLATEAU_SIGNAL"] : [],
+      ...plateau.qualifiesForSubstitutionReview ? ["SUBSTITUTION_REVIEW_SIGNAL"] : []
+    ],
+    plateau,
+    deload
+  );
 }
 function recommendCoreProgression(input, ruleSet) {
   const analysis = analyzeProgressionEvidence(input, ruleSet);
   if (analysis.status === "failure") {
     return analysis;
   }
-  const eligible = analysis.exposures.filter(({ usableWorkingSetCount, wasDeload }) => usableWorkingSetCount > 0 && !wasDeload);
+  const eligible = analysis.exposures.filter(
+    ({ usableWorkingSetCount, wasDeload }) => usableWorkingSetCount > 0 && !wasDeload
+  );
   const reductionWindow = eligible.slice(-ruleSet.reductionRequiredExposureCount);
   const increaseWindow = eligible.slice(-ruleSet.increaseRequiredExposureCount);
-  const reductionSignal = reductionWindow.length === ruleSet.reductionRequiredExposureCount && reductionWindow.every(({ allSetsBelowTargetMinimum, rirBelowReductionThreshold }) => allSetsBelowTargetMinimum || rirBelowReductionThreshold);
-  const increaseSignal = increaseWindow.length === ruleSet.increaseRequiredExposureCount && increaseWindow.every(({ allSetsAtOrAboveTargetMaximum, knownRirSetCount, rirTargetPosition: rirTargetPosition2, exposureId }) => {
-    const targetRir = targetRirForExposure(input, exposureId);
-    return allSetsAtOrAboveTargetMaximum && (targetRir === null || knownRirSetCount >= ruleSet.minimumKnownRirSetsPerExposureForIncrease && rirTargetPosition2 !== "below_target" && rirTargetPosition2 !== "mixed" && rirTargetPosition2 !== "unknown");
-  });
+  const reductionSignal = reductionWindow.length === ruleSet.reductionRequiredExposureCount && reductionWindow.every(
+    ({ allSetsBelowTargetMinimum, rirBelowReductionThreshold }) => allSetsBelowTargetMinimum || rirBelowReductionThreshold
+  );
+  const increaseSignal = increaseWindow.length === ruleSet.increaseRequiredExposureCount && increaseWindow.every(
+    ({ allSetsAtOrAboveTargetMaximum, knownRirSetCount, rirTargetPosition: rirTargetPosition2, exposureId }) => {
+      const targetRir = targetRirForExposure(input, exposureId);
+      return allSetsAtOrAboveTargetMaximum && (targetRir === null || knownRirSetCount >= ruleSet.minimumKnownRirSetsPerExposureForIncrease && rirTargetPosition2 !== "below_target" && rirTargetPosition2 !== "mixed" && rirTargetPosition2 !== "unknown");
+    }
+  );
   const reducedLoad = reductionSignal ? adjustedLoad(input, ruleSet, "reduce") : null;
   if (reductionSignal && reducedLoad !== null) {
     return recommendation(input, analysis, reductionWindow, "reduce_load", reducedLoad, [
@@ -2792,11 +2859,22 @@ function recommendCoreProgression(input, ruleSet) {
     maintainReasons.push("RIR_UNKNOWN");
   }
   maintainReasons.push("LOAD_MAINTAINED");
-  return recommendation(input, analysis, eligible, "maintain_load", input.prescription.currentPlannedLoad, maintainReasons);
+  return recommendation(
+    input,
+    analysis,
+    eligible,
+    "maintain_load",
+    input.prescription.currentPlannedLoad,
+    maintainReasons
+  );
 }
 function analyzeExposure(exposure, input, ruleSet) {
-  const usableSets = exposure.sets.filter((set) => exposure.status === "completed" && set.status === "completed" && set.classification === "working" && set.reps !== null);
-  const workingSetCount = exposure.sets.filter(({ classification }) => classification === "working").length;
+  const usableSets = exposure.sets.filter(
+    (set) => exposure.status === "completed" && set.status === "completed" && set.classification === "working" && set.reps !== null
+  );
+  const workingSetCount = exposure.sets.filter(
+    ({ classification }) => classification === "working"
+  ).length;
   const reps = usableSets.map(({ reps: reps2 }) => reps2);
   const knownRir = usableSets.flatMap(({ rir }) => rir === null ? [] : [rir]);
   const targetRepRange = exposure.prescription?.targetRepRange ?? input.prescription.targetRepRange;
@@ -2813,10 +2891,14 @@ function analyzeExposure(exposure, input, ruleSet) {
     observedRirRange: observedRange(knownRir),
     knownRirSetCount: knownRir.length,
     allSetsAtOrAboveTargetMaximum: reps.length > 0 && reps.every((repsValue) => repsValue >= targetRepRange.maximum),
-    allSetsWithinTargetRange: reps.length > 0 && reps.every((repsValue) => repsValue >= targetRepRange.minimum && repsValue <= targetRepRange.maximum),
+    allSetsWithinTargetRange: reps.length > 0 && reps.every(
+      (repsValue) => repsValue >= targetRepRange.minimum && repsValue <= targetRepRange.maximum
+    ),
     allSetsBelowTargetMinimum: reps.length > 0 && reps.every((repsValue) => repsValue < targetRepRange.minimum),
     rirTargetPosition: rirTargetPosition(knownRir, targetRirRange ?? null),
-    rirBelowReductionThreshold: targetRirRange !== void 0 && targetRirRange !== null && knownRir.length > 0 && knownRir.every((rir) => rir <= Math.max(0, targetRirRange.minimum - ruleSet.rirReductionMargin)),
+    rirBelowReductionThreshold: targetRirRange !== void 0 && targetRirRange !== null && knownRir.length > 0 && knownRir.every(
+      (rir) => rir <= Math.max(0, targetRirRange.minimum - ruleSet.rirReductionMargin)
+    ),
     wasDeload: exposure.wasDeload,
     wasSubstitution: exposure.substitution !== null
   };
@@ -2824,8 +2906,12 @@ function analyzeExposure(exposure, input, ruleSet) {
 function recommendation(input, analysis, evidenceExposures, action, recommendedLoad, reasons, plateau, deload) {
   const exposureIds = evidenceExposures.map(({ exposureId }) => exposureId);
   const setIds = evidenceExposures.flatMap(({ usableSetIds }) => usableSetIds);
-  const repValues = evidenceExposures.flatMap(({ observedRepRange: observedRepRange2 }) => observedRepRange2 === null ? [] : [observedRepRange2.minimum, observedRepRange2.maximum]);
-  const rirValues = evidenceExposures.flatMap(({ observedRirRange: observedRirRange2 }) => observedRirRange2 === null ? [] : [observedRirRange2.minimum, observedRirRange2.maximum]);
+  const repValues = evidenceExposures.flatMap(
+    ({ observedRepRange: observedRepRange2 }) => observedRepRange2 === null ? [] : [observedRepRange2.minimum, observedRepRange2.maximum]
+  );
+  const rirValues = evidenceExposures.flatMap(
+    ({ observedRirRange: observedRirRange2 }) => observedRirRange2 === null ? [] : [observedRirRange2.minimum, observedRirRange2.maximum]
+  );
   const observedRepRange = observedRange(repValues);
   const observedRirRange = observedRange(rirValues);
   const reasonSet = new Set(reasons);
@@ -2858,8 +2944,12 @@ function analyzeDeloadEvidence(analysis, ruleSet) {
   const reviewWindow = analysis.exposures.slice(-ruleSet.deloadReviewRequiredExposureCount);
   const performance = performanceTrend(reviewWindow.filter(({ wasDeload }) => !wasDeload));
   const priorDeloadExposureIds = reviewWindow.filter(({ wasDeload }) => wasDeload).map(({ exposureId }) => exposureId);
-  const knownHighEffortExposureCount = reviewWindow.filter(({ rirBelowReductionThreshold }) => rirBelowReductionThreshold).length;
-  const unknownRirExposureCount = reviewWindow.filter(({ knownRirSetCount }) => knownRirSetCount === 0).length;
+  const knownHighEffortExposureCount = reviewWindow.filter(
+    ({ rirBelowReductionThreshold }) => rirBelowReductionThreshold
+  ).length;
+  const unknownRirExposureCount = reviewWindow.filter(
+    ({ knownRirSetCount }) => knownRirSetCount === 0
+  ).length;
   const completeWindow = reviewWindow.length === ruleSet.deloadReviewRequiredExposureCount && reviewWindow.every(({ usableWorkingSetCount }) => usableWorkingSetCount > 0);
   const degradationSignal = completeWindow && performance.direction === "declining";
   const highEffortSignal = completeWindow && knownHighEffortExposureCount >= ruleSet.deloadReviewMinimumHighEffortExposureCount;
@@ -2878,19 +2968,29 @@ function analyzeDeloadEvidence(analysis, ruleSet) {
 }
 function analyzePlateauEvidence(input, analysis, ruleSet) {
   const plateauWindow = analysis.exposures.slice(-ruleSet.plateauRequiredExposureCount);
-  const substitutionWindow = analysis.exposures.slice(-ruleSet.substitutionReviewRequiredExposureCount);
+  const substitutionWindow = analysis.exposures.slice(
+    -ruleSet.substitutionReviewRequiredExposureCount
+  );
   const stableLoad = hasStableLoad(plateauWindow);
   const stableSetCount = hasStableSetCount(plateauWindow);
   const stagnantReps = hasStagnantReps(plateauWindow, ruleSet.plateauMaximumRepChange);
-  const recentProgression = performanceTrend(plateauWindow).direction === "improving" || directionalTrend(plateauWindow.map(({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value ?? null)) === "increasing";
+  const recentProgression = performanceTrend(plateauWindow).direction === "improving" || directionalTrend(
+    plateauWindow.map(({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value ?? null)
+  ) === "increasing";
   const deloadExposureIds = substitutionWindow.filter(({ wasDeload }) => wasDeload).map(({ exposureId }) => exposureId);
   const knownHighEffortExposureCount = substitutionWindow.filter((exposure) => {
     const targetRir = targetRirForExposure(input, exposure.exposureId);
     return targetRir !== null && exposure.observedRirRange !== null && exposure.observedRirRange.maximum <= targetRir.minimum;
   }).length;
-  const unknownRirExposureCount = substitutionWindow.filter(({ knownRirSetCount }) => knownRirSetCount === 0).length;
-  const qualifiesAsPlateau = plateauWindow.length === ruleSet.plateauRequiredExposureCount && plateauWindow.every(({ usableWorkingSetCount, wasDeload }) => Boolean(usableWorkingSetCount > 0 && !wasDeload)) && stableLoad && stableSetCount && stagnantReps && !recentProgression;
-  const qualifiesForSubstitutionReview = qualifiesAsPlateau && substitutionWindow.length === ruleSet.substitutionReviewRequiredExposureCount && substitutionWindow.every(({ usableWorkingSetCount, wasDeload }) => Boolean(usableWorkingSetCount > 0 && !wasDeload)) && hasStableLoad(substitutionWindow) && hasStableSetCount(substitutionWindow) && hasStagnantReps(substitutionWindow, ruleSet.plateauMaximumRepChange) && knownHighEffortExposureCount >= ruleSet.substitutionReviewMinimumHighEffortExposureCount;
+  const unknownRirExposureCount = substitutionWindow.filter(
+    ({ knownRirSetCount }) => knownRirSetCount === 0
+  ).length;
+  const qualifiesAsPlateau = plateauWindow.length === ruleSet.plateauRequiredExposureCount && plateauWindow.every(
+    ({ usableWorkingSetCount, wasDeload }) => Boolean(usableWorkingSetCount > 0 && !wasDeload)
+  ) && stableLoad && stableSetCount && stagnantReps && !recentProgression;
+  const qualifiesForSubstitutionReview = qualifiesAsPlateau && substitutionWindow.length === ruleSet.substitutionReviewRequiredExposureCount && substitutionWindow.every(
+    ({ usableWorkingSetCount, wasDeload }) => Boolean(usableWorkingSetCount > 0 && !wasDeload)
+  ) && hasStableLoad(substitutionWindow) && hasStableSetCount(substitutionWindow) && hasStagnantReps(substitutionWindow, ruleSet.plateauMaximumRepChange) && knownHighEffortExposureCount >= ruleSet.substitutionReviewMinimumHighEffortExposureCount;
   return {
     plateauExposureIds: plateauWindow.map(({ exposureId }) => exposureId),
     substitutionReviewExposureIds: substitutionWindow.map(({ exposureId }) => exposureId),
@@ -2907,7 +3007,9 @@ function analyzePlateauEvidence(input, analysis, ruleSet) {
 }
 function hasStableLoad(exposures) {
   const first = exposures[0]?.representativeLoad;
-  return first !== void 0 && first !== null && exposures.every(({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value === first.value && representativeLoad2.unit === first.unit);
+  return first !== void 0 && first !== null && exposures.every(
+    ({ representativeLoad: representativeLoad2 }) => representativeLoad2?.value === first.value && representativeLoad2.unit === first.unit
+  );
 }
 function hasStableSetCount(exposures) {
   const first = exposures[0]?.usableWorkingSetCount;
@@ -3003,7 +3105,9 @@ function rirTrend(exposures) {
   if (exposures.length < 2 || exposures.some(({ observedRirRange }) => observedRirRange === null)) {
     return "unknown";
   }
-  const midpoints = exposures.map(({ observedRirRange }) => observedRirRange === null ? null : (observedRirRange.minimum + observedRirRange.maximum) / 2);
+  const midpoints = exposures.map(
+    ({ observedRirRange }) => observedRirRange === null ? null : (observedRirRange.minimum + observedRirRange.maximum) / 2
+  );
   return directionalTrend(midpoints);
 }
 function rirTargetPosition(values, target) {
@@ -3039,7 +3143,7 @@ function roundLoad(value) {
 }
 var progressionEvidenceContractVersion, progressionRecommendationContractVersion;
 var init_analysis = __esm({
-  "packages/progression-engine/dist/analysis.js"() {
+  "packages/progression-engine/src/analysis.ts"() {
     "use strict";
     init_contracts();
     init_validation();
@@ -3048,9 +3152,9 @@ var init_analysis = __esm({
   }
 });
 
-// packages/progression-engine/dist/index.js
-var dist_exports = {};
-__export(dist_exports, {
+// packages/progression-engine/src/index.ts
+var src_exports = {};
+__export(src_exports, {
   analyzeProgressionEvidence: () => analyzeProgressionEvidence,
   packageName: () => packageName,
   progressionEvidenceContractVersion: () => progressionEvidenceContractVersion,
@@ -3068,8 +3172,8 @@ __export(dist_exports, {
   validateProgressionRuleSet: () => validateProgressionRuleSet
 });
 var packageName;
-var init_dist = __esm({
-  "packages/progression-engine/dist/index.js"() {
+var init_src2 = __esm({
+  "packages/progression-engine/src/index.ts"() {
     "use strict";
     init_analysis();
     init_contracts();
@@ -3192,17 +3296,37 @@ function mapExposuresForExercise(exerciseId, assembly) {
       });
     }
   }
-  exposures.sort(
-    (a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime()
-  );
+  exposures.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
   return exposures;
 }
+var ProgressionEngineUnavailableError = class extends Error {
+  code = "PROGRESSION_ENGINE_UNAVAILABLE";
+  constructor() {
+    super("Progression engine is unavailable.");
+    this.name = "ProgressionEngineUnavailableError";
+  }
+};
 var _progressionEngine = null;
-async function getProgressionEngine() {
+async function importProgressionEngine() {
   if (_progressionEngine === null) {
-    _progressionEngine = await Promise.resolve().then(() => (init_dist(), dist_exports));
+    const loadedEngine = await Promise.resolve().then(() => (init_src2(), src_exports));
+    _progressionEngine = loadedEngine;
   }
   return _progressionEngine;
+}
+async function loadProgressionEngine(loader = importProgressionEngine) {
+  try {
+    const engine = await loader();
+    if (engine === null) {
+      throw new ProgressionEngineUnavailableError();
+    }
+    return engine;
+  } catch (error) {
+    if (error instanceof ProgressionEngineUnavailableError) {
+      throw error;
+    }
+    throw new ProgressionEngineUnavailableError();
+  }
 }
 function toEngineExposure(exposure) {
   return {
@@ -3364,9 +3488,7 @@ async function persistPerformanceState(serviceClient, upserts) {
   if (upserts.length === 0) return;
   const { error } = await serviceClient.from("exercise_performance_state").upsert([...upserts]).select();
   if (error) {
-    throw new Error(
-      `Failed to persist progression state: ${error.message}`
-    );
+    throw new Error(`Failed to persist progression state: ${error.message}`);
   }
 }
 async function persistDecision(serviceClient, decision) {
@@ -3376,7 +3498,7 @@ async function persistDecision(serviceClient, decision) {
   }
 }
 async function refreshProgression(ctx) {
-  const { userId, anonClient, serviceClient, correlationId, sink } = ctx;
+  const { userId, anonClient, serviceClient, correlationId, sink, progressionEngineLoader } = ctx;
   const startTime = Date.now();
   sink.emit({
     kind: "refresh.progression.received",
@@ -3417,7 +3539,7 @@ async function refreshProgression(ctx) {
     const assembly = assembleHistory(sessions, sessionExercises, setLogs);
     const distinctExerciseIds = collectDistinctExerciseIds(sessionExercises);
     const exerciseNames = await loadExerciseNames(anonClient, distinctExerciseIds);
-    const engine = await getProgressionEngine();
+    const engine = progressionEngineLoader === void 0 ? await loadProgressionEngine() : await loadProgressionEngine(progressionEngineLoader);
     const ruleSet = defaultRuleSet();
     const calculatedAt = (/* @__PURE__ */ new Date()).toISOString();
     const dtos = [];
@@ -3496,15 +3618,17 @@ async function refreshProgression(ctx) {
       correlationId
     };
   } catch (err) {
+    const engineUnavailable = err instanceof ProgressionEngineUnavailableError;
+    const errorCode = engineUnavailable ? err.code : "REFRESH_FAILED";
     sink.emit({
       kind: "refresh.progression.persistence_failed",
       correlationId,
-      metadata: { errorCode: "REFRESH_FAILED" }
+      metadata: { errorCode }
     });
     return {
       status: "error",
-      code: "REFRESH_FAILED",
-      message: "Progression refresh failed. Please try again."
+      code: errorCode,
+      message: engineUnavailable ? "Progression engine is unavailable. Please try again." : "Progression refresh failed. Please try again."
     };
   }
 }

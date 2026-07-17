@@ -1,13 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "paths": {
-      "@adaptive-workout/domain": ["../domain/src/index.ts"],
-      "@adaptive-workout/ai": ["../ai/src/index.ts"],
-      "@adaptive-workout/ai-glm-provider": ["../ai-glm-provider/src/index.ts"],
-      "@adaptive-workout/ai-deepseek-provider": ["../ai-deepseek-provider/src/index.ts"]
-    }
-  },
+  "compilerOptions": { "noEmit": true },
   "include": ["src"]
 }

@@ -32,10 +32,7 @@ export interface ProgressSummary {
 
 // ─── Exercise Progression ────────────────────────────────────────────
 
-export type ProgressionTrendLabel =
-  | 'Improving'
-  | 'Stable'
-  | 'Declining';
+export type ProgressionTrendLabel = 'Improving' | 'Stable' | 'Declining';
 
 export type ProgressionRecommendationLabel =
   | 'Increase load'
@@ -73,12 +70,7 @@ export const defaultProgressViewMode: ProgressViewMode = 'history';
 
 // ─── Repository Result Types ─────────────────────────────────────────
 
-export type ProgressLoadStatus =
-  | 'loading'
-  | 'loaded'
-  | 'empty'
-  | 'error'
-  | 'refreshing';
+export type ProgressLoadStatus = 'loading' | 'loaded' | 'empty' | 'error' | 'refreshing';
 
 export interface ProgressHistoryData {
   readonly status: 'loaded' | 'empty';

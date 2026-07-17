@@ -186,7 +186,7 @@ export function createTrainingProfileRepository(client: SupabaseClient) {
 
     if (!data) return null;
 
-    const profile = mapProfileRow(data as ProfileRow);
+    const profile = mapProfileRow(data);
     return profile;
   }
 

@@ -35,10 +35,7 @@ export async function installE2ERouteMocks(
     tracker.generationRequests += 1;
     await new Promise((r) => setTimeout(r, MOCK_DELAY_MS));
 
-    if (
-      config.generationFails ||
-      tracker.generationRequests <= (config.generationFailures ?? 0)
-    ) {
+    if (config.generationFails || tracker.generationRequests <= (config.generationFailures ?? 0)) {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -90,8 +87,7 @@ export async function installE2ERouteMocks(
 
     if (
       config.progressionRefreshFails ||
-      tracker.progressionRefreshRequests <=
-        (config.progressionRefreshFailures ?? 0)
+      tracker.progressionRefreshRequests <= (config.progressionRefreshFailures ?? 0)
     ) {
       await route.fulfill({
         status: 500,

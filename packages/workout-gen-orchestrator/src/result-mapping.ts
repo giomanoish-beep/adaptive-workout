@@ -11,17 +11,10 @@ import type {
   FittedWorkoutExercise,
   TrainingGoalRuleProfile,
 } from '@adaptive-workout/workout-engine';
-import type {
-  WorkoutReviewSuccess,
-  WorkoutReviewError,
-  GenerationErrorCode,
-} from './contracts.js';
+import type { WorkoutReviewSuccess, WorkoutReviewError, GenerationErrorCode } from './contracts.js';
 import type { CatalogMappingResult } from './catalog-mapping.js';
 import { prescribeExercise } from './prescription.js';
-import {
-  ORCHESTRATOR_ENGINE_NAME,
-  ORCHESTRATOR_RULE_SET_VERSION,
-} from './engine-input.js';
+import { ORCHESTRATOR_ENGINE_NAME, ORCHESTRATOR_RULE_SET_VERSION } from './engine-input.js';
 
 /**
  * Maps a successful engine result to the browser-safe review DTO.

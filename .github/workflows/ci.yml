@@ -39,3 +39,12 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+      - name: Build Edge Function bundles
+        run: npm run edge-fn:build:all
+
+      - name: Verify production E2E guard
+        run: npm run test:e2e-production-guard

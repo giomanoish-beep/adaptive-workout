@@ -17,11 +17,7 @@ export type {
   SetLogRow,
   ExerciseCatalogRow,
 } from './contracts.js';
-export {
-  engineName,
-  engineVersion,
-  ruleSetVersion,
-} from './contracts.js';
+export { engineName, engineVersion, ruleSetVersion } from './contracts.js';
 
 export const packageName = '@adaptive-workout/progression-orchestrator';
 export const progressionOrchestratorBoundary = 'server-only' as const;

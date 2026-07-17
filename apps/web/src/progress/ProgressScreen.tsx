@@ -1,10 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { useProgressData } from './use-progress-data';
-import type {
-  ProgressViewMode,
-  ProgressionRecommendationLabel,
-} from './progress-types';
+import type { ProgressViewMode, ProgressionRecommendationLabel } from './progress-types';
 import { defaultProgressViewMode } from './progress-types';
 import {
   workoutCompletionPercent,
@@ -55,11 +52,7 @@ export function ProgressScreen({ client }: ProgressScreenProps) {
       </header>
 
       {/* Segmented view-mode control */}
-      <div
-        className="progress-segments"
-        role="group"
-        aria-label="Progress view mode"
-      >
+      <div className="progress-segments" role="group" aria-label="Progress view mode">
         {viewModes.map((vm) => (
           <button
             key={vm.value}
@@ -74,10 +67,7 @@ export function ProgressScreen({ client }: ProgressScreenProps) {
       </div>
 
       {mode === 'history' ? (
-        <HistoryView
-          progress={progress}
-          onRetry={() => void progress.loadHistory()}
-        />
+        <HistoryView progress={progress} onRetry={() => void progress.loadHistory()} />
       ) : (
         <ProgressionView
           progress={progress}
@@ -109,11 +99,7 @@ function HistoryView({ progress, onRetry }: HistoryViewProps) {
     return (
       <div className="progress-error" role="alert">
         <p>{progress.history.message}</p>
-        <button
-          type="button"
-          className="progress-retry-button"
-          onClick={onRetry}
-        >
+        <button type="button" className="progress-retry-button" onClick={onRetry}>
           Retry
         </button>
       </div>
@@ -126,9 +112,7 @@ function HistoryView({ progress, onRetry }: HistoryViewProps) {
     return (
       <div className="progress-empty">
         <p className="progress-empty__title">No completed workouts yet</p>
-        <p className="progress-empty__copy">
-          Finish a workout and it will appear here.
-        </p>
+        <p className="progress-empty__copy">Finish a workout and it will appear here.</p>
         {/* Summary shows zeros */}
         <div className="progress-summary">
           <div className="progress-summary__item">
@@ -153,21 +137,15 @@ function HistoryView({ progress, onRetry }: HistoryViewProps) {
       {/* Summary metrics */}
       <div className="progress-summary">
         <div className="progress-summary__item">
-          <span className="progress-summary__value">
-            {history.summary.totalWorkouts}
-          </span>
+          <span className="progress-summary__value">{history.summary.totalWorkouts}</span>
           <span className="progress-summary__label">Workouts</span>
         </div>
         <div className="progress-summary__item">
-          <span className="progress-summary__value">
-            {history.summary.totalWorkingSets}
-          </span>
+          <span className="progress-summary__value">{history.summary.totalWorkingSets}</span>
           <span className="progress-summary__label">Working sets</span>
         </div>
         <div className="progress-summary__item">
-          <span className="progress-summary__value">
-            {history.summary.streakWeeks} weeks
-          </span>
+          <span className="progress-summary__value">{history.summary.streakWeeks} weeks</span>
           <span className="progress-summary__label">Training streak</span>
         </div>
       </div>
@@ -180,9 +158,7 @@ function HistoryView({ progress, onRetry }: HistoryViewProps) {
           return (
             <li key={w.sessionId} className="progress-history-card">
               <div className="progress-history-card__top">
-                <span className="progress-history-card__date">
-                  {w.dateLabel}
-                </span>
+                <span className="progress-history-card__date">{w.dateLabel}</span>
                 <span
                   className={`progress-history-card__status progress-history-card__status--${w.status}`}
                 >
@@ -191,9 +167,7 @@ function HistoryView({ progress, onRetry }: HistoryViewProps) {
               </div>
               <p className="progress-history-card__title">{w.title}</p>
               <div className="progress-history-card__metrics">
-                <span className="progress-history-card__metric">
-                  {w.durationMinutes} min
-                </span>
+                <span className="progress-history-card__metric">{w.durationMinutes} min</span>
                 <span className="progress-history-card__metric">
                   {w.completedSets}/{w.totalSets} sets
                 </span>
@@ -215,11 +189,7 @@ interface ProgressionViewProps {
   readonly onRefresh: () => void;
 }
 
-function ProgressionView({
-  progress,
-  onRetry,
-  onRefresh,
-}: ProgressionViewProps) {
+function ProgressionView({ progress, onRetry, onRefresh }: ProgressionViewProps) {
   if (progress.isProgressionLoading) {
     return (
       <div className="progress-loading" role="status">
@@ -232,11 +202,7 @@ function ProgressionView({
     return (
       <div className="progress-error" role="alert">
         <p>{progress.progression.message}</p>
-        <button
-          type="button"
-          className="progress-retry-button"
-          onClick={onRetry}
-        >
+        <button type="button" className="progress-retry-button" onClick={onRetry}>
           Retry
         </button>
       </div>
@@ -248,12 +214,9 @@ function ProgressionView({
   if (progression.status === 'empty') {
     return (
       <div className="progress-empty">
-        <p className="progress-empty__title">
-          No exercise progression data yet
-        </p>
+        <p className="progress-empty__title">No exercise progression data yet</p>
         <p className="progress-empty__copy">
-          Complete workouts with logged sets to see your progression
-          recommendations.
+          Complete workouts with logged sets to see your progression recommendations.
         </p>
       </div>
     );
@@ -283,11 +246,7 @@ function ProgressionView({
       {progress.progressionRefreshError && (
         <div className="progress-error" role="alert">
           <p>{progress.progressionRefreshError}</p>
-          <button
-            type="button"
-            className="progress-retry-button"
-            onClick={onRefresh}
-          >
+          <button type="button" className="progress-retry-button" onClick={onRefresh}>
             Retry refresh
           </button>
         </div>
@@ -296,15 +255,11 @@ function ProgressionView({
       <ol className="progress-progression-list">
         {progression.exerciseProgressions.map((ex) => (
           <li key={ex.exerciseId} className="progress-progression-card">
-            <p className="progress-progression-card__name">
-              {ex.exerciseName}
-            </p>
+            <p className="progress-progression-card__name">{ex.exerciseName}</p>
 
             {/* Primary recommendation — strongest visual hierarchy */}
             <div className="progress-progression-card__recommendation">
-              <span className="progress-progression-card__rec-label">
-                Recommendation
-              </span>
+              <span className="progress-progression-card__rec-label">Recommendation</span>
               <span
                 className={`progress-progression-card__rec-value progress-progression-card__rec--${recommendationCssClass(ex.recommendation)}`}
               >
@@ -312,8 +267,7 @@ function ProgressionView({
               </span>
               {ex.nextSuggestedWeightKg !== null && (
                 <span className="progress-progression-card__rec-next">
-                  {ex.nextSuggestedWeightKg}{' '}
-                  {ex.weightUnit ?? 'kg'}
+                  {ex.nextSuggestedWeightKg} {ex.weightUnit ?? 'kg'}
                 </span>
               )}
             </div>
@@ -321,9 +275,7 @@ function ProgressionView({
             {/* Secondary metrics */}
             <div className="progress-progression-card__metrics">
               <div className="progress-progression-card__metric">
-                <span className="progress-progression-card__metric-label">
-                  Working weight
-                </span>
+                <span className="progress-progression-card__metric-label">Working weight</span>
                 <span className="progress-progression-card__metric-value">
                   {ex.currentWorkingWeightKg !== null
                     ? `${ex.currentWorkingWeightKg} ${ex.weightUnit ?? 'kg'}`
@@ -331,29 +283,19 @@ function ProgressionView({
                 </span>
               </div>
               <div className="progress-progression-card__metric">
-                <span className="progress-progression-card__metric-label">
-                  Recent reps
-                </span>
+                <span className="progress-progression-card__metric-label">Recent reps</span>
                 <span className="progress-progression-card__metric-value">
-                  {ex.recentPerformanceReps !== null
-                    ? ex.recentPerformanceReps
-                    : '\u2014'}
+                  {ex.recentPerformanceReps !== null ? ex.recentPerformanceReps : '\u2014'}
                 </span>
               </div>
               <div className="progress-progression-card__metric">
-                <span className="progress-progression-card__metric-label">
-                  Target RIR
-                </span>
+                <span className="progress-progression-card__metric-label">Target RIR</span>
                 <span className="progress-progression-card__metric-value">
-                  {ex.targetRir === null
-                    ? '\u2014'
-                    : formatTargetRir(ex.targetRir)}
+                  {ex.targetRir === null ? '\u2014' : formatTargetRir(ex.targetRir)}
                 </span>
               </div>
               <div className="progress-progression-card__metric">
-                <span className="progress-progression-card__metric-label">
-                  Trend
-                </span>
+                <span className="progress-progression-card__metric-label">Trend</span>
                 <span
                   className={`progress-progression-card__metric-value ${ex.trend ? `progress-progression-card__trend--${ex.trend.toLowerCase()}` : ''}`}
                 >

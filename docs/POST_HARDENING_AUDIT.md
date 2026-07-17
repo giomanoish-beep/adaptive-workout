@@ -13,13 +13,13 @@ This report records observed state. It does not assert that any task is complete
 
 The codebase has a recurring structural pattern across the post-HARDENING-004 work: **the data/server layer is implemented in isolation and is correct in isolation, but it is not wired into the rendered application.** Several packages are orphaned production code with zero runtime importers. The result is that the running app still behaves like the WEB_APP-004 in-memory prototype: onboarding does not persist, workouts come from a local fixture, sets live in React state only, and the Progress/Settings screens are unmounted placeholders.
 
-| Task | Production code | Real wiring | Persistence/server | Security | Tests | E2E evidence | Classification |
-|------|-----------------|-------------|--------------------|----------| -----|--------------|----------------|
-| CLOUD-001 (profile persistence) | Absent | No | No repository | OK (no 2nd client) | N/A | None | **NOT IMPLEMENTED** |
-| CLOUD-002 (session/set persistence) | Present, internally correct | **No — orphaned** | Repository exists, untested | OK | None for repo | None | **PARTIALLY IMPLEMENTED** (dead code) |
-| SERVER-001 (real generation) | Present (gateway + orchestrator + deployed fn) | **No — gateway orphaned; browser uses fixture** | Edge fn deployed & verified | OK | Orchestrator: **none**; fn: none | Edge fn smoke only | **IMPLEMENTED BUT NOT PRODUCTION-READY** |
-| CLOUD-003 (history/progression) | Present (repo reads real tables) | **No — ProgressScreen orphaned** | Repo reads real tables; writers absent | OK | Pure helpers only; queries untested | None | **PARTIALLY IMPLEMENTED** (dead UI; no progression writer) |
-| DEPLOY-001 (deployment) | Config prepared | Edge fn deployed; DB aligned | — | OK | Static checks pass | Edge fn smoke OK; **frontend not deployed** | **PARTIALLY COMPLETE** (backend deployed, frontend not) |
+| Task                                | Production code                                | Real wiring                                     | Persistence/server                     | Security           | Tests                               | E2E evidence                                | Classification                                             |
+| ----------------------------------- | ---------------------------------------------- | ----------------------------------------------- | -------------------------------------- | ------------------ | ----------------------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| CLOUD-001 (profile persistence)     | Absent                                         | No                                              | No repository                          | OK (no 2nd client) | N/A                                 | None                                        | **NOT IMPLEMENTED**                                        |
+| CLOUD-002 (session/set persistence) | Present, internally correct                    | **No — orphaned**                               | Repository exists, untested            | OK                 | None for repo                       | None                                        | **PARTIALLY IMPLEMENTED** (dead code)                      |
+| SERVER-001 (real generation)        | Present (gateway + orchestrator + deployed fn) | **No — gateway orphaned; browser uses fixture** | Edge fn deployed & verified            | OK                 | Orchestrator: **none**; fn: none    | Edge fn smoke only                          | **IMPLEMENTED BUT NOT PRODUCTION-READY**                   |
+| CLOUD-003 (history/progression)     | Present (repo reads real tables)               | **No — ProgressScreen orphaned**                | Repo reads real tables; writers absent | OK                 | Pure helpers only; queries untested | None                                        | **PARTIALLY IMPLEMENTED** (dead UI; no progression writer) |
+| DEPLOY-001 (deployment)             | Config prepared                                | Edge fn deployed; DB aligned                    | —                                      | OK                 | Static checks pass                  | Edge fn smoke OK; **frontend not deployed** | **PARTIALLY COMPLETE** (backend deployed, frontend not)    |
 
 **The app is NOT ready for a real pilot.** Every cloud-dependent user flow is either unwired or absent. The only end-to-end-verified server capability is the `generate-workout` Edge Function, which the browser does not call.
 
@@ -27,18 +27,18 @@ The codebase has a recurring structural pattern across the post-HARDENING-004 wo
 
 ## Executed commands and exact results
 
-| Command | Result |
-|---------|--------|
-| `npm run typecheck` | exit 0 — all workspaces pass |
-| `npm test` | exit 0 — 60 files, **997 tests passed** |
-| `npm run build` | exit 0 |
-| `npm run edge-fn:build` | exit 0 — `index.bundle.ts` generated (149.8 KB) |
-| `npm audit --omit=dev` | exit 0 — **0 vulnerabilities** |
-| `npm run test:e2e` | **CANNOT RUN** — no such script; Playwright not installed (e2e specs are untracked WIP) |
-| `npx supabase functions list` | `generate-workout` **ACTIVE**, version 2 |
-| `npx supabase migration list` | 10/10 migrations applied; local == remote |
-| Edge fn smoke (POST, no auth) | HTTP 401 `{"status":"error","code":"UNAUTHENTICATED","message":"Authentication required."}` |
-| Edge fn smoke (GET) | HTTP 405 `{"status":"error","code":"INVALID_REQUEST","message":"Only POST requests are accepted."}` |
+| Command                       | Result                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`           | exit 0 — all workspaces pass                                                                        |
+| `npm test`                    | exit 0 — 60 files, **997 tests passed**                                                             |
+| `npm run build`               | exit 0                                                                                              |
+| `npm run edge-fn:build`       | exit 0 — `index.bundle.ts` generated (149.8 KB)                                                     |
+| `npm audit --omit=dev`        | exit 0 — **0 vulnerabilities**                                                                      |
+| `npm run test:e2e`            | **CANNOT RUN** — no such script; Playwright not installed (e2e specs are untracked WIP)             |
+| `npx supabase functions list` | `generate-workout` **ACTIVE**, version 2                                                            |
+| `npx supabase migration list` | 10/10 migrations applied; local == remote                                                           |
+| Edge fn smoke (POST, no auth) | HTTP 401 `{"status":"error","code":"UNAUTHENTICATED","message":"Authentication required."}`         |
+| Edge fn smoke (GET)           | HTTP 405 `{"status":"error","code":"INVALID_REQUEST","message":"Only POST requests are accepted."}` |
 
 Static bundle checks (edge + browser dist):
 
@@ -56,12 +56,13 @@ There is no profile persistence. The training profile exists in React memory onl
 ### Findings
 
 - **No profile repository exists.** There is no `apps/web/src/profile/` directory. A repo-wide search for `.from(` across `apps/web/src` returns **zero matches** — no Supabase table is referenced anywhere in browser code. The `profiles` table is never read or written by the web app.
-- **Onboarding does not persist.** `OnboardingFlow.handleFinish` calls `onComplete(profile)`, which is `App.tsx`'s `handleOnboardingComplete` → `setProfile(completed)` into `useState`. The chain terminates in memory. `App.tsx` header comment states: *"Cloud persistence is not wired yet, so a page reload may restart onboarding."*
+- **Onboarding does not persist.** `OnboardingFlow.handleFinish` calls `onComplete(profile)`, which is `App.tsx`'s `handleOnboardingComplete` → `setProfile(completed)` into `useState`. The chain terminates in memory. `App.tsx` header comment states: _"Cloud persistence is not wired yet, so a page reload may restart onboarding."_
 - **No load-on-auth.** `AuthedApp` holds `profile` as `useState<TrainingProfile | null>(null)`. `useAuth` only resolves the auth session. On reload, `profile` resets to `null` and onboarding restarts.
-- **`SettingsScreen` is not rendered.** It is defined in `apps/web/src/settings/SettingsScreen.tsx` but has **no importer** outside its own file. `AppNav`/`Screens.tsx` render a static placeholder for the `settings` route. Even if mounted, `SettingsScreen` does no Supabase I/O; its `DataStatusSection` literally tells the user: *"Workout and profile cloud persistence is not yet connected in the current prototype."*
+- **`SettingsScreen` is not rendered.** It is defined in `apps/web/src/settings/SettingsScreen.tsx` but has **no importer** outside its own file. `AppNav`/`Screens.tsx` render a static placeholder for the `settings` route. Even if mounted, `SettingsScreen` does no Supabase I/O; its `DataStatusSection` literally tells the user: _"Workout and profile cloud persistence is not yet connected in the current prototype."_
 - **Security: OK.** No second Supabase client (only `supabase-client.ts` + its single caller `App.tsx`). No localStorage/sessionStorage/IndexedDB for profile data. No service-role credentials in browser code.
 
 ### Missing behavior (all BLOCKER for CLOUD-001)
+
 - Authenticated profile load from Supabase on auth
 - Loading / missing / loaded / error distinction (no loading state; profile starts null)
 - No-onboarding-flash-while-loading
@@ -71,9 +72,11 @@ There is no profile persistence. The training profile exists in React memory onl
 - User isolation / RLS verification at the app layer
 
 ### Tests
+
 None cover persistence (the repository does not exist). Existing tests (`onboarding-state` 33, `onboarding-imports` 10, `settings-view-model` 55, `supabase-client` 5, `auth-state` 10) cover only pure state, labels, and client env validation.
 
 ### Affected files
+
 - `apps/web/src/App.tsx` — in-memory profile state only
 - `apps/web/src/onboarding/OnboardingFlow.tsx` — completes to a callback, no persistence
 - `apps/web/src/settings/SettingsScreen.tsx` — unmounted, no I/O
@@ -98,6 +101,7 @@ The persistence boundary is fully built and internally correct, but it has **zer
 - **Tests: NONE.** There are **no test files** in `apps/web/src/workout-session/`. The repository's `.from()` queries are entirely untested. (Active-workout pure-state tests exist and pass, but they assert in-memory behavior, not persistence.)
 
 ### Missing behavior (BLOCKER for CLOUD-002 end-to-end)
+
 - Start workout creates a real Supabase session before navigation
 - Double-click duplicate-session prevention
 - Set completion persistence (weight/reps/RIR/status); decimal weight; RIR null vs 0
@@ -109,9 +113,11 @@ The persistence boundary is fully built and internally correct, but it has **zer
 - Cross-user isolation through the app flow
 
 ### Why partial, not "not implemented"
+
 The repository + hook code is real and correct, but unwired and untested. Wiring (`App`/`AuthedApp` → pass client to `AppNav` → persistence-aware active-workout) and tests are the remaining work.
 
 ### Affected files
+
 - `apps/web/src/workout-session/workout-session-repository.ts` — orphaned
 - `apps/web/src/workout-session/use-workout-session.ts` — orphaned
 - `apps/web/src/active-workout/ActiveWorkout.tsx` — rendered; in-memory only
@@ -137,12 +143,14 @@ All three layers exist (browser gateway, server orchestrator, deployed Edge Func
 - **Security: OK.** No service-role or AI keys in browser code or bundle. No engine/AI package identifiers in browser dist. Handler rejects unauthenticated and invalid requests.
 
 ### Critical gaps (BLOCKER for production-readiness)
+
 1. **Browser does not call the server.** Generation is fixture-backed in the rendered app. The entire server pipeline is unreachable by users. (HIGH)
 2. **Orchestrator package has ZERO tests.** None of `orchestrator.ts`, `validation.ts`, `profile-mapping.ts`, `catalog-mapping.ts`, `result-mapping.ts`, `engine-input.ts`, `prescription.ts`, `observability.ts` are covered. No test references `generateWorkout` or `workout-gen-orchestrator`. Request validation, profile/catalog mapping, active-catalog filtering, discomfort handling, controlled error mapping, and the server response shape are all unverified. (BLOCKER — this is the trusted server compute with no test evidence)
 3. **Edge Function has no integration tests** asserting unauthenticated rejection, invalid-request rejection, missing/invalid profile, active-catalog mapping, or no-feasible-workout. Only ad-hoc manual smoke was performed during DEPLOY-001. (HIGH)
 4. **Canonical exercise IDs do not flow into session persistence** because session persistence itself is unwired (CLOUD-002). (depends on CLOUD-002)
 
 ### Affected files
+
 - `apps/web/src/workout/workout-generation-gateway.ts` — orphaned
 - `apps/web/src/workout/WorkoutFlow.tsx` — uses `defaultGenerateReview` fixture
 - `apps/web/src/navigation/AppNav.tsx` — no `generateReview` prop passed
@@ -167,6 +175,7 @@ The data-reading layer is implemented and clean, but the screen that uses it is 
 - **Tests: pure helpers only.** `progress-repository.test.ts` covers date/ISO-week math, streak counting, and `mapProgressionRow` (null vs 0 RIR, next-weight null, trend, deload, "Not enough data"). **No test mocks Supabase or calls `loadHistory`/`loadProgression`** — the `.from()` queries are untested. `progress-view-model.test.ts` still imports `./progress-fixtures` and asserts on hard-coded fixture values.
 
 ### Missing behavior (BLOCKER for CLOUD-003 end-to-end)
+
 - Progress screen rendered in the app (currently placeholder)
 - Real finished sessions loaded from Supabase (wiring + source data)
 - Authoritative progression computed server-side and persisted (no runner exists)
@@ -174,6 +183,7 @@ The data-reading layer is implemented and clean, but the screen that uses it is 
 - Cross-user isolation verified through the app flow
 
 ### Affected files
+
 - `apps/web/src/progress/ProgressScreen.tsx` — orphaned
 - `apps/web/src/navigation/AppNav.tsx`, `Screens.tsx` — placeholder for progress route
 - `packages/progression-engine/src/**` — no runtime consumer
@@ -188,43 +198,45 @@ The data-reading layer is implemented and clean, but the screen that uses it is 
 
 ### Repository readiness (all verified)
 
-| Check | Result |
-|-------|--------|
-| `npm ci` works | PASS (226 packages, 0 vulnerabilities) |
-| esbuild is an explicit reproducible dependency | PASS — declared in root `devDependencies` (`^0.28.0`), present in lockfile, deduped with vite |
-| `edge-fn:build` script exists | PASS — `"edge-fn:build": "node scripts/build-edge-function.mjs generate-workout"` |
-| Edge bundle generated successfully | PASS — `index.bundle.ts`, 149.8 KB, self-contained |
-| Bundle contains no unresolved workspace aliases | PASS — 0 `@adaptive-workout/*`, 0 `../`, 0 `require()`, 0 `node:` imports |
-| Vercel build command/output path correct | Prepared — `vercel.json`: build `npm run build --workspace @adaptive-workout/web`, output `apps/web/dist` |
-| SPA fallback appropriate | PASS — non-asset routes rewrite to `/index.html` |
-| Browser env contains only safe variables | PASS — only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (+ `VITE_E2E_AUTH`/`MODE` in the production guard) |
-| No production secrets committed | PASS — only `.env.example` with empty placeholders tracked |
-| Production E2E auth seam cannot activate | PASS — `App.tsx` throws if `MODE === 'production' && VITE_E2E_AUTH === 'true'`; guarded by `security-hardening.test.ts` |
-| Auth redirect uses allow-listed safe origin | PASS (app-side) — `signInWithOtp({ email })` omits `emailRedirectTo`; uses dashboard Site URL. **Dashboard Site URL not verified from here.** |
-| Security headers configured | PASS — `vercel.json` sets nosniff, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy, HSTS (CSP intentionally deferred) |
-| Migrations forward-only | PASS — versioned, no rollback tooling |
-| Deployment docs do not overstate completion | PASS — `DEPLOYMENT.md` updated to DONE with accurate commands after this audit's changes were in place |
+| Check                                           | Result                                                                                                                                        |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm ci` works                                  | PASS (226 packages, 0 vulnerabilities)                                                                                                        |
+| esbuild is an explicit reproducible dependency  | PASS — declared in root `devDependencies` (`^0.28.0`), present in lockfile, deduped with vite                                                 |
+| `edge-fn:build` script exists                   | PASS — `"edge-fn:build": "node scripts/build-edge-function.mjs generate-workout"`                                                             |
+| Edge bundle generated successfully              | PASS — `index.bundle.ts`, 149.8 KB, self-contained                                                                                            |
+| Bundle contains no unresolved workspace aliases | PASS — 0 `@adaptive-workout/*`, 0 `../`, 0 `require()`, 0 `node:` imports                                                                     |
+| Vercel build command/output path correct        | Prepared — `vercel.json`: build `npm run build --workspace @adaptive-workout/web`, output `apps/web/dist`                                     |
+| SPA fallback appropriate                        | PASS — non-asset routes rewrite to `/index.html`                                                                                              |
+| Browser env contains only safe variables        | PASS — only `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (+ `VITE_E2E_AUTH`/`MODE` in the production guard)                                  |
+| No production secrets committed                 | PASS — only `.env.example` with empty placeholders tracked                                                                                    |
+| Production E2E auth seam cannot activate        | PASS — `App.tsx` throws if `MODE === 'production' && VITE_E2E_AUTH === 'true'`; guarded by `security-hardening.test.ts`                       |
+| Auth redirect uses allow-listed safe origin     | PASS (app-side) — `signInWithOtp({ email })` omits `emailRedirectTo`; uses dashboard Site URL. **Dashboard Site URL not verified from here.** |
+| Security headers configured                     | PASS — `vercel.json` sets nosniff, Referrer-Policy, X-Frame-Options DENY, Permissions-Policy, HSTS (CSP intentionally deferred)               |
+| Migrations forward-only                         | PASS — versioned, no rollback tooling                                                                                                         |
+| Deployment docs do not overstate completion     | PASS — `DEPLOYMENT.md` updated to DONE with accurate commands after this audit's changes were in place                                        |
 
 ### Actual deployment status (evidence-based)
 
-| Aspect | Status | Evidence |
-|--------|--------|----------|
-| Migration local/remote alignment | **DEPLOYED** | `supabase migration list`: 10/10 applied, local == remote |
-| Edge Function presence | **DEPLOYED** | `supabase functions list`: `generate-workout` ACTIVE v2; smoke POST→401 UNAUTHENTICATED, GET→405 |
-| Frontend production URL existence | **NOT DEPLOYED** | No `.vercel/` link, no `vercel.app` URL referenced anywhere, no production URL evidence |
-| Auth Site URL/redirect configuration | CANNOT VERIFY | Dashboard-only setting; app-side redirect code is safe |
-| Critical production smoke flow | **NOT VERIFIED** | No frontend to smoke; the core generate→persist→history loop is unwired (see CLOUD-001/002/003) |
+| Aspect                               | Status           | Evidence                                                                                         |
+| ------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------ |
+| Migration local/remote alignment     | **DEPLOYED**     | `supabase migration list`: 10/10 applied, local == remote                                        |
+| Edge Function presence               | **DEPLOYED**     | `supabase functions list`: `generate-workout` ACTIVE v2; smoke POST→401 UNAUTHENTICATED, GET→405 |
+| Frontend production URL existence    | **NOT DEPLOYED** | No `.vercel/` link, no `vercel.app` URL referenced anywhere, no production URL evidence          |
+| Auth Site URL/redirect configuration | CANNOT VERIFY    | Dashboard-only setting; app-side redirect code is safe                                           |
+| Critical production smoke flow       | **NOT VERIFIED** | No frontend to smoke; the core generate→persist→history loop is unwired (see CLOUD-001/002/003)  |
 
 DEPLOY-001 is not "done" in the sense of a production-reachable application. The backend (DB + Edge Function) is deployed and the Edge Function is verified; the frontend has not been deployed, and — more fundamentally — even a deployed frontend would not exercise cloud persistence or server generation because those flows are unwired.
 
 ### Note on documentation accuracy
-`docs/DEPLOYMENT.md` and `docs/IMPLEMENTATION_PLAN.md` mark DEPLOY-001 as DONE. That status reflects the deployment *path* (bundle → deploy → verify) working, which is accurate for the Edge Function. It does not reflect a deployed, pilot-ready application. This audit recommends treating DEPLOY-001's DONE as "backend deployable" rather than "application deployed."
+
+`docs/DEPLOYMENT.md` and `docs/IMPLEMENTATION_PLAN.md` mark DEPLOY-001 as DONE. That status reflects the deployment _path_ (bundle → deploy → verify) working, which is accurate for the Edge Function. It does not reflect a deployed, pilot-ready application. This audit recommends treating DEPLOY-001's DONE as "backend deployable" rather than "application deployed."
 
 ---
 
 ## Cross-cutting findings
 
 ### 1. Dead / unused implementations
+
 - `apps/web/src/workout-session/` (repository + hook) — zero importers
 - `apps/web/src/workout/workout-generation-gateway.ts` — zero importers
 - `apps/web/src/progress/ProgressScreen.tsx` — zero importers
@@ -234,34 +246,42 @@ DEPLOY-001 is not "done" in the sense of a production-reachable application. The
 - `apps/web/src/progress/progress-fixtures.ts` — no longer imported by production paths (still used by view-model tests)
 
 ### 2. Fixture fallbacks still reachable in production
+
 - `apps/web/src/workout/WorkoutFlow.tsx` → `defaultGenerateReview()` → `workoutReviewFixture` is the **active production path** (AppNav passes no `generateReview` prop). This is the most significant fixture-in-production issue.
 
 ### 3. Duplicate / single Supabase client
+
 - **No duplicate client.** Exactly one client factory (`supabase-client.ts`) with one caller (`App.tsx`). All repositories accept an injected `SupabaseClient`. This boundary is clean.
 
 ### 4. Browser/server boundary violations
+
 - None found. No engine/AI package identifiers or service-role keys in the browser dist. The only `localStorage.setItem` in the bundle is a Supabase gotrue-js storage-availability probe, not domain data.
 
 ### 5. Missing failure / retry / loading states
+
 - CLOUD-001: no profile loading/error/retry (profile starts null; onboarding always re-shows).
 - CLOUD-002: no persistence error surfacing in `ActiveWorkout` (in-memory only); the orphaned `use-workout-session` has error handling but is unmounted.
 - CLOUD-003: `useProgressData` has load/empty/error/retry, but it is behind the unmounted `ProgressScreen`.
 
 ### 6. Missing RLS / ownership checks
+
 - RLS exists on all 22 tables (static-verified by `security-hardening.test.ts`). The app-layer gap is that the persistence repositories are unwired, so ownership is never exercised through the real flow. No runtime/pgTAP RLS verification was possible (Docker unavailable).
 
 ### 7. Tests that pass but do not prove real wiring
+
 - All `active-workout` tests assert in-memory behavior, not Supabase persistence.
 - `progress-view-model.test.ts` asserts on hard-coded fixtures, not persisted data.
 - `progress-repository.test.ts` tests only pure helpers; the `.from()` queries are untested.
 - The `workout-session` repository and the `workout-gen-orchestrator` package have **no tests at all**.
 
 ### 8. Documentation that overstates implementation
+
 - `docs/DEPLOYMENT.md` / `docs/IMPLEMENTATION_PLAN.md`: DEPLOY-001 marked DONE. Accurate for "Edge Function deployable"; inaccurate if read as "application deployed/pilot-ready."
 - `docs/SECURITY_AND_RETENTION.md` §6 and §13 honestly document the profile-in-memory limitation and the missing export/deletion UI.
 - `apps/web/src/settings/SettingsScreen.tsx` honestly tells the user cloud persistence is not connected.
 
 ### 9. Deployment steps completed vs. merely prepared
+
 - **Completed:** DB migrations deployed & aligned; Edge Function deployed & smoke-verified; bundling pipeline reproducible.
 - **Prepared but not executed:** Frontend Vercel deployment (config present, no link/deploy).
 - **Not possible yet:** Full production smoke (core flows unwired).
@@ -270,22 +290,25 @@ DEPLOY-001 is not "done" in the sense of a production-reachable application. The
 
 ## Existing users / data risk
 
-**None at present.** Because the persistence and server-generation flows are unwired, no real user workout/profile/set data is being written by the application. The deployed Edge Function is isolated and rejects unauthenticated access. The risk is *under*-delivery (nothing persists), not data loss or corruption. If the CLOUD-002 repository were wired without tests, duplicate-session and failed-persistence edge cases would become real risks — but that is not the current state.
+**None at present.** Because the persistence and server-generation flows are unwired, no real user workout/profile/set data is being written by the application. The deployed Edge Function is isolated and rejects unauthenticated access. The risk is _under_-delivery (nothing persists), not data loss or corruption. If the CLOUD-002 repository were wired without tests, duplicate-session and failed-persistence edge cases would become real risks — but that is not the current state.
 
 ---
 
 ## Final conclusion
 
 **Genuinely complete (verified end-to-end):**
+
 - None of the five post-HARDENING-004 tasks are complete end-to-end.
 
 **Partial:**
+
 - **SERVER-001** — all layers built and the Edge Function is deployed & verified remotely, but the browser does not call the server (fixture in production) and the orchestrator has no tests.
 - **CLOUD-002** — repository/hook built and correct, but orphaned and untested.
 - **CLOUD-003** — read repository built and clean, but UI orphaned and no progression writer exists.
 - **DEPLOY-001** — backend (DB + Edge Function) deployed & verified; frontend not deployed; core flows unwired.
 
 **Absent:**
+
 - **CLOUD-001** — no profile persistence code exists at all.
 
 **Is the app ready for a real pilot?** **No.** A pilot user would experience: onboarding restarts on every reload, workouts come from a static fixture, sets are lost on reload, and History/Settings are placeholders. No real user data is persisted.
@@ -305,4 +328,4 @@ This is a recommendation only; no remediation was performed in this audit.
 
 ---
 
-*This is an engineering audit. Classifications reflect directly observed code, wiring, tests, and command output as of 2026-07-16. No production behavior was modified.*
+_This is an engineering audit. Classifications reflect directly observed code, wiring, tests, and command output as of 2026-07-16. No production behavior was modified._

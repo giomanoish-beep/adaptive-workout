@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  formatRepRange,
-  totalReviewWorkingSets,
-  workoutReviewFixture,
-} from './workout-review';
+import { formatRepRange, totalReviewWorkingSets, workoutReviewFixture } from './workout-review';
 
 describe('workout review fixture', () => {
   it('has the documented title, duration, and total working sets', () => {

@@ -15,8 +15,8 @@ export function useNow(active: boolean): number {
 
   useEffect(() => {
     if (!active) {
-      setNowMs(Date.now());
-      return;
+      const id = window.setTimeout(() => setNowMs(Date.now()), 0);
+      return () => window.clearTimeout(id);
     }
 
     const id = window.setInterval(() => {

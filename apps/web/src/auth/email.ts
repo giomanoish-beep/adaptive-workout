@@ -46,9 +46,6 @@ function looksLikeEmail(value: string): boolean {
   const lastAtIndex = value.lastIndexOf('@');
   // Exactly one "@", something on both sides, and a dotted domain.
   return (
-    atIndex > 0 &&
-    atIndex === lastAtIndex &&
-    atIndex < value.length - 1 &&
-    emailPattern.test(value)
+    atIndex > 0 && atIndex === lastAtIndex && atIndex < value.length - 1 && emailPattern.test(value)
   );
 }

@@ -4,13 +4,13 @@
 
 ## Architecture
 
-| Layer | Provider | Scope |
-|-------|----------|-------|
-| Frontend (Vite + React) | Vercel | Static SPA hosting |
-| Database (PostgreSQL) | Supabase | Authoritative data + RLS |
-| Authentication | Supabase Auth | Email magic-link OTP |
-| Serverless functions | Supabase Edge Functions | Trusted compute, AI calls |
-| Secrets | Supabase + Vercel env vars | Server-only, never browser |
+| Layer                   | Provider                   | Scope                      |
+| ----------------------- | -------------------------- | -------------------------- |
+| Frontend (Vite + React) | Vercel                     | Static SPA hosting         |
+| Database (PostgreSQL)   | Supabase                   | Authoritative data + RLS   |
+| Authentication          | Supabase Auth              | Email magic-link OTP       |
+| Serverless functions    | Supabase Edge Functions    | Trusted compute, AI calls  |
+| Secrets                 | Supabase + Vercel env vars | Server-only, never browser |
 
 ## Prerequisites
 
@@ -25,24 +25,25 @@
 
 ### Browser (Vite build-time injection)
 
-| Variable | Required | Consuming Component | Notes |
-|----------|----------|---------------------|-------|
-| `VITE_SUPABASE_URL` | Yes | `apps/web/src/auth/supabase-client.ts`, `apps/web/src/workout/workout-generation-gateway.ts` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes | `apps/web/src/auth/supabase-client.ts` | Supabase anonymous key (browser-safe) |
+| Variable                 | Required | Consuming Component                                                                          | Notes                                 |
+| ------------------------ | -------- | -------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `VITE_SUPABASE_URL`      | Yes      | `apps/web/src/auth/supabase-client.ts`, `apps/web/src/workout/workout-generation-gateway.ts` | Supabase project URL                  |
+| `VITE_SUPABASE_ANON_KEY` | Yes      | `apps/web/src/auth/supabase-client.ts`                                                       | Supabase anonymous key (browser-safe) |
 
 Set these in Vercel project settings (Environment Variables), not in `vercel.json`.
 
 ### Server/Function Secrets
 
-| Variable | Required | Consuming Function(s) | Notes |
-|----------|----------|-----------------------|-------|
-| `SUPABASE_URL` | Yes | Both Edge Functions | Supabase project URL (function-side) |
-| `SUPABASE_ANON_KEY` | Yes | Both Edge Functions | Auth verification and user-scoped reads |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | `refresh-progression` only | Derived-state writes scoped to the verified user ID |
-| `ZAI_API_KEY` | No | Only if AI generation is enabled | NOT currently consumed |
-| `DEEPSEEK_API_KEY` | No | Only if AI generation is enabled | NOT currently consumed |
+| Variable                    | Required | Consuming Function(s)            | Notes                                               |
+| --------------------------- | -------- | -------------------------------- | --------------------------------------------------- |
+| `SUPABASE_URL`              | Yes      | Both Edge Functions              | Supabase project URL (function-side)                |
+| `SUPABASE_ANON_KEY`         | Yes      | Both Edge Functions              | Auth verification and user-scoped reads             |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | `refresh-progression` only       | Derived-state writes scoped to the verified user ID |
+| `ZAI_API_KEY`               | No       | Only if AI generation is enabled | NOT currently consumed                              |
+| `DEEPSEEK_API_KEY`          | No       | Only if AI generation is enabled | NOT currently consumed                              |
 
 Set function secrets via Supabase Dashboard or CLI:
+
 ```bash
 npx supabase secrets set SUPABASE_URL=<value> SUPABASE_ANON_KEY=<value>
 ```
@@ -55,13 +56,13 @@ npx supabase secrets set SUPABASE_URL=<value> SUPABASE_ANON_KEY=<value>
 
 A `vercel.json` is already present at the repository root:
 
-| Setting | Value |
-|---------|-------|
-| Framework | None (Vite SPA) |
-| Install command | `npm ci` |
-| Build command | `npm run build --workspace @adaptive-workout/web` |
-| Output directory | `apps/web/dist` |
-| Node.js version | 22.x (set in Vercel project settings) |
+| Setting          | Value                                             |
+| ---------------- | ------------------------------------------------- |
+| Framework        | None (Vite SPA)                                   |
+| Install command  | `npm ci`                                          |
+| Build command    | `npm run build --workspace @adaptive-workout/web` |
+| Output directory | `apps/web/dist`                                   |
+| Node.js version  | 22.x (set in Vercel project settings)             |
 
 ### SPA Routing
 
@@ -70,6 +71,7 @@ The config includes a single rewrite rule: any route not matching `/assets/*` fa
 ### Security Headers
 
 All responses receive:
+
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `X-Frame-Options: DENY`
@@ -81,6 +83,7 @@ Asset files (`/assets/*`) receive `Cache-Control: public, max-age=31536000, immu
 ### CSP
 
 A Content-Security-Policy is **not** set in `vercel.json` headers due to the dynamic nature of Supabase Auth magic links (which redirect through Supabase domains). To add CSP, test with a report-only header first and ensure:
+
 - `connect-src`: Supabase project URL + `https://*.supabase.co`
 - `script-src 'self'`
 - `style-src 'self' 'unsafe-inline'`
@@ -125,6 +128,7 @@ npx supabase migration list
 ### Pre-deployment Checklist
 
 Before pushing migrations to production:
+
 1. `npx supabase migration list` — verify all migrations are numbered sequentially
 2. `npx supabase db diff --linked` — review changes against remote
 3. Do NOT push if any migation drops tables or columns containing production data
@@ -142,28 +146,28 @@ npx supabase migration up
 
 ### Migration Inventory
 
-| Migration File | Purpose |
-|----------------|---------|
-| `20260714105900_database_baseline.sql` | Core schema |
-| `20260714110435_create_profiles_and_exercise_taxonomy.sql` | Profiles + exercise catalog |
-| `20260714111319_create_programs_and_workout_templates.sql` | Programs |
-| `20260714112146_create_workout_history.sql` | Sessions/sets |
-| `20260714112815_create_performance_and_muscle_state.sql` | Performance state |
-| `20260714113406_create_pain_preferences_and_audits.sql` | Pain, preferences, audits |
-| `20260714114141_add_rls_policies_and_policy_tests.sql` | RLS on all 22 tables |
-| `20260714121000_seed_initial_exercise_catalog.sql` | Seed exercise data |
-| `20260714121550_add_exercise_catalog_search_and_filters.sql` | Catalog indexes |
-| `20260716120000_add_cloud_session_persistence.sql` | Cloud session persistence |
-| `20260716200000_add_training_profile_fields.sql` | Persist completed onboarding profiles |
+| Migration File                                                 | Purpose                                              |
+| -------------------------------------------------------------- | ---------------------------------------------------- |
+| `20260714105900_database_baseline.sql`                         | Core schema                                          |
+| `20260714110435_create_profiles_and_exercise_taxonomy.sql`     | Profiles + exercise catalog                          |
+| `20260714111319_create_programs_and_workout_templates.sql`     | Programs                                             |
+| `20260714112146_create_workout_history.sql`                    | Sessions/sets                                        |
+| `20260714112815_create_performance_and_muscle_state.sql`       | Performance state                                    |
+| `20260714113406_create_pain_preferences_and_audits.sql`        | Pain, preferences, audits                            |
+| `20260714114141_add_rls_policies_and_policy_tests.sql`         | RLS on all 22 tables                                 |
+| `20260714121000_seed_initial_exercise_catalog.sql`             | Seed exercise data                                   |
+| `20260714121550_add_exercise_catalog_search_and_filters.sql`   | Catalog indexes                                      |
+| `20260716120000_add_cloud_session_persistence.sql`             | Cloud session persistence                            |
+| `20260716200000_add_training_profile_fields.sql`               | Persist completed onboarding profiles                |
 | `20260716210000_add_progression_insufficient_data_support.sql` | Persist explicit insufficient-data progression state |
 
 ## Edge Function Deployment
 
 ### Function Inventory
 
-| Function | Directory | Auth | Purpose |
-|----------|-----------|------|---------|
-| `generate-workout` | `supabase/functions/generate-workout/` | JWT-verified | Deterministic workout generation |
+| Function              | Directory                                 | Auth         | Purpose                                           |
+| --------------------- | ----------------------------------------- | ------------ | ------------------------------------------------- |
+| `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation                  |
 | `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state |
 
 ### Deployment Prerequisite: Bundling
@@ -333,6 +337,7 @@ ALTER TABLE ... ALTER COLUMN ...;
 ### Existing: FOUNDATION-002 GitHub Actions
 
 The repository already has a CI workflow (`.github/workflows/ci.yml`) that runs on pull requests:
+
 - Install / dependency check
 - Typecheck
 - Unit tests (vitest)
@@ -400,10 +405,10 @@ is attempted.
 
 ## Preview vs Production
 
-| Aspect | Preview (Vercel) | Production |
-|--------|-----------------|------------|
-| Supabase project | Same | Same |
-| Database | Same (shared) | Same (shared) |
-| Edge Functions | Same deployment | Same deployment |
-| Auth redirects | Allow `*-<team>.vercel.app` | Exact production URL |
-| Environment | `VITE_E2E_AUTH` can be enabled | `VITE_E2E_AUTH` MUST be disabled |
+| Aspect           | Preview (Vercel)               | Production                       |
+| ---------------- | ------------------------------ | -------------------------------- |
+| Supabase project | Same                           | Same                             |
+| Database         | Same (shared)                  | Same (shared)                    |
+| Edge Functions   | Same deployment                | Same deployment                  |
+| Auth redirects   | Allow `*-<team>.vercel.app`    | Exact production URL             |
+| Environment      | `VITE_E2E_AUTH` can be enabled | `VITE_E2E_AUTH` MUST be disabled |

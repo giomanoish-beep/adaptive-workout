@@ -17,7 +17,9 @@ const MIGRATIONS_DIR = join(ROOT, 'supabase', 'migrations');
 
 function readMigrationFiles(): string {
   try {
-    const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort();
+    const files = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
     return files.map((f) => readFileSync(join(MIGRATIONS_DIR, f), 'utf-8')).join('\n');
   } catch {
     return '';
@@ -67,14 +69,18 @@ function extractFkRelationships(migrations: string): readonly FkRelationship[] {
   const flat = collapseSql(migrations);
 
   // Split into statements on `;` that are meaningful.
-  const statements = flat.split(';').map((s) => s.trim()).filter((s) => s.length > 0);
+  const statements = flat
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 
   for (const stmt of statements) {
     // --- Inline column-level REFERENCES (inside CREATE TABLE or ALTER TABLE) ---
     // Pattern: … REFERENCES [schema.]parent_table [(col)] ON DELETE action
     // Captures optional schema prefix so `auth.users`, `public.exercises`, and
     // bare `users` are all parsed correctly.
-    const inlinePattern = /\breferences\s+(?:([\w]+)\.)?(\w+)\s*(?:\([^)]+\))?\s+on\s+delete\s+(cascade|restrict|set\s+null|set\s+default|no\s+action)/gi;
+    const inlinePattern =
+      /\breferences\s+(?:([\w]+)\.)?(\w+)\s*(?:\([^)]+\))?\s+on\s+delete\s+(cascade|restrict|set\s+null|set\s+default|no\s+action)/gi;
 
     // Determine which child table this statement belongs to.
     const createMatch = stmt.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?(\w+)/i);
@@ -94,7 +100,8 @@ function extractFkRelationships(migrations: string): readonly FkRelationship[] {
 
     // --- Named CONSTRAINT ... FOREIGN KEY ... REFERENCES ---
     // Also handles ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY ... REFERENCES
-    const constraintPattern = /foreign\s+key\s*\([^)]+\)\s+references\s+(?:([\w]+)\.)?(\w+)\s*(?:\([^)]+\))?\s+on\s+delete\s+(cascade|restrict|set\s+null|set\s+default|no\s+action)/gi;
+    const constraintPattern =
+      /foreign\s+key\s*\([^)]+\)\s+references\s+(?:([\w]+)\.)?(\w+)\s*(?:\([^)]+\))?\s+on\s+delete\s+(cascade|restrict|set\s+null|set\s+default|no\s+action)/gi;
 
     if (childTable) {
       let match: RegExpExecArray | null;
@@ -295,9 +302,7 @@ describe('HARDENING-004 — RLS policies (static migration audit)', () => {
 
   it('anonymous privileges are revoked on every table', () => {
     for (const table of applicationTables) {
-      const anonRevokes = migrations.match(
-        new RegExp(`revoke all on.*${table}.*from anon`, 'gi'),
-      );
+      const anonRevokes = migrations.match(new RegExp(`revoke all on.*${table}.*from anon`, 'gi'));
       expect(anonRevokes, `Table "${table}" does not revoke anon privileges`).toBeTruthy();
     }
   });
@@ -330,7 +335,10 @@ describe('HARDENING-004 — RLS policies (static migration audit)', () => {
   });
 
   it('server-written tables reject authenticated direct insert/update/delete', () => {
-    const serverWrittenTables: Record<string, { insert: boolean; update: boolean; delete: boolean }> = {
+    const serverWrittenTables: Record<
+      string,
+      { insert: boolean; update: boolean; delete: boolean }
+    > = {
       workout_decisions: { insert: false, update: false, delete: false },
       ai_interactions: { insert: false, update: false, delete: false },
       exercise_performance_state: { insert: false, update: false, delete: false },
@@ -341,11 +349,16 @@ describe('HARDENING-004 — RLS policies (static migration audit)', () => {
       for (const [privilege, shouldBeDenied] of Object.entries(expectedGrants)) {
         if (!shouldBeDenied) continue;
         const grantLine = migrations.match(
-          new RegExp(`grant\\s+([\\w,\\s]+)\\s+on\\s+(table\\s+)?${table}\\s+to authenticated`, 'i'),
+          new RegExp(
+            `grant\\s+([\\w,\\s]+)\\s+on\\s+(table\\s+)?${table}\\s+to authenticated`,
+            'i',
+          ),
         );
         if (grantLine?.[1]) {
           const granted = grantLine[1].toLowerCase();
-          expect(granted, `Table "${table}" allows authenticated "${privilege}"`).not.toContain(privilege);
+          expect(granted, `Table "${table}" allows authenticated "${privilege}"`).not.toContain(
+            privilege,
+          );
         }
       }
     }
@@ -399,7 +412,9 @@ describe('HARDENING-004 — deletion cascade map', () => {
     // programs.owner_user_id references auth.users(id) on delete cascade.
     // The FK is nullable so shared (system) programs remain when a user is deleted.
     const action = findOnDelete('programs', 'users', 'auth');
-    expect(action, `programs → auth.users FK — expected CASCADE, got ${action ?? 'MISSING'}`).toBe('cascade');
+    expect(action, `programs → auth.users FK — expected CASCADE, got ${action ?? 'MISSING'}`).toBe(
+      'cascade',
+    );
   });
 
   it('exercise definitions referenced by sessions use RESTRICT (not cascade)', () => {
@@ -516,7 +531,9 @@ describe('HARDENING-004 — data minimization', () => {
       );
       if (tableBlock) {
         for (const block of tableBlock) {
-          expect(block.toLowerCase(), `Table "${table}" has an email column`).not.toMatch(/\bemail\b/);
+          expect(block.toLowerCase(), `Table "${table}" has an email column`).not.toMatch(
+            /\bemail\b/,
+          );
         }
       }
     }
@@ -557,7 +574,15 @@ describe('HARDENING-004 — data minimization', () => {
 
   it('no calorie-burn or unrelated health data columns exist in migrations', () => {
     const migrationSql = readMigrationFiles().toLowerCase();
-    const forbiddenColumns = ['calories', 'calorie', 'heart_rate', 'blood_pressure', 'body_weight', 'body_fat', 'sleep'];
+    const forbiddenColumns = [
+      'calories',
+      'calorie',
+      'heart_rate',
+      'blood_pressure',
+      'body_weight',
+      'body_fat',
+      'sleep',
+    ];
 
     for (const col of forbiddenColumns) {
       const count = (migrationSql.match(new RegExp(`\\b${col}\\b`, 'g')) ?? []).length;

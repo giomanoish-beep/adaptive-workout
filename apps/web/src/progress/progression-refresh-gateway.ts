@@ -80,7 +80,7 @@ export async function refreshProgressionGateway(
     };
   }
 
-  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/+$/, '');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL.replace(/\/+$/, '');
   const url = `${supabaseUrl}/functions/v1/refresh-progression`;
 
   let response: Response;
@@ -110,9 +110,7 @@ export async function refreshProgressionGateway(
     return {
       ok: false,
       code: (body['code'] as string) ?? 'REFRESH_FAILED',
-      message:
-        (body['message'] as string) ??
-        `Refresh failed with status ${response.status}.`,
+      message: (body['message'] as string) ?? `Refresh failed with status ${response.status}.`,
     };
   }
 

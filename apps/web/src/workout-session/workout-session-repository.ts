@@ -151,7 +151,9 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
         planned_duration_minutes: review.estimatedDurationMinutes,
         started_at: now,
       })
-      .select('id, user_id, title, origin, status, started_at, completed_at, planned_duration_minutes, created_at')
+      .select(
+        'id, user_id, title, origin, status, started_at, completed_at, planned_duration_minutes, created_at',
+      )
       .single();
 
     if (sessionError || !sessionData) {
@@ -192,9 +194,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
   }
 
   /** Loads an active session with exercises and set logs. */
-  async function loadActiveSession(
-    userId: string,
-  ): Promise<LoadedSession | null> {
+  async function loadActiveSession(userId: string): Promise<LoadedSession | null> {
     // Find most recently started in_progress session
     const { data: sessions, error: sessionError } = await client
       .from('workout_sessions')
@@ -308,10 +308,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
    * - completed: all planned exercises are complete
    * - partial: explicitly finished but some planned sets remain incomplete
    */
-  async function finishSession(
-    sessionId: string,
-    hasIncomplete: boolean,
-  ): Promise<SessionRow> {
+  async function finishSession(sessionId: string, hasIncomplete: boolean): Promise<SessionRow> {
     const now = new Date().toISOString();
     const status = hasIncomplete ? 'partial' : 'completed';
 

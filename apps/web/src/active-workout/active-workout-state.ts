@@ -107,10 +107,7 @@ export function setSession(
 }
 
 /** Transitions into the `error` stage with a controlled surface message. */
-export function setSessionError(
-  _state: ActiveWorkoutState,
-  message: string,
-): ActiveWorkoutState {
+export function setSessionError(_state: ActiveWorkoutState, message: string): ActiveWorkoutState {
   return { ...buildLoadingState(), stage: 'error', errorMessage: message };
 }
 
@@ -160,9 +157,7 @@ export function restoreActiveWorkoutState(
     sets: state.sets.map((exerciseSets, exerciseIndex) =>
       exerciseSets.map((set) => {
         const logged = restoredByKey.get(`${exerciseIndex}:${set.setNumber}`);
-        return logged
-          ? { ...set, status: 'completed' as const, logged }
-          : set;
+        return logged ? { ...set, status: 'completed' as const, logged } : set;
       }),
     ),
   };
@@ -201,10 +196,7 @@ export function completedSetCount(state: ActiveWorkoutState): number {
 }
 
 /** True when every planned set for the exercise is completed. */
-export function isExerciseComplete(
-  state: ActiveWorkoutState,
-  exerciseIndex: number,
-): boolean {
+export function isExerciseComplete(state: ActiveWorkoutState, exerciseIndex: number): boolean {
   const sets = state.sets[exerciseIndex];
   if (sets === undefined) return false;
   return sets.length > 0 && sets.every((set) => set.status === 'completed');
@@ -295,10 +287,7 @@ export function editCompletedSet(
  * sets and the active rest timer are preserved because state is carried over
  * unchanged apart from the index and finish-confirmation flag.
  */
-export function moveCurrentExercise(
-  state: ActiveWorkoutState,
-  delta: number,
-): ActiveWorkoutState {
+export function moveCurrentExercise(state: ActiveWorkoutState, delta: number): ActiveWorkoutState {
   if (delta === 0) return state;
   const next = clampExerciseIndex(state, state.currentExerciseIndex + delta);
   if (next === state.currentExerciseIndex) return state;

@@ -30,7 +30,7 @@ async function filesBelow(directory) {
   const files = [];
   for (const entry of entries) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await filesBelow(path));
+    if (entry.isDirectory()) files.push(...(await filesBelow(path)));
     else files.push(path);
   }
   return files;
@@ -55,7 +55,11 @@ try {
   }
 
   const guardedBuild = build({ ...process.env, VITE_E2E_AUTH: 'true' });
-  assert.notEqual(guardedBuild.status, 0, 'production build unexpectedly accepted VITE_E2E_AUTH=true');
+  assert.notEqual(
+    guardedBuild.status,
+    0,
+    'production build unexpectedly accepted VITE_E2E_AUTH=true',
+  );
   assert(
     `${guardedBuild.stdout}\n${guardedBuild.stderr}`.includes(
       'E2E auth seam must not be active in a production build.',

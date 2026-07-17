@@ -2142,7 +2142,7 @@ function isUuid(value) {
   return uuidPattern.test(value);
 }
 
-// packages/workout-engine/dist/filtering.js
+// packages/workout-engine/src/filtering.ts
 var workoutCandidateRejectionCodes = [
   "INVALID_CANDIDATE",
   "INACTIVE_EXERCISE",
@@ -2174,7 +2174,9 @@ function filterWorkoutCandidates(input) {
   const unavailableEquipment = /* @__PURE__ */ new Set();
   const excludedExerciseConstraints = /* @__PURE__ */ new Map();
   const excludedFamilyConstraints = /* @__PURE__ */ new Map();
-  for (const constraint of [...input.constraints].sort((left, right) => left.id.localeCompare(right.id))) {
+  for (const constraint of [...input.constraints].sort(
+    (left, right) => left.id.localeCompare(right.id)
+  )) {
     switch (constraint.kind) {
       case "excluded_muscles":
         constraint.muscleIds.forEach((muscleId) => excludedMuscles.add(muscleId));
@@ -2240,19 +2242,27 @@ function filterWorkoutCandidates(input) {
     if (relevantMuscles.length === 0) {
       reasons.push({ code: "NO_TARGET_MUSCLE_RELEVANCE" });
     }
-    const conflictingMuscles = uniqueSorted(candidate.muscleContributions.filter(({ muscleId }) => excludedMuscles.has(muscleId)).map(({ muscleId }) => muscleId));
+    const conflictingMuscles = uniqueSorted(
+      candidate.muscleContributions.filter(({ muscleId }) => excludedMuscles.has(muscleId)).map(({ muscleId }) => muscleId)
+    );
     if (conflictingMuscles.length > 0) {
       reasons.push({ code: "EXCLUDED_MUSCLE", relatedMuscleIds: conflictingMuscles });
     }
     const requiredEquipment = candidate.equipment.filter(({ requirement }) => requirement === "required").map(({ equipmentId }) => equipmentId);
-    const explicitlyUnavailable = uniqueSorted(requiredEquipment.filter((equipmentId) => unavailableEquipment.has(equipmentId)));
+    const explicitlyUnavailable = uniqueSorted(
+      requiredEquipment.filter((equipmentId) => unavailableEquipment.has(equipmentId))
+    );
     if (explicitlyUnavailable.length > 0) {
       reasons.push({
         code: "EXPLICITLY_UNAVAILABLE_EQUIPMENT",
         relatedEquipmentIds: explicitlyUnavailable
       });
     }
-    const missingEquipment = uniqueSorted(requiredEquipment.filter((equipmentId) => !availableEquipment.has(equipmentId) && !unavailableEquipment.has(equipmentId)));
+    const missingEquipment = uniqueSorted(
+      requiredEquipment.filter(
+        (equipmentId) => !availableEquipment.has(equipmentId) && !unavailableEquipment.has(equipmentId)
+      )
+    );
     if (missingEquipment.length > 0) {
       reasons.push({ code: "MISSING_REQUIRED_EQUIPMENT", relatedEquipmentIds: missingEquipment });
     }
@@ -2285,7 +2295,9 @@ function validateCandidate(candidate, exerciseIdCounts) {
   if (candidate.durationEstimate !== void 0 && (!Number.isFinite(candidate.durationEstimate.setupSeconds) || candidate.durationEstimate.setupSeconds < 0 || !Number.isFinite(candidate.durationEstimate.perSetSeconds) || candidate.durationEstimate.perSetSeconds <= 0)) {
     invalidities.add("INVALID_DURATION_ESTIMATE");
   }
-  return [...invalidities].sort((left, right) => workoutCandidateInvalidityCodes.indexOf(left) - workoutCandidateInvalidityCodes.indexOf(right));
+  return [...invalidities].sort(
+    (left, right) => workoutCandidateInvalidityCodes.indexOf(left) - workoutCandidateInvalidityCodes.indexOf(right)
+  );
 }
 function validateMuscleContributions(contributions, invalidities) {
   if (contributions.length === 0) {
@@ -2342,21 +2354,55 @@ function uniqueSorted(values) {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
-// packages/workout-engine/dist/validation.js
+// packages/workout-engine/src/validation.ts
 function validateWorkoutEngineInput(input) {
   const issues = [];
   if (input.targetMuscles.length === 0) {
-    addIssue2(issues, "NO_TARGET_MUSCLES", "targetMuscles", "At least one target muscle is required.");
+    addIssue2(
+      issues,
+      "NO_TARGET_MUSCLES",
+      "targetMuscles",
+      "At least one target muscle is required."
+    );
   }
   const targetMuscleIds = input.targetMuscles.map(({ muscleId }) => muscleId);
-  addDuplicateIssues(targetMuscleIds, "DUPLICATE_TARGET_MUSCLE", "targetMuscles", "Target muscle is duplicated.", issues);
+  addDuplicateIssues(
+    targetMuscleIds,
+    "DUPLICATE_TARGET_MUSCLE",
+    "targetMuscles",
+    "Target muscle is duplicated.",
+    issues
+  );
   if (!Number.isFinite(input.availableDurationMinutes) || input.availableDurationMinutes <= 0) {
-    addIssue2(issues, "INVALID_DURATION", "availableDurationMinutes", "Available duration must be greater than zero.");
+    addIssue2(
+      issues,
+      "INVALID_DURATION",
+      "availableDurationMinutes",
+      "Available duration must be greater than zero."
+    );
   }
-  addDuplicateIssues(input.availableEquipmentIds, "DUPLICATE_AVAILABLE_EQUIPMENT", "availableEquipmentIds", "Available equipment is duplicated.", issues);
-  addDuplicateIssues(input.exerciseCatalog.map(({ exerciseId }) => exerciseId), "DUPLICATE_CATALOG_EXERCISE", "exerciseCatalog", "Exercise candidate is duplicated.", issues);
+  addDuplicateIssues(
+    input.availableEquipmentIds,
+    "DUPLICATE_AVAILABLE_EQUIPMENT",
+    "availableEquipmentIds",
+    "Available equipment is duplicated.",
+    issues
+  );
+  addDuplicateIssues(
+    input.exerciseCatalog.map(({ exerciseId }) => exerciseId),
+    "DUPLICATE_CATALOG_EXERCISE",
+    "exerciseCatalog",
+    "Exercise candidate is duplicated.",
+    issues
+  );
   const constraintIds = input.constraints.map(({ id }) => id);
-  addDuplicateIssues(constraintIds, "DUPLICATE_CONSTRAINT_ID", "constraints", "Constraint ID is duplicated.", issues);
+  addDuplicateIssues(
+    constraintIds,
+    "DUPLICATE_CONSTRAINT_ID",
+    "constraints",
+    "Constraint ID is duplicated.",
+    issues
+  );
   const requiredMuscleIds = [...targetMuscleIds];
   const excludedMuscleIds = [...input.excludedMuscleIds];
   const unavailableEquipmentIds = [];
@@ -2395,39 +2441,105 @@ function validateWorkoutEngineInput(input) {
         break;
     }
   });
-  addDuplicateIssues(excludedExerciseIds, "DUPLICATE_EXCLUDED_EXERCISE", "constraints", "Excluded exercise is duplicated.", issues);
-  addCollisionIssue(requiredMuscleIds, excludedMuscleIds, "TARGET_EXCLUDED_MUSCLE_COLLISION", "targetMuscles", "A required target muscle is also excluded.", issues);
-  addCollisionIssue(input.availableEquipmentIds, unavailableEquipmentIds, "AVAILABLE_UNAVAILABLE_EQUIPMENT_COLLISION", "constraints", "Equipment cannot be both available and unavailable.", issues);
-  addCollisionIssue(excludedExerciseIds, preferredExerciseIds, "CONTRADICTORY_EXERCISE_CONSTRAINTS", "constraints", "An exercise cannot be both excluded and preferred.", issues);
-  addCollisionIssue(excludedExerciseFamilyIds, preferredExerciseFamilyIds, "CONTRADICTORY_FAMILY_CONSTRAINTS", "constraints", "An exercise family cannot be both excluded and preferred.", issues);
+  addDuplicateIssues(
+    excludedExerciseIds,
+    "DUPLICATE_EXCLUDED_EXERCISE",
+    "constraints",
+    "Excluded exercise is duplicated.",
+    issues
+  );
+  addCollisionIssue(
+    requiredMuscleIds,
+    excludedMuscleIds,
+    "TARGET_EXCLUDED_MUSCLE_COLLISION",
+    "targetMuscles",
+    "A required target muscle is also excluded.",
+    issues
+  );
+  addCollisionIssue(
+    input.availableEquipmentIds,
+    unavailableEquipmentIds,
+    "AVAILABLE_UNAVAILABLE_EQUIPMENT_COLLISION",
+    "constraints",
+    "Equipment cannot be both available and unavailable.",
+    issues
+  );
+  addCollisionIssue(
+    excludedExerciseIds,
+    preferredExerciseIds,
+    "CONTRADICTORY_EXERCISE_CONSTRAINTS",
+    "constraints",
+    "An exercise cannot be both excluded and preferred.",
+    issues
+  );
+  addCollisionIssue(
+    excludedExerciseFamilyIds,
+    preferredExerciseFamilyIds,
+    "CONTRADICTORY_FAMILY_CONSTRAINTS",
+    "constraints",
+    "An exercise family cannot be both excluded and preferred.",
+    issues
+  );
   if (!isIsoDate(input.sessionDate)) {
-    addIssue2(issues, "INVALID_SESSION_DATE", "sessionDate", "Session date must be a valid ISO calendar date.");
+    addIssue2(
+      issues,
+      "INVALID_SESSION_DATE",
+      "sessionDate",
+      "Session date must be a valid ISO calendar date."
+    );
   }
   if (input.deterministicSeed.trim().length === 0) {
-    addIssue2(issues, "INVALID_DETERMINISTIC_SEED", "deterministicSeed", "Deterministic seed cannot be empty.");
+    addIssue2(
+      issues,
+      "INVALID_DETERMINISTIC_SEED",
+      "deterministicSeed",
+      "Deterministic seed cannot be empty."
+    );
   }
   if (input.version.engineName.trim().length === 0 || !parseVersionIdentifier(input.contractVersion, "contract").ok || !parseVersionIdentifier(input.version.engineVersion, "engine").ok || !parseVersionIdentifier(input.version.ruleSetVersion, "rule-set").ok) {
-    addIssue2(issues, "INVALID_VERSION", "version", "Engine name, engine version, and rule-set version must be valid.");
+    addIssue2(
+      issues,
+      "INVALID_VERSION",
+      "version",
+      "Engine name, engine version, and rule-set version must be valid."
+    );
   }
   if (issues.length > 0) {
-    return failure(domainError("VALIDATION_ERROR", "Workout engine input validation failed.", { issues }));
+    return failure(
+      domainError("VALIDATION_ERROR", "Workout engine input validation failed.", { issues })
+    );
   }
   return success(input);
 }
 function validateConstraint(constraint, index, issues) {
   const path = `constraints[${index}]`;
   if (constraint.id.trim().length === 0 || !/^[a-z][a-z0-9_]{0,63}$/.test(constraint.reasonCode)) {
-    addIssue2(issues, "INVALID_CONSTRAINT", path, "Constraint ID and reason code must be non-empty controlled values.");
+    addIssue2(
+      issues,
+      "INVALID_CONSTRAINT",
+      path,
+      "Constraint ID and reason code must be non-empty controlled values."
+    );
   }
   switch (constraint.kind) {
     case "maximum_workout_duration":
       if (!Number.isFinite(constraint.maximumMinutes) || constraint.maximumMinutes <= 0) {
-        addIssue2(issues, "INVALID_CONSTRAINT", `${path}.maximumMinutes`, "Maximum workout duration must be greater than zero.");
+        addIssue2(
+          issues,
+          "INVALID_CONSTRAINT",
+          `${path}.maximumMinutes`,
+          "Maximum workout duration must be greater than zero."
+        );
       }
       break;
     case "muscle_volume_limit":
       if (!Number.isInteger(constraint.maximumWorkingSets) || constraint.maximumWorkingSets < 0 || constraint.minimumWorkingSets !== void 0 && (!Number.isInteger(constraint.minimumWorkingSets) || constraint.minimumWorkingSets < 0 || constraint.minimumWorkingSets > constraint.maximumWorkingSets)) {
-        addIssue2(issues, "INVALID_CONSTRAINT", path, "Muscle volume limits require non-negative ordered integer bounds.");
+        addIssue2(
+          issues,
+          "INVALID_CONSTRAINT",
+          path,
+          "Muscle volume limits require non-negative ordered integer bounds."
+        );
       }
       break;
     case "required_target_muscles":
@@ -2440,7 +2552,12 @@ function validateConstraint(constraint, index, issues) {
     case "preferred_muscles":
     case "preferred_exercise_families":
       if (constraintValues(constraint).length === 0) {
-        addIssue2(issues, "INVALID_CONSTRAINT", path, "List constraints require at least one referenced entity.");
+        addIssue2(
+          issues,
+          "INVALID_CONSTRAINT",
+          path,
+          "List constraints require at least one referenced entity."
+        );
       }
       break;
   }
@@ -2493,7 +2610,7 @@ function isIsoDate(value) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-// packages/workout-engine/dist/scoring.js
+// packages/workout-engine/src/scoring.ts
 var workoutCandidateScoringReasonCodes = [
   "PRIMARY_TARGET_RELEVANCE",
   "SECONDARY_TARGET_RELEVANCE",
@@ -2565,9 +2682,11 @@ function validateWorkoutCandidateScoringRuleSet(ruleSet, expectedRuleSetVersion)
     });
   }
   if (issues.length > 0) {
-    return failure(domainError("VALIDATION_ERROR", "Workout candidate scoring rule set is invalid.", {
-      issues
-    }));
+    return failure(
+      domainError("VALIDATION_ERROR", "Workout candidate scoring rule set is invalid.", {
+        issues
+      })
+    );
   }
   return success(ruleSet);
 }
@@ -2576,7 +2695,10 @@ function rankWorkoutCandidates(input, ruleSet) {
   if (!inputValidation.ok) {
     return inputValidation;
   }
-  const ruleSetValidation = validateWorkoutCandidateScoringRuleSet(ruleSet, input.version.ruleSetVersion);
+  const ruleSetValidation = validateWorkoutCandidateScoringRuleSet(
+    ruleSet,
+    input.version.ruleSetVersion
+  );
   if (!ruleSetValidation.ok) {
     return ruleSetValidation;
   }
@@ -2584,7 +2706,13 @@ function rankWorkoutCandidates(input, ruleSet) {
   const targetMuscles = new Map(input.targetMuscles.map((target) => [target.muscleId, target]));
   const preferredMuscles = collectConstraintReferences(input.constraints, "preferred_muscles");
   const scored = filtering.eligibleCandidates.map((candidate) => {
-    const components = scoreCandidate(candidate, input, ruleSet, targetMuscles, preferredMuscles).sort(compareScoreComponents);
+    const components = scoreCandidate(
+      candidate,
+      input,
+      ruleSet,
+      targetMuscles,
+      preferredMuscles
+    ).sort(compareScoreComponents);
     const finalScore = components.reduce((total, component) => total + component.score, 0);
     return {
       candidate,
@@ -2593,7 +2721,9 @@ function rankWorkoutCandidates(input, ruleSet) {
       reasonCodes: uniqueReasonCodes(components)
     };
   });
-  const rankedCandidates = scored.sort((left, right) => right.finalScore - left.finalScore || left.candidate.exerciseId.localeCompare(right.candidate.exerciseId)).map((candidate, index) => ({
+  const rankedCandidates = scored.sort(
+    (left, right) => right.finalScore - left.finalScore || left.candidate.exerciseId.localeCompare(right.candidate.exerciseId)
+  ).map((candidate, index) => ({
     rank: index + 1,
     ...candidate,
     scoringContractVersion: ruleSet.contractVersion,
@@ -2635,7 +2765,9 @@ function scoreCandidate(candidate, input, ruleSet, targetMuscles, preferredMuscl
   scorePreferences(candidate.exerciseId, input.exercisePreferences, ruleSet, components);
   scoreConstraints(candidate, input.constraints, ruleSet, components);
   scoreRecency(candidate.exerciseId, input, ruleSet, components);
-  if (input.programPrescription?.exercises.some(({ exerciseId }) => exerciseId === candidate.exerciseId)) {
+  if (input.programPrescription?.exercises.some(
+    ({ exerciseId }) => exerciseId === candidate.exerciseId
+  )) {
     components.push({
       code: "TEMPLATE_PRESCRIPTION",
       score: ruleSet.adjustments.templatePrescriptionBonus
@@ -2644,7 +2776,9 @@ function scoreCandidate(candidate, input, ruleSet, targetMuscles, preferredMuscl
   return components;
 }
 function scorePreferences(exerciseId, preferences, ruleSet, components) {
-  const matchingPreferences = new Set(preferences.filter((preference) => preference.exerciseId === exerciseId).map(({ preference }) => preference));
+  const matchingPreferences = new Set(
+    preferences.filter((preference) => preference.exerciseId === exerciseId).map(({ preference }) => preference)
+  );
   if (matchingPreferences.has("like")) {
     components.push({ code: "USER_LIKE", score: ruleSet.adjustments.userLikeBonus });
   }
@@ -2694,7 +2828,9 @@ function scoreRecency(exerciseId, input, ruleSet, components) {
   });
 }
 function latestExposure(exerciseId, exposures) {
-  return exposures.filter((exposure) => exposure.exerciseId === exerciseId).sort((left, right) => (right.lastPerformedAt ?? "").localeCompare(left.lastPerformedAt ?? "") || right.completedWorkingSets - left.completedWorkingSets)[0];
+  return exposures.filter((exposure) => exposure.exerciseId === exerciseId).sort(
+    (left, right) => (right.lastPerformedAt ?? "").localeCompare(left.lastPerformedAt ?? "") || right.completedWorkingSets - left.completedWorkingSets
+  )[0];
 }
 function calendarDaysBetween(earlier, later) {
   const earlierDate = Date.parse(`${earlier.slice(0, 10)}T00:00:00.000Z`);
@@ -2705,7 +2841,9 @@ function calendarDaysBetween(earlier, later) {
   return Math.floor((laterDate - earlierDate) / 864e5);
 }
 function collectConstraintReferences(constraints, kind) {
-  return new Set(constraints.flatMap((constraint) => constraint.kind === kind ? constraint.muscleIds : []));
+  return new Set(
+    constraints.flatMap((constraint) => constraint.kind === kind ? constraint.muscleIds : [])
+  );
 }
 function uniqueReasonCodes(components) {
   const present = new Set(components.map(({ code }) => code));
@@ -2721,7 +2859,7 @@ function isBoundedNonNegative(value, maximum) {
   return Number.isFinite(value) && value >= 0 && value <= maximum;
 }
 
-// packages/workout-engine/dist/allocation.js
+// packages/workout-engine/src/allocation.ts
 var workoutSelectionReasonCodes = [
   "TARGET_VOLUME_COVERAGE",
   "HIGH_RANKED_CANDIDATE",
@@ -2795,9 +2933,17 @@ function allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRule
       "invalid_scoring_rule_set"
     ]);
   }
-  const allocationIssues = validateWorkoutAllocationRuleSet(allocationRuleSet, input.version.ruleSetVersion);
+  const allocationIssues = validateWorkoutAllocationRuleSet(
+    allocationRuleSet,
+    input.version.ruleSetVersion
+  );
   if (allocationIssues.length > 0) {
-    return allocationFailure("INVALID_ALLOCATION_CONFIGURATION", input, allocationRuleSet, allocationIssues.map(({ code }) => code.toLocaleLowerCase("en-US")));
+    return allocationFailure(
+      "INVALID_ALLOCATION_CONFIGURATION",
+      input,
+      allocationRuleSet,
+      allocationIssues.map(({ code }) => code.toLocaleLowerCase("en-US"))
+    );
   }
   const scoringResult = rankWorkoutCandidates(input, scoringRuleSet);
   if (!scoringResult.ok) {
@@ -2807,7 +2953,13 @@ function allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRule
   }
   const targetResult = buildMuscleTargets(input, allocationRuleSet);
   if (targetResult.failure !== void 0) {
-    return allocationFailure("IMPOSSIBLE_VOLUME_CONSTRAINTS", input, allocationRuleSet, ["incompatible_muscle_volume_bounds"], targetResult.failure);
+    return allocationFailure(
+      "IMPOSSIBLE_VOLUME_CONSTRAINTS",
+      input,
+      allocationRuleSet,
+      ["incompatible_muscle_volume_bounds"],
+      targetResult.failure
+    );
   }
   const targets = targetResult.targets;
   const hardMaximums = buildHardMaximums(input, allocationRuleSet, targets);
@@ -2815,11 +2967,25 @@ function allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRule
   const familyIds = /* @__PURE__ */ new Set();
   const weightedVolumes = /* @__PURE__ */ new Map();
   while (hasUnmetTargets(targets, weightedVolumes) || familyIds.size < allocationRuleSet.minimumDistinctExerciseFamilies) {
-    const target = selectNextTarget(targets, weightedVolumes, scoringResult.value.rankedCandidates, familyIds, allocationRuleSet.minimumDistinctExerciseFamilies);
+    const target = selectNextTarget(
+      targets,
+      weightedVolumes,
+      scoringResult.value.rankedCandidates,
+      familyIds,
+      allocationRuleSet.minimumDistinctExerciseFamilies
+    );
     if (target === void 0) {
       break;
     }
-    const choice = chooseCandidate(target, scoringResult.value.rankedCandidates, selected, familyIds, weightedVolumes, hardMaximums, allocationRuleSet);
+    const choice = chooseCandidate(
+      target,
+      scoringResult.value.rankedCandidates,
+      selected,
+      familyIds,
+      weightedVolumes,
+      hardMaximums,
+      allocationRuleSet
+    );
     if (choice === void 0) {
       break;
     }
@@ -2842,16 +3008,26 @@ function allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRule
     }
     addCandidateVolume(weightedVolumes, choice.scored.candidate, choice.sets, allocationRuleSet);
   }
-  const insufficientMuscles = targets.filter(({ muscleId, minimumWorkingSets }) => (weightedVolumes.get(muscleId) ?? 0) + Number.EPSILON < minimumWorkingSets).map(({ muscleId }) => muscleId);
+  const insufficientMuscles = targets.filter(
+    ({ muscleId, minimumWorkingSets }) => (weightedVolumes.get(muscleId) ?? 0) + Number.EPSILON < minimumWorkingSets
+  ).map(({ muscleId }) => muscleId);
   if (insufficientMuscles.length > 0) {
-    return allocationFailure("INSUFFICIENT_TARGET_COVERAGE", input, allocationRuleSet, ["required_muscle_coverage_unmet"], insufficientMuscles);
+    return allocationFailure(
+      "INSUFFICIENT_TARGET_COVERAGE",
+      input,
+      allocationRuleSet,
+      ["required_muscle_coverage_unmet"],
+      insufficientMuscles
+    );
   }
   if (familyIds.size < allocationRuleSet.minimumDistinctExerciseFamilies) {
     return allocationFailure("NO_VIABLE_DIVERSE_SELECTION", input, allocationRuleSet, [
       "minimum_distinct_families_unmet"
     ]);
   }
-  const selectedExercises = [...selected.values()].sort((left, right) => left.scored.rank - right.scored.rank || left.scored.candidate.exerciseId.localeCompare(right.scored.candidate.exerciseId)).map((selection, index) => ({
+  const selectedExercises = [...selected.values()].sort(
+    (left, right) => left.scored.rank - right.scored.rank || left.scored.candidate.exerciseId.localeCompare(right.scored.candidate.exerciseId)
+  ).map((selection, index) => ({
     position: index + 1,
     exerciseId: selection.scored.candidate.exerciseId,
     exerciseFamilyId: selection.scored.candidate.exerciseFamilyId,
@@ -2875,7 +3051,11 @@ function allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRule
   };
 }
 function buildMuscleTargets(input, ruleSet) {
-  const preferredMuscles = new Set(input.constraints.flatMap((constraint) => constraint.kind === "preferred_muscles" ? constraint.muscleIds : []));
+  const preferredMuscles = new Set(
+    input.constraints.flatMap(
+      (constraint) => constraint.kind === "preferred_muscles" ? constraint.muscleIds : []
+    )
+  );
   const limits = /* @__PURE__ */ new Map();
   input.constraints.forEach((constraint) => {
     if (constraint.kind !== "muscle_volume_limit") {
@@ -2889,7 +3069,9 @@ function buildMuscleTargets(input, ruleSet) {
     limits.set(constraint.muscleId, current);
   });
   const targetMuscleIds = new Set(input.targetMuscles.map(({ muscleId }) => muscleId));
-  const nonTargetMinimums = [...limits.entries()].filter(([muscleId, bounds]) => !targetMuscleIds.has(muscleId) && bounds.minimums.some((minimum) => minimum > 0)).map(([muscleId]) => muscleId);
+  const nonTargetMinimums = [...limits.entries()].filter(
+    ([muscleId, bounds]) => !targetMuscleIds.has(muscleId) && bounds.minimums.some((minimum) => minimum > 0)
+  ).map(([muscleId]) => muscleId);
   if (nonTargetMinimums.length > 0) {
     return { targets: [], failure: nonTargetMinimums.sort() };
   }
@@ -2897,29 +3079,45 @@ function buildMuscleTargets(input, ruleSet) {
     const explicit = limits.get(target.muscleId);
     const configuredMinimum = target.priority === "required" ? ruleSet.minimumRequiredMuscleWorkingSets : ruleSet.minimumPreferredMuscleWorkingSets;
     const minimumWorkingSets = Math.max(configuredMinimum, ...explicit?.minimums ?? [0]);
-    const maximumWorkingSets = Math.min(ruleSet.maximumWorkingSetsPerMuscle, ...explicit?.maximums ?? [ruleSet.maximumWorkingSetsPerMuscle]);
+    const maximumWorkingSets = Math.min(
+      ruleSet.maximumWorkingSetsPerMuscle,
+      ...explicit?.maximums ?? [ruleSet.maximumWorkingSetsPerMuscle]
+    );
     const configuredTarget = (target.priority === "required" ? ruleSet.requiredMuscleTargetWorkingSets : ruleSet.preferredMuscleTargetWorkingSets) + (preferredMuscles.has(target.muscleId) ? ruleSet.preferredMuscleAdditionalWorkingSets : 0);
     return {
       muscleId: target.muscleId,
       minimumWorkingSets,
       maximumWorkingSets,
-      targetWorkingSets: Math.min(Math.max(configuredTarget, minimumWorkingSets), maximumWorkingSets)
+      targetWorkingSets: Math.min(
+        Math.max(configuredTarget, minimumWorkingSets),
+        maximumWorkingSets
+      )
     };
   });
   const impossible = targets.filter(({ minimumWorkingSets, maximumWorkingSets }) => minimumWorkingSets > maximumWorkingSets).map(({ muscleId }) => muscleId);
   return impossible.length > 0 ? { targets, failure: impossible } : { targets };
 }
 function buildHardMaximums(input, ruleSet, targets) {
-  const maximums = new Map(targets.map(({ muscleId, maximumWorkingSets }) => [muscleId, maximumWorkingSets]));
+  const maximums = new Map(
+    targets.map(({ muscleId, maximumWorkingSets }) => [muscleId, maximumWorkingSets])
+  );
   input.constraints.forEach((constraint) => {
     if (constraint.kind === "muscle_volume_limit") {
-      maximums.set(constraint.muscleId, Math.min(maximums.get(constraint.muscleId) ?? ruleSet.maximumWorkingSetsPerMuscle, constraint.maximumWorkingSets));
+      maximums.set(
+        constraint.muscleId,
+        Math.min(
+          maximums.get(constraint.muscleId) ?? ruleSet.maximumWorkingSetsPerMuscle,
+          constraint.maximumWorkingSets
+        )
+      );
     }
   });
   return maximums;
 }
 function selectNextTarget(targets, volumes, candidates, selectedFamilies, minimumDistinctFamilies) {
-  const unmet = targets.filter(({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < targetWorkingSets).sort((left, right) => {
+  const unmet = targets.filter(
+    ({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < targetWorkingSets
+  ).sort((left, right) => {
     const leftRatio = (left.targetWorkingSets - (volumes.get(left.muscleId) ?? 0)) / left.targetWorkingSets;
     const rightRatio = (right.targetWorkingSets - (volumes.get(right.muscleId) ?? 0)) / right.targetWorkingSets;
     return rightRatio - leftRatio || left.muscleId.localeCompare(right.muscleId);
@@ -2930,13 +3128,19 @@ function selectNextTarget(targets, volumes, candidates, selectedFamilies, minimu
   if (selectedFamilies.size >= minimumDistinctFamilies) {
     return void 0;
   }
-  return targets.find((target) => candidates.some(({ candidate }) => !selectedFamilies.has(candidate.exerciseFamilyId) && calculateExerciseMuscleSetContribution(candidate, target.muscleId, {
-    primarySetContribution: 1,
-    secondarySetContribution: 1
-  }) > 0));
+  return targets.find(
+    (target) => candidates.some(
+      ({ candidate }) => !selectedFamilies.has(candidate.exerciseFamilyId) && calculateExerciseMuscleSetContribution(candidate, target.muscleId, {
+        primarySetContribution: 1,
+        secondarySetContribution: 1
+      }) > 0
+    )
+  );
 }
 function chooseCandidate(target, rankedCandidates, selected, selectedFamilies, volumes, hardMaximums, ruleSet) {
-  const candidates = rankedCandidates.filter(({ candidate }) => calculateExerciseMuscleSetContribution(candidate, target.muscleId, ruleSet) > 0).filter(({ candidate }) => {
+  const candidates = rankedCandidates.filter(
+    ({ candidate }) => calculateExerciseMuscleSetContribution(candidate, target.muscleId, ruleSet) > 0
+  ).filter(({ candidate }) => {
     const existing = selected.get(candidate.exerciseId);
     return (existing !== void 0 || selected.size < ruleSet.maximumSelectedExercises) && (existing?.workingSets ?? 0) < ruleSet.maximumWorkingSetsPerExercise;
   }).sort((left, right) => {
@@ -2947,12 +3151,26 @@ function chooseCandidate(target, rankedCandidates, selected, selectedFamilies, v
   for (const scored of candidates) {
     const existingSets = selected.get(scored.candidate.exerciseId)?.workingSets ?? 0;
     const remainingExerciseSets = ruleSet.maximumWorkingSetsPerExercise - existingSets;
-    const targetContribution = calculateExerciseMuscleSetContribution(scored.candidate, target.muscleId, ruleSet);
-    const targetDeficit = Math.max(target.targetWorkingSets - (volumes.get(target.muscleId) ?? 0), targetContribution);
-    let requestedSets = Math.min(ruleSet.defaultWorkingSetsPerExercise, remainingExerciseSets, Math.max(1, Math.ceil(targetDeficit / targetContribution)));
+    const targetContribution = calculateExerciseMuscleSetContribution(
+      scored.candidate,
+      target.muscleId,
+      ruleSet
+    );
+    const targetDeficit = Math.max(
+      target.targetWorkingSets - (volumes.get(target.muscleId) ?? 0),
+      targetContribution
+    );
+    let requestedSets = Math.min(
+      ruleSet.defaultWorkingSetsPerExercise,
+      remainingExerciseSets,
+      Math.max(1, Math.ceil(targetDeficit / targetContribution))
+    );
     if (!selectedFamilies.has(scored.candidate.exerciseFamilyId) && selectedFamilies.size < ruleSet.minimumDistinctExerciseFamilies - 1) {
       const remainingFamilies = ruleSet.minimumDistinctExerciseFamilies - selectedFamilies.size;
-      requestedSets = Math.min(requestedSets, Math.max(1, Math.floor(targetDeficit / targetContribution / remainingFamilies)));
+      requestedSets = Math.min(
+        requestedSets,
+        Math.max(1, Math.floor(targetDeficit / targetContribution / remainingFamilies))
+      );
     }
     for (let sets = requestedSets; sets >= 1; sets -= 1) {
       if (respectsHardMaximums(scored.candidate, sets, volumes, hardMaximums, ruleSet)) {
@@ -2986,7 +3204,9 @@ function addCandidateVolume(volumes, candidate, sets, ruleSet) {
   });
 }
 function calculateExerciseMuscleSetContribution(candidate, muscleId, ruleSet) {
-  const contribution = candidate.muscleContributions.find((candidateMuscle) => candidateMuscle.muscleId === muscleId);
+  const contribution = candidate.muscleContributions.find(
+    (candidateMuscle) => candidateMuscle.muscleId === muscleId
+  );
   if (contribution === void 0 || contribution.role === "stabilizer") {
     return 0;
   }
@@ -2994,7 +3214,9 @@ function calculateExerciseMuscleSetContribution(candidate, muscleId, ruleSet) {
   return contribution.contribution * roleWeight;
 }
 function hasUnmetTargets(targets, volumes) {
-  return targets.some(({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < targetWorkingSets);
+  return targets.some(
+    ({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < targetWorkingSets
+  );
 }
 function allocationFailure(code, input, ruleSet, reasonCodes, relatedMuscleIds = []) {
   return {
@@ -3018,7 +3240,7 @@ function isContributionWeight(value) {
   return Number.isFinite(value) && value >= 0 && value <= 1;
 }
 
-// packages/workout-engine/dist/duration.js
+// packages/workout-engine/src/duration.ts
 var DEFAULT_GOAL_MULTIPLIERS = {
   volumeMultiplier: 1.6,
   diversityTendency: 1,
@@ -3084,7 +3306,10 @@ function validateWorkoutDurationRuleSet(ruleSet, expectedRuleSetVersion) {
   return issues;
 }
 function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet, durationRuleSet, goalProfile) {
-  const durationIssues = validateWorkoutDurationRuleSet(durationRuleSet, input.version.ruleSetVersion);
+  const durationIssues = validateWorkoutDurationRuleSet(
+    durationRuleSet,
+    input.version.ruleSetVersion
+  );
   if (durationIssues.length > 0) {
     return durationFailure("INVALID_DURATION_CONFIGURATION", input, durationRuleSet, {
       reasonCodes: durationIssues.map(({ code }) => code.toLocaleLowerCase("en-US"))
@@ -3093,7 +3318,11 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
   const goalMultipliers = resolveGoalMultipliers(goalProfile);
   const effectiveDurationRuleSet = {
     ...durationRuleSet,
-    targetDurationUtilization: clamp(durationRuleSet.targetDurationUtilization * goalMultipliers.expansionFactor, 0, durationRuleSet.targetDurationUtilization),
+    targetDurationUtilization: clamp(
+      durationRuleSet.targetDurationUtilization * goalMultipliers.expansionFactor,
+      0,
+      durationRuleSet.targetDurationUtilization
+    ),
     preferredVolumeExpansionMultiplier: durationRuleSet.preferredVolumeExpansionMultiplier * goalMultipliers.volumeFactor
   };
   const allocation = allocateAndSelectWorkoutExercises(input, scoringRuleSet, allocationRuleSet);
@@ -3104,13 +3333,22 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       relatedMuscleIds: allocation.relatedMuscleIds
     });
   }
-  const candidates = new Map(input.exerciseCatalog.map((candidate) => [candidate.exerciseId, candidate]));
+  const candidates = new Map(
+    input.exerciseCatalog.map((candidate) => [candidate.exerciseId, candidate])
+  );
   const decisions = [];
   let exercises = allocation.selectedExercises.map((selected) => ({
     selected,
     workingSets: selected.plannedWorkingSets
   }));
-  const normalized = enforceMinimumWorkingSets(exercises, allocation, candidates, input, allocationRuleSet, durationRuleSet);
+  const normalized = enforceMinimumWorkingSets(
+    exercises,
+    allocation,
+    candidates,
+    input,
+    allocationRuleSet,
+    durationRuleSet
+  );
   if (normalized.failureExerciseIds.length > 0) {
     return durationFailure("MINIMUM_SET_PRESCRIPTION_IMPOSSIBLE", input, durationRuleSet, {
       reasonCodes: ["minimum_working_sets_cannot_be_preserved"],
@@ -3121,9 +3359,21 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
   decisions.push(...normalized.decisions);
   const maximumDurationMinutes = effectiveMaximumDuration(input);
   const maximumDurationSeconds = maximumDurationMinutes * 60;
-  let estimate = estimateWorkoutDuration(durationExerciseInputs(exercises), candidates, input, durationRuleSet);
+  let estimate = estimateWorkoutDuration(
+    durationExerciseInputs(exercises),
+    candidates,
+    input,
+    durationRuleSet
+  );
   while (estimate.totalSeconds > maximumDurationSeconds) {
-    const option = chooseReduction(exercises, allocation, candidates, input, allocationRuleSet, durationRuleSet);
+    const option = chooseReduction(
+      exercises,
+      allocation,
+      candidates,
+      input,
+      allocationRuleSet,
+      durationRuleSet
+    );
     if (option === void 0) {
       return durationFailure("DURATION_CONSTRAINT_IMPOSSIBLE", input, durationRuleSet, {
         reasonCodes: ["required_coverage_cannot_fit_duration"],
@@ -3131,7 +3381,9 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       });
     }
     const previous = exercises.find(({ selected }) => selected.exerciseId === option.exerciseId);
-    const resulting = option.resultingExercises.find(({ selected }) => selected.exerciseId === option.exerciseId);
+    const resulting = option.resultingExercises.find(
+      ({ selected }) => selected.exerciseId === option.exerciseId
+    );
     decisions.push({
       code: option.decisionCode,
       exerciseId: option.exerciseId,
@@ -3139,21 +3391,49 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       resultingWorkingSets: resulting?.workingSets ?? 0
     });
     exercises = [...option.resultingExercises];
-    estimate = estimateWorkoutDuration(durationExerciseInputs(exercises), candidates, input, durationRuleSet);
+    estimate = estimateWorkoutDuration(
+      durationExerciseInputs(exercises),
+      candidates,
+      input,
+      durationRuleSet
+    );
   }
-  const expanded = expandToUseDurationBudget(exercises, allocation, candidates, input, allocationRuleSet, effectiveDurationRuleSet, maximumDurationSeconds, goalMultipliers.diversityFactor);
+  const expanded = expandToUseDurationBudget(
+    exercises,
+    allocation,
+    candidates,
+    input,
+    allocationRuleSet,
+    effectiveDurationRuleSet,
+    maximumDurationSeconds,
+    goalMultipliers.diversityFactor
+  );
   exercises = [...expanded.exercises];
   decisions.push(...expanded.decisions);
   estimate = expanded.estimate;
-  const muscleVolumeSummary = recomputeVolumeSummary(exercises, allocation, candidates, allocationRuleSet);
+  const muscleVolumeSummary = recomputeVolumeSummary(
+    exercises,
+    allocation,
+    candidates,
+    allocationRuleSet
+  );
   const fittedExercises = exercises.map((exercise2, index) => {
     const candidate = requiredCandidate(candidates, exercise2.selected.exerciseId);
-    const restSecondsBetweenSets = exerciseRestSeconds(exercise2.selected.exerciseId, input, durationRuleSet);
+    const restSecondsBetweenSets = exerciseRestSeconds(
+      exercise2.selected.exerciseId,
+      input,
+      durationRuleSet
+    );
     return {
       ...exercise2.selected,
       position: index + 1,
       plannedWorkingSets: exercise2.workingSets,
-      estimatedDurationSeconds: estimateExerciseDurationSeconds(exercise2.workingSets, candidate, restSecondsBetweenSets, durationRuleSet),
+      estimatedDurationSeconds: estimateExerciseDurationSeconds(
+        exercise2.workingSets,
+        candidate,
+        restSecondsBetweenSets,
+        durationRuleSet
+      ),
       restSecondsBetweenSets
     };
   });
@@ -3173,31 +3453,70 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
 }
 function expandToUseDurationBudget(initialExercises, allocation, candidates, input, allocationRuleSet, durationRuleSet, maximumDurationSeconds, diversityFactor) {
   let exercises = cloneExercises(initialExercises);
-  let estimate = estimateWorkoutDuration(durationExerciseInputs(exercises), candidates, input, durationRuleSet);
+  let estimate = estimateWorkoutDuration(
+    durationExerciseInputs(exercises),
+    candidates,
+    input,
+    durationRuleSet
+  );
   const decisions = [];
-  const preferredMaximums = new Map(allocation.muscleVolumeSummary.map((summary) => [
-    summary.muscleId,
-    Math.min(summary.maximumWorkingSets, summary.targetWorkingSets * durationRuleSet.preferredVolumeExpansionMultiplier)
-  ]));
+  const preferredMaximums = new Map(
+    allocation.muscleVolumeSummary.map((summary) => [
+      summary.muscleId,
+      Math.min(
+        summary.maximumWorkingSets,
+        summary.targetWorkingSets * durationRuleSet.preferredVolumeExpansionMultiplier
+      )
+    ])
+  );
   while (estimate.totalSeconds / maximumDurationSeconds < durationRuleSet.targetDurationUtilization && maximumDurationSeconds - estimate.totalSeconds >= durationRuleSet.minimumExpansionBudgetSeconds) {
     const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
-    const targetMuscles = allocation.muscleVolumeSummary.filter(({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (preferredMaximums.get(muscleId) ?? 0)).sort((left, right) => {
+    const targetMuscles = allocation.muscleVolumeSummary.filter(
+      ({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (preferredMaximums.get(muscleId) ?? 0)
+    ).sort((left, right) => {
       const leftRatio = (volumes.get(left.muscleId) ?? 0) / Math.max(preferredMaximums.get(left.muscleId) ?? 0, Number.EPSILON);
       const rightRatio = (volumes.get(right.muscleId) ?? 0) / Math.max(preferredMaximums.get(right.muscleId) ?? 0, Number.EPSILON);
       return leftRatio - rightRatio || left.muscleId.localeCompare(right.muscleId);
     });
     let accepted = false;
     for (const target of targetMuscles) {
-      const selectedCandidates = exercises.filter((exercise2) => exercise2.workingSets < allocationRuleSet.maximumWorkingSetsPerExercise && calculateExerciseMuscleSetContribution(requiredCandidate(candidates, exercise2.selected.exerciseId), target.muscleId, allocationRuleSet) > 0).sort((left, right) => left.selected.scoreRank - right.selected.scoreRank || left.selected.exerciseId.localeCompare(right.selected.exerciseId));
+      const selectedCandidates = exercises.filter(
+        (exercise2) => exercise2.workingSets < allocationRuleSet.maximumWorkingSetsPerExercise && calculateExerciseMuscleSetContribution(
+          requiredCandidate(candidates, exercise2.selected.exerciseId),
+          target.muscleId,
+          allocationRuleSet
+        ) > 0
+      ).sort(
+        (left, right) => left.selected.scoreRank - right.selected.scoreRank || left.selected.exerciseId.localeCompare(right.selected.exerciseId)
+      );
       for (const selectedCandidate of selectedCandidates) {
         const expandedExercises = cloneExercises(exercises);
-        const expandedExercise = expandedExercises.find(({ selected }) => selected.exerciseId === selectedCandidate.selected.exerciseId);
+        const expandedExercise = expandedExercises.find(
+          ({ selected }) => selected.exerciseId === selectedCandidate.selected.exerciseId
+        );
         if (expandedExercise === void 0) {
           continue;
         }
         expandedExercise.workingSets += 1;
-        const expandedEstimate = estimateWorkoutDuration(durationExerciseInputs(expandedExercises), candidates, input, durationRuleSet);
-        if (expandedEstimate.totalSeconds <= maximumDurationSeconds && isValidVolumePlan(expandedExercises, allocation, candidates, input, allocationRuleSet, "minimum") && respectsPreferredExpansionMaximums(expandedExercises, candidates, allocationRuleSet, preferredMaximums)) {
+        const expandedEstimate = estimateWorkoutDuration(
+          durationExerciseInputs(expandedExercises),
+          candidates,
+          input,
+          durationRuleSet
+        );
+        if (expandedEstimate.totalSeconds <= maximumDurationSeconds && isValidVolumePlan(
+          expandedExercises,
+          allocation,
+          candidates,
+          input,
+          allocationRuleSet,
+          "minimum"
+        ) && respectsPreferredExpansionMaximums(
+          expandedExercises,
+          candidates,
+          allocationRuleSet,
+          preferredMaximums
+        )) {
           decisions.push({
             code: "ADDED_WORKING_SET_FOR_DURATION_BUDGET",
             exerciseId: expandedExercise.selected.exerciseId,
@@ -3215,7 +3534,13 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
       }
       const selectedExerciseIds = new Set(exercises.map(({ selected }) => selected.exerciseId));
       const selectedFamilyIds = new Set(exercises.map(({ selected }) => selected.exerciseFamilyId));
-      const expansionCandidates = diversityFactor >= 1 ? allocation.scoring.rankedCandidates.filter(({ candidate }) => !selectedExerciseIds.has(candidate.exerciseId) && !selectedFamilyIds.has(candidate.exerciseFamilyId) && calculateExerciseMuscleSetContribution(candidate, target.muscleId, allocationRuleSet) > 0) : [];
+      const expansionCandidates = diversityFactor >= 1 ? allocation.scoring.rankedCandidates.filter(
+        ({ candidate }) => !selectedExerciseIds.has(candidate.exerciseId) && !selectedFamilyIds.has(candidate.exerciseFamilyId) && calculateExerciseMuscleSetContribution(
+          candidate,
+          target.muscleId,
+          allocationRuleSet
+        ) > 0
+      ) : [];
       for (const scored of expansionCandidates) {
         const newSelection = {
           position: exercises.length + 1,
@@ -3233,8 +3558,25 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
             workingSets: durationRuleSet.minimumWorkingSetsPerExercise
           }
         ];
-        const expandedEstimate = estimateWorkoutDuration(durationExerciseInputs(expandedExercises), candidates, input, durationRuleSet);
-        if (expandedEstimate.totalSeconds <= maximumDurationSeconds && isValidVolumePlan(expandedExercises, allocation, candidates, input, allocationRuleSet, "minimum") && respectsPreferredExpansionMaximums(expandedExercises, candidates, allocationRuleSet, preferredMaximums)) {
+        const expandedEstimate = estimateWorkoutDuration(
+          durationExerciseInputs(expandedExercises),
+          candidates,
+          input,
+          durationRuleSet
+        );
+        if (expandedEstimate.totalSeconds <= maximumDurationSeconds && isValidVolumePlan(
+          expandedExercises,
+          allocation,
+          candidates,
+          input,
+          allocationRuleSet,
+          "minimum"
+        ) && respectsPreferredExpansionMaximums(
+          expandedExercises,
+          candidates,
+          allocationRuleSet,
+          preferredMaximums
+        )) {
           decisions.push({
             code: "ADDED_EXERCISE_FOR_DURATION_BUDGET",
             exerciseId: scored.candidate.exerciseId,
@@ -3259,7 +3601,9 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
 }
 function respectsPreferredExpansionMaximums(exercises, candidates, allocationRuleSet, preferredMaximums) {
   const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
-  return [...preferredMaximums.entries()].every(([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) <= maximum + Number.EPSILON);
+  return [...preferredMaximums.entries()].every(
+    ([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) <= maximum + Number.EPSILON
+  );
 }
 function enforceMinimumWorkingSets(initialExercises, allocation, candidates, input, allocationRuleSet, durationRuleSet) {
   let exercises = cloneExercises(initialExercises);
@@ -3268,8 +3612,17 @@ function enforceMinimumWorkingSets(initialExercises, allocation, candidates, inp
     if (exercise2.workingSets >= durationRuleSet.minimumWorkingSetsPerExercise) {
       continue;
     }
-    const withoutExercise = exercises.filter(({ selected }) => selected.exerciseId !== exercise2.selected.exerciseId);
-    if (isValidVolumePlan(withoutExercise, allocation, candidates, input, allocationRuleSet, "minimum")) {
+    const withoutExercise = exercises.filter(
+      ({ selected }) => selected.exerciseId !== exercise2.selected.exerciseId
+    );
+    if (isValidVolumePlan(
+      withoutExercise,
+      allocation,
+      candidates,
+      input,
+      allocationRuleSet,
+      "minimum"
+    )) {
       exercises = withoutExercise;
       decisions.push({
         code: "REMOVED_SUBMINIMUM_EXERCISE",
@@ -3279,15 +3632,28 @@ function enforceMinimumWorkingSets(initialExercises, allocation, candidates, inp
       });
       continue;
     }
-    const recipients = withoutExercise.filter((recipient2) => recipient2.workingSets + exercise2.workingSets <= allocationRuleSet.maximumWorkingSetsPerExercise).sort((left, right) => left.selected.scoreRank - right.selected.scoreRank || left.selected.exerciseId.localeCompare(right.selected.exerciseId));
+    const recipients = withoutExercise.filter(
+      (recipient2) => recipient2.workingSets + exercise2.workingSets <= allocationRuleSet.maximumWorkingSetsPerExercise
+    ).sort(
+      (left, right) => left.selected.scoreRank - right.selected.scoreRank || left.selected.exerciseId.localeCompare(right.selected.exerciseId)
+    );
     const recipient = recipients.find((possibleRecipient) => {
       const transferred = cloneExercises(withoutExercise);
-      const mutableRecipient2 = transferred.find(({ selected }) => selected.exerciseId === possibleRecipient.selected.exerciseId);
+      const mutableRecipient2 = transferred.find(
+        ({ selected }) => selected.exerciseId === possibleRecipient.selected.exerciseId
+      );
       if (mutableRecipient2 === void 0) {
         return false;
       }
       mutableRecipient2.workingSets += exercise2.workingSets;
-      return isValidVolumePlan(transferred, allocation, candidates, input, allocationRuleSet, "minimum");
+      return isValidVolumePlan(
+        transferred,
+        allocation,
+        candidates,
+        input,
+        allocationRuleSet,
+        "minimum"
+      );
     });
     if (recipient === void 0) {
       return {
@@ -3297,7 +3663,9 @@ function enforceMinimumWorkingSets(initialExercises, allocation, candidates, inp
       };
     }
     exercises = cloneExercises(withoutExercise);
-    const mutableRecipient = exercises.find(({ selected }) => selected.exerciseId === recipient.selected.exerciseId);
+    const mutableRecipient = exercises.find(
+      ({ selected }) => selected.exerciseId === recipient.selected.exerciseId
+    );
     if (mutableRecipient !== void 0) {
       mutableRecipient.workingSets += exercise2.workingSets;
     }
@@ -3316,24 +3684,60 @@ function chooseReduction(exercises, allocation, candidates, input, allocationRul
   exercises.forEach((exercise2) => {
     if (exercise2.workingSets > durationRuleSet.minimumWorkingSetsPerExercise) {
       const reduced = cloneExercises(exercises);
-      const mutable = reduced.find(({ selected }) => selected.exerciseId === exercise2.selected.exerciseId);
+      const mutable = reduced.find(
+        ({ selected }) => selected.exerciseId === exercise2.selected.exerciseId
+      );
       if (mutable !== void 0) {
         mutable.workingSets -= 1;
       }
       if (isValidVolumePlan(reduced, allocation, candidates, input, allocationRuleSet, "target")) {
-        options.push(reductionOption(0, exercise2, reduced, "REDUCED_VOLUME_ABOVE_TARGET", allocation, candidates, allocationRuleSet));
+        options.push(
+          reductionOption(
+            0,
+            exercise2,
+            reduced,
+            "REDUCED_VOLUME_ABOVE_TARGET",
+            allocation,
+            candidates,
+            allocationRuleSet
+          )
+        );
       } else if (isValidVolumePlan(reduced, allocation, candidates, input, allocationRuleSet, "minimum")) {
-        options.push(reductionOption(1, exercise2, reduced, "REDUCED_OPTIONAL_VOLUME", allocation, candidates, allocationRuleSet));
+        options.push(
+          reductionOption(
+            1,
+            exercise2,
+            reduced,
+            "REDUCED_OPTIONAL_VOLUME",
+            allocation,
+            candidates,
+            allocationRuleSet
+          )
+        );
       }
     }
     if (exercises.length > 1) {
-      const removed = exercises.filter(({ selected }) => selected.exerciseId !== exercise2.selected.exerciseId);
+      const removed = exercises.filter(
+        ({ selected }) => selected.exerciseId !== exercise2.selected.exerciseId
+      );
       if (isValidVolumePlan(removed, allocation, candidates, input, allocationRuleSet, "minimum")) {
-        options.push(reductionOption(2, exercise2, removed, "REMOVED_LOWER_PRIORITY_EXERCISE", allocation, candidates, allocationRuleSet));
+        options.push(
+          reductionOption(
+            2,
+            exercise2,
+            removed,
+            "REMOVED_LOWER_PRIORITY_EXERCISE",
+            allocation,
+            candidates,
+            allocationRuleSet
+          )
+        );
       }
     }
   });
-  return options.sort((left, right) => left.stage - right.stage || left.imbalance - right.imbalance || right.scoreRank - left.scoreRank || left.exerciseId.localeCompare(right.exerciseId))[0];
+  return options.sort(
+    (left, right) => left.stage - right.stage || left.imbalance - right.imbalance || right.scoreRank - left.scoreRank || left.exerciseId.localeCompare(right.exerciseId)
+  )[0];
 }
 function reductionOption(stage, exercise2, resultingExercises, decisionCode, allocation, candidates, allocationRuleSet) {
   return {
@@ -3354,16 +3758,26 @@ function isValidVolumePlan(exercises, allocation, candidates, input, allocationR
   if (!requiredVolumesSatisfied) {
     return false;
   }
-  const hardMaximums = new Map(allocation.muscleVolumeSummary.map(({ muscleId, maximumWorkingSets }) => [
-    muscleId,
-    maximumWorkingSets
-  ]));
+  const hardMaximums = new Map(
+    allocation.muscleVolumeSummary.map(({ muscleId, maximumWorkingSets }) => [
+      muscleId,
+      maximumWorkingSets
+    ])
+  );
   input.constraints.forEach((constraint) => {
     if (constraint.kind === "muscle_volume_limit") {
-      hardMaximums.set(constraint.muscleId, Math.min(hardMaximums.get(constraint.muscleId) ?? allocationRuleSet.maximumWorkingSetsPerMuscle, constraint.maximumWorkingSets));
+      hardMaximums.set(
+        constraint.muscleId,
+        Math.min(
+          hardMaximums.get(constraint.muscleId) ?? allocationRuleSet.maximumWorkingSetsPerMuscle,
+          constraint.maximumWorkingSets
+        )
+      );
     }
   });
-  if ([...hardMaximums.entries()].some(([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) > maximum + Number.EPSILON)) {
+  if ([...hardMaximums.entries()].some(
+    ([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) > maximum + Number.EPSILON
+  )) {
     return false;
   }
   const distinctFamilies = new Set(exercises.map(({ selected }) => selected.exerciseFamilyId)).size;
@@ -3400,7 +3814,9 @@ function durationExerciseInputs(exercises) {
   }));
 }
 function exerciseRestSeconds(exerciseId, input, ruleSet) {
-  return input.programPrescription?.exercises.find((prescription) => prescription.exerciseId === exerciseId)?.restSeconds ?? ruleSet.defaultRestSecondsBetweenSets;
+  return input.programPrescription?.exercises.find(
+    (prescription) => prescription.exerciseId === exerciseId
+  )?.restSeconds ?? ruleSet.defaultRestSecondsBetweenSets;
 }
 function recomputeVolumeSummary(exercises, allocation, candidates, allocationRuleSet) {
   const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
@@ -3424,11 +3840,15 @@ function calculateVolumes(exercises, candidates, allocationRuleSet) {
 }
 function volumeImbalance(exercises, allocation, candidates, allocationRuleSet) {
   const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
-  const ratios = allocation.muscleVolumeSummary.map(({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) / Math.max(targetWorkingSets, Number.EPSILON));
+  const ratios = allocation.muscleVolumeSummary.map(
+    ({ muscleId, targetWorkingSets }) => (volumes.get(muscleId) ?? 0) / Math.max(targetWorkingSets, Number.EPSILON)
+  );
   return ratios.length === 0 ? 0 : Math.max(...ratios) - Math.min(...ratios);
 }
 function effectiveMaximumDuration(input) {
-  const constraintMaximums = input.constraints.flatMap((constraint) => constraint.kind === "maximum_workout_duration" ? [constraint.maximumMinutes] : []);
+  const constraintMaximums = input.constraints.flatMap(
+    (constraint) => constraint.kind === "maximum_workout_duration" ? [constraint.maximumMinutes] : []
+  );
   return Math.min(input.availableDurationMinutes, ...constraintMaximums);
 }
 function requiredCandidate(candidates, exerciseId) {
@@ -3465,7 +3885,7 @@ function isNonNegativeInteger2(value) {
   return Number.isInteger(value) && value >= 0;
 }
 
-// packages/workout-engine/dist/training-goal-rules.js
+// packages/workout-engine/src/training-goal-rules.ts
 var goalProfiles = {
   build_muscle: {
     goal: "build_muscle",
@@ -3523,7 +3943,7 @@ function resolveTrainingGoalRules(goal) {
   return goalProfiles[goal];
 }
 
-// packages/observability/dist/emitter.js
+// packages/observability/src/emitter.ts
 function safeSink(sink) {
   return {
     emit(event) {
@@ -3541,9 +3961,35 @@ function createEmitter(config) {
   };
 }
 
-// packages/observability/dist/sinks.js
+// packages/observability/src/sinks.ts
 var NoopSink = class {
   emit(_) {
+  }
+};
+var ConsoleSink = class {
+  emit(event) {
+    const display = {
+      eventName: event.eventName,
+      level: event.level,
+      domain: event.domain,
+      timestamp: event.timestamp,
+      ...event.correlationId ? { correlationId: event.correlationId } : {},
+      metadata: event.metadata
+    };
+    switch (event.level) {
+      case "debug":
+        console.debug(display);
+        break;
+      case "info":
+        console.info(display);
+        break;
+      case "warn":
+        console.warn(display);
+        break;
+      case "error":
+        console.error(display);
+        break;
+    }
   }
 };
 
@@ -4073,11 +4519,19 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
   }
   if (!profile) {
     obs.emitProfileLoadFailed({ correlationId, reason: "profile_missing" });
-    return mapErrorToReview("PROFILE_MISSING", "Complete your training profile first.", correlationId);
+    return mapErrorToReview(
+      "PROFILE_MISSING",
+      "Complete your training profile first.",
+      correlationId
+    );
   }
   if (!profile.goal || !profile.experience) {
     obs.emitProfileLoadFailed({ correlationId, reason: "profile_invalid" });
-    return mapErrorToReview("PROFILE_INVALID", "Training profile is incomplete. Please update your settings.", correlationId);
+    return mapErrorToReview(
+      "PROFILE_INVALID",
+      "Training profile is incomplete. Please update your settings.",
+      correlationId
+    );
   }
   const { goalProfile, discomfortReviewRequired } = mapProfileToGoalRules(profile);
   if (discomfortReviewRequired) {
@@ -4096,7 +4550,11 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     catalog = await deps.catalogLoader.loadActiveCatalog();
   } catch {
     obs.emitCatalogLoadFailed({ correlationId, reason: "load_error" });
-    return mapErrorToReview("CATALOG_UNAVAILABLE", "Exercise catalog is unavailable. Please try again.", correlationId);
+    return mapErrorToReview(
+      "CATALOG_UNAVAILABLE",
+      "Exercise catalog is unavailable. Please try again.",
+      correlationId
+    );
   }
   if (!catalog || !catalog.exercises || catalog.exercises.length === 0) {
     obs.emitCatalogLoadFailed({ correlationId, reason: "empty_catalog" });
@@ -4205,12 +4663,7 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     prescriptionVersion: PRESCRIPTION_RULES_VERSION,
     latencyMs
   });
-  return mapEngineResultToReview(
-    engineResult,
-    catalogResult,
-    goalProfile,
-    correlationId
-  );
+  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId);
 }
 function mapEngineFailureToErrorCode(code) {
   const noFeasibleCodes = /* @__PURE__ */ new Set([
@@ -4224,34 +4677,6 @@ function mapEngineFailureToErrorCode(code) {
   return noFeasibleCodes.has(code) ? "NO_FEASIBLE_WORKOUT" : "GENERATION_FAILED";
 }
 var ORCHESTRATOR_ENGINE_NAME2 = "@adaptive-workout/workout-engine";
-
-// packages/observability/src/sinks.ts
-var ConsoleSink2 = class {
-  emit(event) {
-    const display = {
-      eventName: event.eventName,
-      level: event.level,
-      domain: event.domain,
-      timestamp: event.timestamp,
-      ...event.correlationId ? { correlationId: event.correlationId } : {},
-      metadata: event.metadata
-    };
-    switch (event.level) {
-      case "debug":
-        console.debug(display);
-        break;
-      case "info":
-        console.info(display);
-        break;
-      case "warn":
-        console.warn(display);
-        break;
-      case "error":
-        console.error(display);
-        break;
-    }
-  }
-};
 
 // supabase/functions/generate-workout/index.ts
 var equipmentContextMap = {
@@ -4307,8 +4732,10 @@ function createSupabaseCatalogLoader(supabaseUrl, anonKey, accessToken) {
       ]);
       if (exercisesResult.error) throw new Error(`exercises: ${exercisesResult.error.message}`);
       if (musclesResult.error) throw new Error(`muscles: ${musclesResult.error.message}`);
-      if (exerciseMusclesResult.error) throw new Error(`exercise_muscles: ${exerciseMusclesResult.error.message}`);
-      if (exerciseEquipmentResult.error) throw new Error(`exercise_equipment: ${exerciseEquipmentResult.error.message}`);
+      if (exerciseMusclesResult.error)
+        throw new Error(`exercise_muscles: ${exerciseMusclesResult.error.message}`);
+      if (exerciseEquipmentResult.error)
+        throw new Error(`exercise_equipment: ${exerciseEquipmentResult.error.message}`);
       if (equipmentResult.error) throw new Error(`equipment: ${equipmentResult.error.message}`);
       const { data: families, error: familiesError } = await client.from("exercise_families").select("id, slug");
       if (familiesError) throw new Error(`exercise_families: ${familiesError.message}`);
@@ -4316,27 +4743,33 @@ function createSupabaseCatalogLoader(supabaseUrl, anonKey, accessToken) {
       for (const f of families ?? []) {
         familySlugMap.set(f.id, f.slug);
       }
-      const exercises = (exercisesResult.data ?? []).map((row) => ({
-        id: row["id"],
-        slug: row["slug"],
-        name: row["name"],
-        exerciseFamilyId: row["exercise_family_id"],
-        exerciseFamilySlug: familySlugMap.get(row["exercise_family_id"]) ?? "unknown",
-        isActive: row["is_active"],
-        version: row["version"]
-      }));
-      const muscles = (musclesResult.data ?? []).map((row) => ({
-        id: row["id"],
-        slug: row["slug"],
-        name: row["name"],
-        isActive: row["is_active"]
-      }));
-      const exerciseMuscles = (exerciseMusclesResult.data ?? []).map((row) => ({
-        exerciseId: row["exercise_id"],
-        muscleId: row["muscle_id"],
-        role: row["role"],
-        contribution: row["contribution"]
-      }));
+      const exercises = (exercisesResult.data ?? []).map(
+        (row) => ({
+          id: row["id"],
+          slug: row["slug"],
+          name: row["name"],
+          exerciseFamilyId: row["exercise_family_id"],
+          exerciseFamilySlug: familySlugMap.get(row["exercise_family_id"]) ?? "unknown",
+          isActive: row["is_active"],
+          version: row["version"]
+        })
+      );
+      const muscles = (musclesResult.data ?? []).map(
+        (row) => ({
+          id: row["id"],
+          slug: row["slug"],
+          name: row["name"],
+          isActive: row["is_active"]
+        })
+      );
+      const exerciseMuscles = (exerciseMusclesResult.data ?? []).map(
+        (row) => ({
+          exerciseId: row["exercise_id"],
+          muscleId: row["muscle_id"],
+          role: row["role"],
+          contribution: row["contribution"]
+        })
+      );
       const exerciseEquipment = (exerciseEquipmentResult.data ?? []).map((row) => ({
         exerciseId: row["exercise_id"],
         equipmentId: row["equipment_id"],
@@ -4344,12 +4777,14 @@ function createSupabaseCatalogLoader(supabaseUrl, anonKey, accessToken) {
         // Not needed for candidate mapping
         requirement: row["requirement"]
       }));
-      const equipment = (equipmentResult.data ?? []).map((row) => ({
-        id: row["id"],
-        slug: row["slug"],
-        name: row["name"],
-        isActive: row["is_active"]
-      }));
+      const equipment = (equipmentResult.data ?? []).map(
+        (row) => ({
+          id: row["id"],
+          slug: row["slug"],
+          name: row["name"],
+          isActive: row["is_active"]
+        })
+      );
       return { exercises, muscles, exerciseMuscles, exerciseEquipment, equipment };
     }
   };
@@ -4440,13 +4875,18 @@ serve(async (req) => {
   }
   const catalogLoader = createSupabaseCatalogLoader(supabaseUrl, anonKey, token);
   const profileLoader = createSupabaseProfileLoader(supabaseUrl, anonKey, token);
-  const sink = new ConsoleSink2();
-  const result = await generateWorkout(body, userId, {
-    profileLoader,
-    catalogLoader,
-    equipmentContextMap,
-    muscleIdMap
-  }, sink);
+  const sink = new ConsoleSink();
+  const result = await generateWorkout(
+    body,
+    userId,
+    {
+      profileLoader,
+      catalogLoader,
+      equipmentContextMap,
+      muscleIdMap
+    },
+    sink
+  );
   if (result.status === "error") {
     const statusCode = result.code === "UNAUTHENTICATED" ? 401 : result.code === "INVALID_REQUEST" ? 400 : 500;
     return jsonResponse(statusCode, result);

@@ -5,7 +5,16 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/.tools/**', '**/dist/**', '**/coverage/**', '**/node_modules/**', '**/security-hardening.test.ts', 'supabase/functions/**'] },
+  {
+    ignores: [
+      '**/.tools/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/security-hardening.test.ts',
+      'supabase/functions/**',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -33,5 +42,15 @@ export default tseslint.config(
     files: ['*.js', 'scripts/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['packages/progression-orchestrator/src/orchestrator.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+    },
   },
 );

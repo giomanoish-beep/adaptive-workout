@@ -87,18 +87,10 @@ export function WorkoutReview({
       </section>
 
       <div className="workout-review__actions">
-        <button
-          type="button"
-          className="workout-review__start"
-          onClick={onStartWorkout}
-        >
+        <button type="button" className="workout-review__start" onClick={onStartWorkout}>
           Start workout
         </button>
-        <button
-          type="button"
-          className="workout-review__edit"
-          onClick={onEditRequest}
-        >
+        <button type="button" className="workout-review__edit" onClick={onEditRequest}>
           Edit request
         </button>
       </div>

@@ -43,9 +43,7 @@ async function goToSignInScreen(page: import('@playwright/test').Page) {
   await setupWithOnboarding(page);
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(
-    page.getByRole('textbox', { name: 'Email' }),
-  ).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
 }
 
 /** Shared setup: generate Chest+Back active workout.
@@ -65,9 +63,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await expect(
-      page.getByRole('heading', { name: "What's your main goal?" }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: "What's your main goal?" })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -75,9 +71,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Workout' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Build your session' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Build your session' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -91,9 +85,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Training profile' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -109,9 +101,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Workout' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Build your session' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Build your session' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -125,9 +115,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Training profile' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 });
@@ -136,9 +124,7 @@ test.describe('HARDENING-003 — bottom navigation visibility', () => {
   test('bottom navigation visible in standard tabs', async ({ page }) => {
     await setupWithOnboarding(page);
     await expect(page.locator('.bottom-nav')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Workout' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Workout' })).toBeVisible();
   });
 
   test('bottom navigation hidden during active workout', async ({ page }) => {
@@ -295,11 +281,7 @@ test.describe('HARDENING-003 — rest timer behavior', () => {
     await page.getByLabel('Set 1 RIR').fill('2');
 
     // Complete Set 1 — scope to first .active-set
-    await page
-      .locator('.active-set')
-      .first()
-      .getByRole('button', { name: 'Complete' })
-      .click();
+    await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 
     const restPanel = page.locator('.rest-panel');
     await expect(restPanel).toBeVisible();
@@ -316,11 +298,7 @@ test.describe('HARDENING-003 — rest timer behavior', () => {
     await page.getByLabel('Set 1 reps').fill('10');
     await page.getByLabel('Set 1 RIR').fill('2');
 
-    await page
-      .locator('.active-set')
-      .first()
-      .getByRole('button', { name: 'Complete' })
-      .click();
+    await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 
     await expect(page.locator('.rest-panel')).toBeVisible();
 

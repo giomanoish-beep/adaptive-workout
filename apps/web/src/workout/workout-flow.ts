@@ -1,8 +1,5 @@
 import type { AppRoute } from '../navigation/routes';
-import {
-  initialWorkoutRequestDraft,
-  type WorkoutRequestDraft,
-} from './workout-request';
+import { initialWorkoutRequestDraft, type WorkoutRequestDraft } from './workout-request';
 import type { WorkoutReview } from './workout-review';
 
 /**
@@ -101,10 +98,7 @@ export function editWorkoutRequest(state: WorkoutFlowState): WorkoutFlowState {
  * UI-only Replace selection. Toggles a non-blocking placeholder state on an
  * exercise card. No substitution logic is performed in this task.
  */
-export function toggleReplaceExercise(
-  state: WorkoutFlowState,
-  position: number,
-): WorkoutFlowState {
+export function toggleReplaceExercise(state: WorkoutFlowState, position: number): WorkoutFlowState {
   if (state.stage !== 'review') {
     return state;
   }

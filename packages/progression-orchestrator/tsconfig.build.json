@@ -5,6 +5,14 @@
     "outDir": "dist",
     "declaration": true,
     "declarationMap": true,
+    "noEmit": false,
+    "paths": {
+      "@adaptive-workout/domain": ["../domain/dist/index.d.ts"],
+      "@adaptive-workout/progression-decision-persistence": [
+        "../progression-decision-persistence/dist/index.d.ts"
+      ],
+      "@adaptive-workout/progression-engine": ["../progression-engine/dist/index.d.ts"]
+    },
     "sourceMap": true
   },
   "include": ["src"],

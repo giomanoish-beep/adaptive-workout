@@ -72,9 +72,7 @@ export function formatDurationMinutes(minutes: number): string {
  * Never classifies GREEN/ADAPT/STOP and never imports pain-safety.
  */
 export function discomfortStatusLabel(hasCurrentDiscomfort: boolean): string {
-  return hasCurrentDiscomfort
-    ? 'Discomfort currently affecting training'
-    : 'No current discomfort';
+  return hasCurrentDiscomfort ? 'Discomfort currently affecting training' : 'No current discomfort';
 }
 
 /**

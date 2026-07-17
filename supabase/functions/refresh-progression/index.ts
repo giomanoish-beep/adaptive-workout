@@ -149,11 +149,7 @@ serve(async (req: Request) => {
 
   if (result.status === 'error') {
     const statusCode =
-      result.code === 'UNAUTHENTICATED'
-        ? 401
-        : result.code === 'REFRESH_FAILED'
-          ? 500
-          : 500;
+      result.code === 'UNAUTHENTICATED' ? 401 : result.code === 'REFRESH_FAILED' ? 500 : 500;
     return jsonResponse(statusCode, result);
   }
 

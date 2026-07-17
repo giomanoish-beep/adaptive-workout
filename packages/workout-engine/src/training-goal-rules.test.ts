@@ -51,7 +51,9 @@ describe('resolveTrainingGoalRules', () => {
       expect(profile.diversityTendency).toBeGreaterThan(0);
       expect(profile.expansionAggressiveness).toBeGreaterThan(0);
       expect(profile.repRangeGuidance.minimum).toBeGreaterThan(0);
-      expect(profile.repRangeGuidance.maximum).toBeGreaterThanOrEqual(profile.repRangeGuidance.minimum);
+      expect(profile.repRangeGuidance.maximum).toBeGreaterThanOrEqual(
+        profile.repRangeGuidance.minimum,
+      );
       expect(['shorter', 'moderate', 'longer']).toContain(profile.restTendency);
     }
   });
@@ -77,7 +79,9 @@ describe('training goal comparisons', () => {
   it('build_muscle has higher or equal meaningful expansion aggressiveness than gain_strength', () => {
     const hypertrophy = resolveTrainingGoalRules('build_muscle');
     const strength = resolveTrainingGoalRules('gain_strength');
-    expect(hypertrophy.expansionAggressiveness).toBeGreaterThanOrEqual(strength.expansionAggressiveness);
+    expect(hypertrophy.expansionAggressiveness).toBeGreaterThanOrEqual(
+      strength.expansionAggressiveness,
+    );
   });
 
   it('build_muscle volume tendency >= gain_strength', () => {
@@ -110,7 +114,9 @@ describe('training goal comparisons', () => {
   it('lose_fat does not exceed build_muscle expansion aggressiveness', () => {
     const fatLoss = resolveTrainingGoalRules('lose_fat');
     const hypertrophy = resolveTrainingGoalRules('build_muscle');
-    expect(fatLoss.expansionAggressiveness).toBeLessThanOrEqual(hypertrophy.expansionAggressiveness);
+    expect(fatLoss.expansionAggressiveness).toBeLessThanOrEqual(
+      hypertrophy.expansionAggressiveness,
+    );
   });
 
   it('lose_fat preserves resistance-training rep guidance', () => {
@@ -176,10 +182,8 @@ describe('goal integration into duration-fitted workouts', () => {
     expect(hypertrophyResult.status).toBe('success');
     expect(strengthResult.status).toBe('success');
     if (hypertrophyResult.status === 'success' && strengthResult.status === 'success') {
-      const hypertrophyUtilization =
-        hypertrophyResult.estimatedDuration.totalMinutes / 60;
-      const strengthUtilization =
-        strengthResult.estimatedDuration.totalMinutes / 60;
+      const hypertrophyUtilization = hypertrophyResult.estimatedDuration.totalMinutes / 60;
+      const strengthUtilization = strengthResult.estimatedDuration.totalMinutes / 60;
       // Strength should use less of the duration budget
       expect(strengthUtilization).toBeLessThanOrEqual(hypertrophyUtilization + 0.01);
     }
@@ -386,7 +390,13 @@ function straightArmPulldown(): WorkoutExerciseCandidate {
 }
 
 function seatedLegCurl(): WorkoutExerciseCandidate {
-  return exercise(seatedLegCurlId, id('40000000-0000-0000-0000-000000000008', 'exercise-family'), id('10000000-0000-0000-0000-000000000003', 'muscle'), 1, [machineId]);
+  return exercise(
+    seatedLegCurlId,
+    id('40000000-0000-0000-0000-000000000008', 'exercise-family'),
+    id('10000000-0000-0000-0000-000000000003', 'muscle'),
+    1,
+    [machineId],
+  );
 }
 
 function exercise(

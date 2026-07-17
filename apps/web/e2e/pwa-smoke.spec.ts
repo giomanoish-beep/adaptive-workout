@@ -9,28 +9,42 @@
 
 import { test, expect } from '@playwright/test';
 
+interface WebAppManifest {
+  readonly name: string;
+  readonly short_name: string;
+  readonly description: string;
+  readonly start_url: string;
+  readonly scope: string;
+  readonly display: string;
+  readonly background_color?: string;
+  readonly theme_color?: string;
+  readonly icons: readonly {
+    readonly src: string;
+    readonly sizes: string;
+    readonly type: string;
+    readonly purpose: string;
+  }[];
+}
+
 test.describe('PWA — smoke checks', () => {
-  test('manifest is reachable and contains required fields', async ({
-    page,
-  }) => {
+  test('manifest is reachable and contains required fields', async ({ page }) => {
     // Navigate to the app root to ensure the manifest link is in the DOM
     await page.goto('/');
 
     // Read the manifest from the link tag
-    const manifestHref = await page
-      .locator('link[rel="manifest"]')
-      .getAttribute('href');
+    const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
 
     expect(manifestHref).toBeTruthy();
 
     // Fetch and validate the manifest
     const fullUrl = manifestHref!.startsWith('http')
-      ? manifestHref! : `http://localhost:5173${manifestHref}`;
+      ? manifestHref!
+      : `http://localhost:5173${manifestHref}`;
 
     const response = await page.request.get(fullUrl);
     expect(response.ok()).toBeTruthy();
 
-    const manifest = await response.json();
+    const manifest = (await response.json()) as WebAppManifest;
 
     // Required PWA fields
     expect(manifest.name).toBe('Adaptive Workout');
@@ -41,11 +55,14 @@ test.describe('PWA — smoke checks', () => {
     expect(manifest.icons).toBeTruthy();
     expect(Array.isArray(manifest.icons)).toBeTruthy();
     expect(manifest.icons.length).toBeGreaterThan(0);
-    expect(manifest.icons[0].src).toBeTruthy();
+    const firstIcon = manifest.icons[0];
+    expect(firstIcon).toBeDefined();
+    if (firstIcon === undefined) {
+      throw new Error('Manifest must declare at least one icon.');
+    }
+    expect(firstIcon.src).toBeTruthy();
     expect(manifest.display).toBe('standalone');
-    expect(
-      manifest.background_color || manifest.theme_color,
-    ).toBeTruthy();
+    expect(manifest.background_color || manifest.theme_color).toBeTruthy();
     expect(manifest.theme_color).toBeTruthy();
 
     const expectedIcons = [
@@ -71,9 +88,7 @@ test.describe('PWA — smoke checks', () => {
     }
   });
 
-  test('service worker registration does not crash the app', async ({
-    page,
-  }) => {
+  test('service worker registration does not crash the app', async ({ page }) => {
     // Navigate to the app and check for console errors during SW registration
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
