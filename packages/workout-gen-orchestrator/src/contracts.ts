@@ -39,6 +39,8 @@ export interface WorkoutReviewExercise {
   readonly position: number;
   /** Canonical exercise ID (UUID). */
   readonly exerciseId: string;
+  /** Catalog version paired with the canonical exercise ID. */
+  readonly exerciseVersion: number;
   readonly name: string;
   readonly sets: number;
   readonly reps: WorkoutReviewRepRange;

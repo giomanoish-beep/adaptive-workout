@@ -16,10 +16,13 @@ export interface WorkoutReviewRepRange {
 
 export interface WorkoutReviewExercise {
   readonly position: number;
+  readonly exerciseId?: string;
+  readonly exerciseVersion?: number;
   readonly name: string;
   readonly sets: number;
   readonly reps: WorkoutReviewRepRange;
   readonly rir: number;
+  readonly restSeconds?: number | null;
 }
 
 export interface WorkoutReviewMuscleVolume {

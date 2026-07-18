@@ -58,6 +58,7 @@ export async function installE2ERouteMocks(
       exercises: workoutReviewFixture.exercises.map((ex) => ({
         position: ex.position,
         exerciseId: `e2e-exercise-${ex.position}`,
+        exerciseVersion: 1,
         name: ex.name,
         sets: ex.sets,
         reps: { minimum: ex.reps.minimum, maximum: ex.reps.maximum },

@@ -223,6 +223,57 @@ describe('createWorkoutSessionRepository', () => {
       expect(exerciseCall[0]).toHaveProperty('planned_exercise_name');
     });
 
+    it('pairs the deployed planned exercise ID and catalog version', async () => {
+      const { client, insert } = buildMockClient();
+      const repo = createWorkoutSessionRepository(client);
+      const review = buildReview({
+        exercises: [
+          {
+            position: 1,
+            exerciseId: '00000000-0000-4000-8000-000000000001',
+            exerciseVersion: 3,
+            name: 'Bench Press',
+            sets: 3,
+            reps: { minimum: 8, maximum: 12 },
+            rir: 2,
+          },
+        ],
+      });
+
+      await repo.createSession(review);
+
+      const exerciseCall = insert.mock.calls[1] as [Record<string, unknown>];
+      expect(exerciseCall[0]).toMatchObject({
+        planned_exercise_id: '00000000-0000-4000-8000-000000000001',
+        planned_exercise_version: 3,
+      });
+    });
+
+    it('uses a name-only snapshot when catalog identity is incomplete', async () => {
+      const { client, insert } = buildMockClient();
+      const repo = createWorkoutSessionRepository(client);
+      const review = buildReview({
+        exercises: [
+          {
+            position: 1,
+            exerciseId: '00000000-0000-4000-8000-000000000001',
+            name: 'Bench Press',
+            sets: 3,
+            reps: { minimum: 8, maximum: 12 },
+            rir: 2,
+          },
+        ],
+      });
+
+      await repo.createSession(review);
+
+      const exerciseCall = insert.mock.calls[1] as [Record<string, unknown>];
+      expect(exerciseCall[0]).toMatchObject({
+        planned_exercise_id: null,
+        planned_exercise_version: null,
+      });
+    });
+
     it('redacts raw database errors on insert failure', async () => {
       const { client } = buildMockClient({
         insertResponse: {

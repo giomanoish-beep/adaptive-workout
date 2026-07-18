@@ -4149,6 +4149,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
   const muscleIdToSlug = /* @__PURE__ */ new Map();
   const muscleIdToName = /* @__PURE__ */ new Map();
   const exerciseIdToName = /* @__PURE__ */ new Map();
+  const exerciseIdToVersion = /* @__PURE__ */ new Map();
   const equipmentIdToSlug = /* @__PURE__ */ new Map();
   for (const m of muscles) {
     muscleIdToSlug.set(m.id, m.slug);
@@ -4170,6 +4171,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
   const candidates = [];
   for (const ex of activeExercises) {
     exerciseIdToName.set(ex.id, ex.name);
+    exerciseIdToVersion.set(ex.id, ex.version);
     const muscleRows = muscleContributionsByExercise.get(ex.id) ?? [];
     const equipmentRows2 = equipmentRequirementsByExercise.get(ex.id) ?? [];
     const muscleContributions = muscleRows.map((row) => ({
@@ -4194,6 +4196,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     muscleIdToSlug,
     muscleIdToName,
     exerciseIdToName,
+    exerciseIdToVersion,
     equipmentIdToSlug
   };
 }
@@ -4397,6 +4400,7 @@ function mapExercise(fitted, index, catalogResult, goalProfile) {
   return {
     position: index + 1,
     exerciseId: fitted.exerciseId,
+    exerciseVersion: catalogResult.exerciseIdToVersion.get(fitted.exerciseId),
     name,
     sets: fitted.plannedWorkingSets,
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },

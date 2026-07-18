@@ -70,6 +70,7 @@ function mapExercise(
   return {
     position: index + 1,
     exerciseId: fitted.exerciseId,
+    exerciseVersion: catalogResult.exerciseIdToVersion.get(fitted.exerciseId)!,
     name,
     sets: fitted.plannedWorkingSets,
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },

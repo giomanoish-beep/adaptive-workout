@@ -364,21 +364,26 @@ function toExerciseInsert(
   sessionId: string,
   exercise: WorkoutReviewExercise,
 ): Record<string, unknown> {
-  // Use canonical exercise ID if available (SERVER-001), otherwise fall back to null.
-  const augmented = exercise as unknown as Record<string, unknown>;
-  const plannedExerciseId = augmented['exerciseId'] ?? null;
+  // The deployed constraint requires the canonical ID and catalog version to
+  // be present together. Local fixtures without either value use the name
+  // snapshot only.
+  const hasCatalogIdentity =
+    typeof exercise.exerciseId === 'string' &&
+    typeof exercise.exerciseVersion === 'number' &&
+    Number.isInteger(exercise.exerciseVersion) &&
+    exercise.exerciseVersion > 0;
 
   return {
     workout_session_id: sessionId,
-    planned_exercise_id: typeof plannedExerciseId === 'string' ? plannedExerciseId : null,
+    planned_exercise_id: hasCatalogIdentity ? exercise.exerciseId : null,
     position: exercise.position,
     status: 'planned',
     planned_exercise_name: exercise.name,
-    planned_exercise_version: null,
+    planned_exercise_version: hasCatalogIdentity ? exercise.exerciseVersion : null,
     planned_sets: exercise.sets,
     planned_reps_min: exercise.reps.minimum,
     planned_reps_max: exercise.reps.maximum,
     planned_rir: exercise.rir,
-    planned_rest_seconds: augmented['restSeconds'] ?? null,
+    planned_rest_seconds: exercise.restSeconds ?? null,
   };
 }

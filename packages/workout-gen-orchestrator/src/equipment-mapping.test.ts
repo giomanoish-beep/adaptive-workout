@@ -138,6 +138,7 @@ describe('equipment context mapping', () => {
     if (result.status === 'success') {
       expect(result.exercises.length).toBeGreaterThan(0);
       expect(result.exercises.every((exercise) => exercise.sets > 0)).toBe(true);
+      expect(result.exercises.every((exercise) => exercise.exerciseVersion === 1)).toBe(true);
     }
   });
 });

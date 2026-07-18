@@ -25,6 +25,7 @@ export interface CatalogMappingResult {
   readonly muscleIdToSlug: ReadonlyMap<string, string>;
   readonly muscleIdToName: ReadonlyMap<string, string>;
   readonly exerciseIdToName: ReadonlyMap<string, string>;
+  readonly exerciseIdToVersion: ReadonlyMap<string, number>;
   readonly equipmentIdToSlug: ReadonlyMap<string, string>;
 }
 
@@ -49,6 +50,7 @@ export function mapCatalogToEngineCandidates(
   const muscleIdToSlug = new Map<string, string>();
   const muscleIdToName = new Map<string, string>();
   const exerciseIdToName = new Map<string, string>();
+  const exerciseIdToVersion = new Map<string, number>();
   const equipmentIdToSlug = new Map<string, string>();
 
   for (const m of muscles) {
@@ -76,6 +78,7 @@ export function mapCatalogToEngineCandidates(
 
   for (const ex of activeExercises) {
     exerciseIdToName.set(ex.id, ex.name);
+    exerciseIdToVersion.set(ex.id, ex.version);
 
     const muscleRows = muscleContributionsByExercise.get(ex.id) ?? [];
     const equipmentRows = equipmentRequirementsByExercise.get(ex.id) ?? [];
@@ -105,6 +108,7 @@ export function mapCatalogToEngineCandidates(
     muscleIdToSlug,
     muscleIdToName,
     exerciseIdToName,
+    exerciseIdToVersion,
     equipmentIdToSlug,
   };
 }

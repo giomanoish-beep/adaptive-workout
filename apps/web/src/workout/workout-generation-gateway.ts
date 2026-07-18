@@ -31,6 +31,7 @@ export interface GatewayReviewRepRange {
 export interface GatewayReviewExercise {
   readonly position: number;
   readonly exerciseId: string;
+  readonly exerciseVersion: number;
   readonly name: string;
   readonly sets: number;
   readonly reps: GatewayReviewRepRange;
@@ -216,6 +217,7 @@ export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess) {
     exercises: gateway.exercises.map((ex) => ({
       position: ex.position,
       exerciseId: ex.exerciseId,
+      exerciseVersion: ex.exerciseVersion,
       name: ex.name,
       sets: ex.sets,
       reps: { minimum: ex.reps.minimum, maximum: ex.reps.maximum },
