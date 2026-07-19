@@ -9,3 +9,5 @@ node-runtime.zip
 *.local
 *.log
 .DS_Store
+
+.vercel/
