@@ -63,6 +63,16 @@ export interface LoadedSession {
   readonly setLogs: ReadonlyMap<string, SetLogRow>;
 }
 
+export interface SessionCreateOptions {
+  readonly origin?: 'generated' | 'programmed' | 'adapted';
+  readonly scheduledProgramWorkoutId?: string;
+  readonly programWorkoutId?: string;
+  readonly programVersion?: number;
+  readonly programWorkoutName?: string;
+  readonly engineVersion?: string;
+  readonly ruleSetVersion?: string;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Repository errors                                                  */
 /* ------------------------------------------------------------------ */
@@ -138,6 +148,7 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
    */
   async function createSession(
     review: WorkoutReview,
+    options: SessionCreateOptions = {},
   ): Promise<{ sessionId: string; exercises: readonly SessionExerciseRow[] }> {
     // Derive authenticated user ID from the Supabase client.
     // Never accept ownership from the WorkoutReview or arbitrary caller input.
@@ -160,10 +171,17 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
       .insert({
         user_id: userId,
         title: review.title,
-        origin: 'generated',
+        origin: options.origin ?? 'generated',
         status: 'in_progress',
         planned_duration_minutes: review.estimatedDurationMinutes,
         started_at: now,
+        scheduled_program_workout_id: options.scheduledProgramWorkoutId ?? null,
+        source_program_workout_id: options.programWorkoutId ?? null,
+        source_program_version: options.programVersion ?? null,
+        source_program_workout_name: options.programWorkoutName ?? null,
+        workout_engine_version: options.engineVersion ?? null,
+        workout_rule_set_version: options.ruleSetVersion ?? null,
+        counts_for_program: options.scheduledProgramWorkoutId !== undefined,
       })
       .select(
         'id, user_id, title, origin, status, started_at, completed_at, planned_duration_minutes, created_at',
@@ -322,7 +340,11 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
    * - completed: all planned exercises are complete
    * - partial: explicitly finished but some planned sets remain incomplete
    */
-  async function finishSession(sessionId: string, hasIncomplete: boolean): Promise<SessionRow> {
+  async function finishSession(
+    sessionId: string,
+    hasIncomplete: boolean,
+    scheduledProgramWorkoutId?: string,
+  ): Promise<SessionRow> {
     const now = new Date().toISOString();
     const status = hasIncomplete ? 'partial' : 'completed';
 
@@ -341,6 +363,23 @@ export function createWorkoutSessionRepository(client: SupabaseClient) {
         'SESSION_FINISH_FAILED',
         "We couldn't finish your workout. Please try again.",
       );
+    }
+
+    if (scheduledProgramWorkoutId) {
+      const { error: scheduleError } = await client
+        .from('program_scheduled_workouts')
+        .update({
+          status: 'completed',
+          completed_session_id: sessionId,
+          completed_at: now,
+        })
+        .eq('id', scheduledProgramWorkoutId);
+      if (scheduleError) {
+        throw new WorkoutSessionError(
+          'PROGRAM_ADVANCE_FAILED',
+          'Your workout was saved, but the program could not advance. Please retry.',
+        );
+      }
     }
 
     return mapSessionRow(finishResult.data as Record<string, unknown>);

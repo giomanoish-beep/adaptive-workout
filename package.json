@@ -16,7 +16,7 @@
     "dev": "npm run dev --workspace @adaptive-workout/web",
     "edge-fn:build": "node scripts/build-edge-function.mjs generate-workout",
     "edge-fn:build:refresh": "node scripts/build-edge-function.mjs refresh-progression",
-    "edge-fn:build:all": "node scripts/build-edge-function.mjs generate-workout && node scripts/build-edge-function.mjs refresh-progression",
+    "edge-fn:build:all": "node scripts/build-edge-function.mjs generate-workout && node scripts/build-edge-function.mjs refresh-progression && node scripts/build-edge-function.mjs generate-program",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

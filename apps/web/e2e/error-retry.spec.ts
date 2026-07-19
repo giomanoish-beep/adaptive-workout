@@ -42,7 +42,7 @@ test.describe('V1-005 error, retry, and persistence coverage', () => {
     await expect(complete).toBeDisabled();
 
     await page.getByLabel('Set 1 weight').fill('22.5');
-    await page.getByLabel('Set 1 RIR').fill('0');
+    await page.getByLabel('Set 1 RIR').selectOption('0');
     await complete.click();
     await expect(page.locator('.active-set--completed').first()).toContainText('22.5 kg');
     let store = await readE2EStore(page);
@@ -63,7 +63,7 @@ test.describe('V1-005 error, retry, and persistence coverage', () => {
       .click();
     await page.getByLabel('Set 1 weight').fill('23.5');
     await page.getByLabel('Set 1 reps').fill('10');
-    await page.getByLabel('Set 1 RIR').fill('');
+    await page.getByLabel('Set 1 RIR').selectOption('');
     await complete.click();
     await expect(page.locator('.active-set--completed').first()).toContainText('23.5 kg');
     store = await readE2EStore(page);
@@ -141,13 +141,11 @@ test.describe('V1-005 error, retry, and persistence coverage', () => {
     await page.goto('/');
     await completeOnboarding(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'Edit training goal' }).click();
-    await page.getByRole('radio', { name: 'Build muscle' }).click();
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByLabel('Goal').selectOption('build_muscle');
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     await preserveStoreAndReload(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    const goal = page.locator('.settings-card').filter({ hasText: 'Training goal' });
-    await expect(goal.locator('.settings-card__value')).toHaveText('Build muscle');
+    await expect(page.getByLabel('Goal')).toHaveValue('build_muscle');
   });
 });

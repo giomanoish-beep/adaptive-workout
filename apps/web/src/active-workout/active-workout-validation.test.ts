@@ -55,6 +55,10 @@ describe('RIR validation', () => {
     expect(toLoggedSet({ weight: '20', reps: '8', rir: '0' }).rir).toBe(0);
   });
 
+  it('stores the guided 5+ option as the domain-compatible value 5', () => {
+    expect(toLoggedSet({ weight: '20', reps: '8', rir: '5' }).rir).toBe(5);
+  });
+
   it('rejects RIR below 0', () => {
     const result = validateSetEntry({ weight: '20', reps: '8', rir: '-1' });
     expect(result.issues.some((i) => i.code === 'RIR_OUT_OF_RANGE')).toBe(true);

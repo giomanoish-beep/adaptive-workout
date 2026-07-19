@@ -1,19 +1,18 @@
 import { useCallback, useState } from 'react';
 import {
+  environmentLabels,
+  frequencyLabels,
   goalLabels,
-  discomfortStatusLabel,
-  discomfortDetailText,
-  isProfileComplete,
-  preferenceRows,
+  programPreferenceLabels,
 } from './settings-view-model';
-import type { TrainingProfile } from '../onboarding/training-profile';
-import { profileGoals, type ProfileGoal } from '../onboarding/training-profile';
+import {
+  profileEnvironments,
+  profileFrequencies,
+  profileGoals,
+  profileProgramPreferences,
+  type TrainingProfile,
+} from '../onboarding/training-profile';
 
-/**
- * Mobile-first Profile / Settings screen. Receives the profile and
- * persistence callbacks from the parent; owns no data fetching,
- * Supabase client creation, or browser storage.
- */
 export interface SettingsScreenProps {
   readonly profile: TrainingProfile;
   readonly onProfileChange: (profile: TrainingProfile) => Promise<void>;
@@ -29,253 +28,202 @@ export function SettingsScreen({
   saveError,
   signOut,
 }: SettingsScreenProps) {
+  const [pendingProfile, setPendingProfile] = useState(profile);
+  const [lastAttempt, setLastAttempt] = useState<TrainingProfile | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  const save = useCallback(
+    (next: TrainingProfile) => {
+      setPendingProfile(next);
+      setLastAttempt(next);
+      void onProfileChange(next);
+    },
+    [onProfileChange],
+  );
+
+  const handleSignOut = useCallback(() => {
+    setSigningOut(true);
+    setSignOutError(null);
+    void signOut().catch(() => {
+      setSignOutError('Sign out failed. Please try again.');
+      setSigningOut(false);
+    });
+  }, [signOut]);
+
   return (
     <section className="settings-screen">
-      {/* ── Profile header ─────────────────────────────────────────── */}
       <header className="settings-screen__header">
-        <p className="eyebrow">PROFILE</p>
-        <h2 className="settings-screen__title">Training profile</h2>
-        <p className="settings-screen__subtitle">
-          These settings shape workout recommendations for your sessions.
-        </p>
-        {isProfileComplete(profile) && (
-          <span className="settings-screen__complete-badge">Profile complete</span>
-        )}
+        <p className="eyebrow">Settings</p>
+        <h2>Training preferences</h2>
+        <p>Changes save to your account and shape future workout recommendations.</p>
       </header>
 
-      {/* ── Training goal (editable) ────────────────────────────────── */}
-      <GoalSection
-        profile={profile}
-        onProfileChange={onProfileChange}
-        saving={saving}
-        saveError={saveError}
-      />
+      <SettingsSection title="Training goal">
+        <SettingSelect
+          label="Goal"
+          value={pendingProfile.goal}
+          disabled={saving}
+          options={profileGoals.map((value) => ({ value, label: goalLabels[value] }))}
+          onChange={(goal) => save({ ...pendingProfile, goal })}
+        />
+      </SettingsSection>
 
-      {/* ── Training preferences (read-only summary) ────────────────── */}
-      <PreferencesSection profile={profile} />
+      <SettingsSection title="Training environment">
+        <SettingSelect
+          label="Environment"
+          value={pendingProfile.environment}
+          disabled={saving}
+          options={profileEnvironments.map((value) => ({
+            value,
+            label: environmentLabels[value],
+          }))}
+          onChange={(environment) => save({ ...pendingProfile, environment })}
+        />
+      </SettingsSection>
 
-      {/* ── Current discomfort status ───────────────────────────────── */}
-      <DiscomfortSection hasCurrentDiscomfort={profile.hasCurrentDiscomfort} />
+      <SettingsSection title="Equipment">
+        <p className="settings-section__detail">{equipmentSummary(pendingProfile.environment)}</p>
+        <p className="settings-section__hint">
+          Change Training environment to update availability.
+        </p>
+      </SettingsSection>
 
-      {/* ── App & data status (replaced prototype messaging) ─────────── */}
-      <DataStatusSection saving={saving} saveError={saveError} />
+      <SettingsSection title="Session preferences">
+        <SettingSelect
+          label="Training frequency"
+          value={pendingProfile.frequency}
+          disabled={saving}
+          options={profileFrequencies.map((value) => ({ value, label: frequencyLabels[value] }))}
+          onChange={(frequency) => save({ ...pendingProfile, frequency })}
+        />
+        <label className="settings-field">
+          <span>Typical duration</span>
+          <select
+            value={pendingProfile.typicalDurationMinutes}
+            disabled={saving}
+            onChange={(event) =>
+              save({ ...pendingProfile, typicalDurationMinutes: Number(event.target.value) })
+            }
+          >
+            {[30, 45, 60, 75, 90, 120].map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes} min
+              </option>
+            ))}
+          </select>
+        </label>
+        <SettingSelect
+          label="Workout structure"
+          value={pendingProfile.programPreference}
+          disabled={saving}
+          options={profileProgramPreferences.map((value) => ({
+            value,
+            label: programPreferenceLabels[value],
+          }))}
+          onChange={(programPreference) => save({ ...pendingProfile, programPreference })}
+        />
+      </SettingsSection>
 
-      {/* ── Sign out ────────────────────────────────────────────────── */}
-      <SignOutSection signOut={signOut} />
+      <SettingsSection title="Discomfort">
+        <label className="settings-toggle">
+          <span>
+            <strong>Currently affecting training</strong>
+            <small>Workout generation will pause for a safety review.</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={pendingProfile.hasCurrentDiscomfort}
+            disabled={saving}
+            onChange={(event) =>
+              save({ ...pendingProfile, hasCurrentDiscomfort: event.target.checked })
+            }
+          />
+        </label>
+      </SettingsSection>
+
+      <SettingsSection title="Account">
+        <button className="settings-sign-out__btn" disabled={signingOut} onClick={handleSignOut}>
+          {signingOut ? 'Signing out…' : 'Sign out'}
+        </button>
+        {signOutError && (
+          <p role="alert" className="settings-error">
+            {signOutError}
+          </p>
+        )}
+      </SettingsSection>
+
+      <SettingsSection title="Data and privacy">
+        <p className="settings-section__detail">
+          Workout and fitness data is saved to your account, not browser storage.
+        </p>
+      </SettingsSection>
+
+      <div className="settings-save-status" aria-live="polite">
+        {saving && <span>Saving…</span>}
+        {!saving && !saveError && lastAttempt && <span>Saved</span>}
+        {saveError && (
+          <>
+            <span role="alert">{saveError}</span>
+            <button type="button" onClick={() => lastAttempt && void onProfileChange(lastAttempt)}>
+              Retry
+            </button>
+          </>
+        )}
+      </div>
     </section>
   );
 }
 
-/* ─── Goal section (editable inline) ──────────────────────────────────── */
-
-interface GoalSectionProps {
-  readonly profile: TrainingProfile;
-  readonly onProfileChange: (profile: TrainingProfile) => Promise<void>;
-  readonly saving: boolean;
-  readonly saveError: string | null;
-}
-
-function GoalSection({ profile, onProfileChange, saving, saveError }: GoalSectionProps) {
-  const [editing, setEditing] = useState(false);
-  const [pendingGoal, setPendingGoal] = useState<ProfileGoal>(profile.goal);
-
-  const handleEdit = useCallback(() => {
-    setPendingGoal(profile.goal);
-    setEditing(true);
-  }, [profile.goal]);
-
-  const handleCancel = useCallback(() => {
-    setEditing(false);
-  }, []);
-
-  const handleSelect = useCallback((goal: ProfileGoal) => {
-    setPendingGoal(goal);
-  }, []);
-
-  const handleSave = useCallback(() => {
-    void onProfileChange({ ...profile, goal: pendingGoal });
-    setEditing(false);
-  }, [onProfileChange, pendingGoal, profile]);
-
+function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="settings-card">
-      <div className="settings-card__header">
-        <h3 className="settings-card__title">Training goal</h3>
-        {!editing && (
-          <button
-            type="button"
-            className="settings-card__edit-btn"
-            onClick={handleEdit}
-            disabled={saving}
-            aria-label="Edit training goal"
-          >
-            Edit
-          </button>
-        )}
-      </div>
-
-      {editing ? (
-        <div className="settings-goal-edit">
-          <div className="settings-goal-edit__options" role="radiogroup" aria-label="Training goal">
-            {profileGoals.map((goal) => {
-              const isSelected = goal === pendingGoal;
-              return (
-                <button
-                  key={goal}
-                  type="button"
-                  className={`settings-chip${isSelected ? ' settings-chip--selected' : ''}`}
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => handleSelect(goal)}
-                >
-                  {goalLabels[goal]}
-                </button>
-              );
-            })}
-          </div>
-          <div className="settings-goal-edit__actions">
-            <button
-              type="button"
-              className="settings-btn settings-btn--cancel"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="settings-btn settings-btn--save"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {saveError && (
-            <p className="settings-card__error" role="alert">
-              {saveError}
-            </p>
-          )}
-        </div>
-      ) : (
-        <p className="settings-card__value">{goalLabels[profile.goal]}</p>
-      )}
-    </div>
+    <section className="settings-section">
+      <h3>{title}</h3>
+      <div className="settings-section__content">{children}</div>
+    </section>
   );
 }
 
-/* ─── Preferences section (read-only summary rows) ────────────────────── */
-
-interface PreferencesSectionProps {
-  readonly profile: TrainingProfile;
-}
-
-function PreferencesSection({ profile }: PreferencesSectionProps) {
-  const rows = preferenceRows(profile);
-
+function SettingSelect<T extends string>({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
   return (
-    <div className="settings-card">
-      <h3 className="settings-card__title">Training preferences</h3>
-      <dl className="settings-rows">
-        {rows.map((row) => (
-          <div key={row.label} className="settings-row">
-            <dt className="settings-row__label">{row.label}</dt>
-            <dd className="settings-row__value">{row.value}</dd>
-          </div>
+    <label className="settings-field">
+      <span>{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as T)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
         ))}
-      </dl>
-    </div>
+      </select>
+    </label>
   );
 }
 
-/* ─── Discomfort section ───────────────────────────────────────────────── */
-
-interface DiscomfortSectionProps {
-  readonly hasCurrentDiscomfort: boolean;
-}
-
-function DiscomfortSection({ hasCurrentDiscomfort }: DiscomfortSectionProps) {
-  return (
-    <div className="settings-card">
-      <h3 className="settings-card__title">Current discomfort status</h3>
-      <p
-        className={`settings-card__value${
-          hasCurrentDiscomfort ? ' settings-card__value--discomfort' : ''
-        }`}
-      >
-        {discomfortStatusLabel(hasCurrentDiscomfort)}
-      </p>
-      {hasCurrentDiscomfort && <p className="settings-card__detail">{discomfortDetailText()}</p>}
-    </div>
-  );
-}
-
-/* ─── Data status section ──────────────────────────────────────────────── */
-
-interface DataStatusSectionProps {
-  readonly saving: boolean;
-  readonly saveError: string | null;
-}
-
-function DataStatusSection({ saving, saveError }: DataStatusSectionProps) {
-  return (
-    <div className="settings-card settings-card--muted">
-      <h3 className="settings-card__title">Data & save status</h3>
-      {saving && <p className="settings-card__detail">Saving profile changes…</p>}
-      {saveError && (
-        <p className="settings-card__error" role="alert">
-          {saveError}
-        </p>
-      )}
-      {!saving && !saveError && (
-        <p className="settings-card__detail">
-          Your training profile is persisted to the cloud. Changes appear here after a successful
-          save.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* ─── Sign-out section ─────────────────────────────────────────────────── */
-
-interface SignOutSectionProps {
-  readonly signOut: () => Promise<void>;
-}
-
-function SignOutSection({ signOut }: SignOutSectionProps) {
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSignOut = useCallback(() => {
-    setSubmitting(true);
-    setError(null);
-    void signOut()
-      .then(() => {
-        // Auth state change is handled by the parent useAuth listener.
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Sign out failed. Please try again.';
-        setError(message);
-        setSubmitting(false);
-      });
-  }, [signOut]);
-
-  return (
-    <div className="settings-sign-out">
-      <button
-        type="button"
-        className="settings-sign-out__btn"
-        onClick={handleSignOut}
-        disabled={submitting}
-        aria-busy={submitting}
-      >
-        {submitting ? 'Signing out\u2026' : 'Sign out'}
-      </button>
-      {error && (
-        <p className="settings-sign-out__error" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
+function equipmentSummary(environment: TrainingProfile['environment']): string {
+  switch (environment) {
+    case 'commercial_gym':
+      return 'Full gym equipment';
+    case 'home_gym':
+      return 'Home gym equipment';
+    case 'minimal_equipment':
+      return 'Dumbbells and compact equipment';
+    case 'bodyweight':
+      return 'Bodyweight only';
+  }
 }

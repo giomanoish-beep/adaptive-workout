@@ -97,6 +97,272 @@ main > p:last-child {
   line-height: 1.55;
 }
 
+/* ---------- V1.2 program and Today ---------- */
+
+.today-screen h2,
+.scheduled-review h2,
+.program-screen h2,
+.program-setup h2 {
+  margin: 0.25rem 0 0.65rem;
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+  line-height: 1.05;
+}
+
+.today-screen--empty {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 34rem;
+}
+
+.today-card,
+.program-session,
+.program-adaptations,
+.program-edit,
+.program-setup__field,
+.adaptation-banner {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 1rem;
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.today-card__meta,
+.today-summary,
+.today-card__actions,
+.program-session__actions,
+.program-screen__title,
+.program-session header,
+.program-setup__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.today-card__meta,
+.program-session > p,
+.program-screen__title p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.today-summary {
+  margin: 1rem 0;
+}
+
+.today-summary > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.today-summary span,
+.program-session li span,
+.program-session li small {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.primary-button,
+.secondary-button,
+.text-button,
+.program-session button,
+.program-edit button {
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--nav-border);
+  color: #e2e8f0;
+  background: #1e293b;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  border-color: #2dd4bf;
+  color: #082f49;
+  background: #5eead4;
+}
+
+.text-button {
+  border-color: transparent;
+  background: transparent;
+  color: var(--nav-accent);
+}
+
+.adaptation-banner {
+  display: grid;
+  gap: 0.35rem;
+  border-color: #f59e0b;
+}
+
+.program-screen__title h2,
+.program-session h3 {
+  margin: 0;
+}
+
+.week-select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  font-weight: 700;
+}
+
+.week-select select,
+.program-edit input,
+.program-edit select,
+.today-card input,
+.program-session input {
+  min-height: 42px;
+  max-width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #475569;
+  border-radius: 0.5rem;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.program-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  color: #99f6e4;
+  background: rgba(13, 148, 136, 0.2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.program-session ul {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0;
+  list-style: none;
+}
+
+.program-session li {
+  display: grid;
+  gap: 0.18rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid #334155;
+}
+
+.scheduled-review ol {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduled-review li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.75rem;
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.scheduled-review li span,
+.scheduled-review li small {
+  color: #94a3b8;
+}
+
+.program-session li.is-adapted {
+  border-color: #f59e0b;
+}
+
+.program-session li em {
+  color: #fbbf24;
+  font-size: 0.75rem;
+}
+
+.program-adaptations > div,
+.program-edit,
+.program-edit label {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.program-adaptations > div {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin: 0.6rem 0;
+}
+
+.program-setup__field {
+  min-width: 0;
+}
+
+.program-setup__field legend {
+  padding: 0 0.35rem;
+  font-weight: 700;
+}
+
+.program-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+}
+
+.program-choice button {
+  min-height: 44px;
+  padding: 0.55rem;
+  border: 1px solid #475569;
+  border-radius: 0.65rem;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.program-choice button.is-selected {
+  border-color: var(--nav-accent);
+  color: var(--nav-accent);
+}
+
+.program-setup__checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+}
+
+.program-setup__guidance,
+.program-action-error {
+  color: #fbbf24;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 380px) {
+  .app-nav__content {
+    width: min(100% - 1rem, var(--content-max));
+  }
+  .bottom-nav {
+    gap: 0;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+  }
+  .bottom-nav__label {
+    font-size: 0.61rem;
+  }
+  .program-session,
+  .today-card,
+  .program-adaptations,
+  .program-setup__field {
+    padding: 0.75rem;
+  }
+  .program-edit {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .today-card__actions label,
+  .program-session__actions label {
+    display: grid;
+    gap: 0.25rem;
+  }
+}
+
 /* ---------- Bottom navigation ---------- */
 
 .bottom-nav {
@@ -1481,4 +1747,275 @@ main > p:last-child {
 .onboarding__back:focus-visible {
   outline: 2px solid var(--nav-accent-dim);
   outline-offset: 2px;
+}
+
+/* ---------- V1.1 compact exercise progress ---------- */
+
+.exercise-progress {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.65rem 0 0;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.65rem;
+  background: rgba(2, 6, 23, 0.45);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.exercise-progress--empty,
+.exercise-progress__trend {
+  color: #94a3b8;
+}
+
+.workout-review__replacement-error,
+.settings-error {
+  color: #fca5a5;
+  font-size: 0.88rem;
+}
+
+/* ---------- V1.1 active-workout mobile layout ---------- */
+
+.app-nav--focused .app-nav__content {
+  width: min(100% - 1rem, var(--content-max));
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.active-workout__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.active-workout__session-title {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-workout__current {
+  margin-bottom: 0.55rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.active-workout__name {
+  margin: 0.2rem 0;
+  font-size: clamp(1.15rem, 5vw, 1.45rem);
+}
+
+.active-workout__prescription {
+  margin: 0;
+}
+
+.active-workout__recommendation {
+  margin: 0.4rem 0 0;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.active-workout__sets {
+  gap: 0.45rem;
+}
+
+.active-set {
+  padding: 0.55rem 0.65rem;
+}
+
+.active-set__head {
+  margin-bottom: 0.35rem;
+}
+
+.active-set__entry {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(5.25rem, 1.15fr);
+  gap: 0.35rem;
+}
+
+.active-set__input {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.3rem;
+  font-size: 1rem;
+}
+
+.active-set__rir-select {
+  text-align: left;
+}
+
+.active-set__rir-guidance {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+
+.active-set__complete {
+  min-height: 2.75rem;
+  margin-top: 0;
+  padding: 0.55rem;
+}
+
+.active-workout__nav {
+  position: sticky;
+  bottom: max(0.25rem, env(safe-area-inset-bottom));
+  z-index: 3;
+  align-items: center;
+  margin: 0.55rem 0;
+  padding: 0.35rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.8rem;
+  background: rgba(11, 17, 32, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.active-workout__nav-btn {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.88rem;
+}
+
+.active-workout__nav-position {
+  min-width: 3.2rem;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.active-workout__finish {
+  margin-top: 0.25rem;
+}
+
+.active-workout__finish-btn {
+  min-height: 2.75rem;
+  padding: 0.55rem;
+  font-size: 0.88rem;
+}
+
+/* ---------- V1.1 settings sections ---------- */
+
+.settings-screen {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-screen__header h2 {
+  margin: 0.15rem 0 0.25rem;
+  font-size: clamp(1.55rem, 6vw, 2.1rem);
+}
+
+.settings-screen__header p:last-child {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.88rem;
+}
+
+.settings-section {
+  padding: 0.75rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.8rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.settings-section h3 {
+  margin: 0 0 0.55rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.settings-section__content {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.settings-field,
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.settings-field select {
+  max-width: 62%;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.6rem;
+  background: #0b1120;
+  color: #f1f5f9;
+  font: inherit;
+}
+
+.settings-toggle small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.settings-toggle input {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.settings-section__detail,
+.settings-section__hint {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.settings-section__hint {
+  color: #94a3b8;
+}
+
+.settings-sign-out__btn,
+.settings-save-status button {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #fca5a5;
+  font: inherit;
+  font-weight: 650;
+}
+
+.settings-save-status {
+  position: sticky;
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.65rem;
+  background: rgba(11, 17, 32, 0.96);
+  color: var(--nav-accent);
+  font-size: 0.78rem;
+}
+
+@media (min-width: 700px) {
+  .settings-screen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-screen__header,
+  .settings-save-status {
+    grid-column: 1 / -1;
+  }
 }

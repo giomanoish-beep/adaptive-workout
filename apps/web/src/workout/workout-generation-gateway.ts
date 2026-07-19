@@ -80,6 +80,25 @@ export interface GatewayErrorResponse {
 
 export type GatewayReviewResponse = GatewayReviewSuccess | GatewayErrorResponse;
 
+export interface GatewayReplacementRequest extends GatewayGenerateRequest {
+  readonly action: 'replace_exercise';
+  readonly currentExerciseId: string;
+  readonly workoutExerciseIds: readonly string[];
+  readonly excludedReplacementIds?: readonly string[];
+}
+
+export interface GatewayReplacementResponse {
+  readonly status: 'success' | 'error';
+  readonly action: 'replace_exercise';
+  readonly replacement?: {
+    readonly exerciseId: string;
+    readonly exerciseVersion: number;
+    readonly name: string;
+  };
+  readonly code?: string;
+  readonly message?: string;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Gateway error                                                      */
 /* ------------------------------------------------------------------ */
@@ -201,6 +220,46 @@ export async function generateWorkoutViaGateway(
       generationId: null,
       code: 'NETWORK_ERROR',
       message: 'Unable to reach the server. Check your connection and try again.',
+    };
+  }
+}
+
+export async function replaceExerciseViaGateway(
+  client: SupabaseClient,
+  request: GatewayReplacementRequest,
+): Promise<GatewayReplacementResponse> {
+  const { data } = await client.auth.getSession();
+  const token = data.session?.access_token;
+  const supabaseUrl = getSupabaseUrl();
+  if (!token || !supabaseUrl) {
+    return {
+      status: 'error',
+      action: 'replace_exercise',
+      code: token ? 'GENERATION_FAILED' : 'UNAUTHENTICATED',
+      message: token ? 'Server configuration error.' : 'Please sign in again.',
+    };
+  }
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-workout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(request),
+    });
+    const result = (await response.json()) as GatewayReplacementResponse;
+    return response.ok
+      ? result
+      : {
+          status: 'error',
+          action: 'replace_exercise',
+          code: result.code ?? 'GENERATION_FAILED',
+          message: result.message ?? 'Exercise replacement failed.',
+        };
+  } catch {
+    return {
+      status: 'error',
+      action: 'replace_exercise',
+      code: 'NETWORK_ERROR',
+      message: 'Unable to reach the server. Try again.',
     };
   }
 }

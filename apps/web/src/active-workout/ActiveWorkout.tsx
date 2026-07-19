@@ -24,11 +24,13 @@ import {
   type SetEntryValidationResult,
 } from './active-workout-validation';
 import type { WorkoutReview } from '../workout/workout-review';
+import type { SessionCreateOptions } from '../workout-session/workout-session-repository';
 
 export interface ActiveWorkoutProps {
   readonly client: SupabaseClient;
   readonly userId: string;
   readonly initialReview?: WorkoutReview;
+  readonly sessionOptions?: SessionCreateOptions;
   readonly onExit: () => void;
 }
 
@@ -36,7 +38,13 @@ function setKey(ei: number, sn: number): string {
   return `${ei}:${sn}`;
 }
 
-export function ActiveWorkout({ client, userId, initialReview, onExit }: ActiveWorkoutProps) {
+export function ActiveWorkout({
+  client,
+  userId,
+  initialReview,
+  sessionOptions,
+  onExit,
+}: ActiveWorkoutProps) {
   const session = useWorkoutSession(client, userId);
   const { state } = session;
 
@@ -44,9 +52,9 @@ export function ActiveWorkout({ client, userId, initialReview, onExit }: ActiveW
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    if (initialReview) void session.startSession(initialReview);
+    if (initialReview) void session.startSession(initialReview, sessionOptions);
     else void session.resumeSession();
-  }, [initialReview, session]);
+  }, [initialReview, session, sessionOptions]);
 
   const [inputs, setInputs] = useState<ReadonlyMap<string, SetEntryInput>>(new Map());
   const restActive = state.stage === 'active' && state.rest !== null;
@@ -90,9 +98,23 @@ export function ActiveWorkout({ client, userId, initialReview, onExit }: ActiveW
   );
   const handleEdit = useCallback(
     (sn: number) => {
-      if (state.stage === 'active') session.editSet(exIdx, sn);
+      if (state.stage === 'active') {
+        const logged = state.sets[exIdx]?.find((set) => set.setNumber === sn)?.logged;
+        if (logged) {
+          setInputs((previous) => {
+            const next = new Map(previous);
+            next.set(setKey(exIdx, sn), {
+              weight: String(logged.weight),
+              reps: String(logged.reps),
+              rir: logged.rir === null ? '' : String(logged.rir),
+            });
+            return next;
+          });
+        }
+        session.editSet(exIdx, sn);
+      }
     },
-    [exIdx, session, state.stage],
+    [exIdx, session, state],
   );
 
   // ---- RENDER SWITCH (all hooks above, early returns below) ----
@@ -126,29 +148,58 @@ export function ActiveWorkout({ client, userId, initialReview, onExit }: ActiveW
     );
   }
   if (!exercise) return null;
+  const exerciseSets = state.sets[exIdx] ?? [];
+  const latestCompleted = [...exerciseSets].reverse().find((set) => set.status === 'completed');
+  const nextIncomplete = exerciseSets.find((set) => set.status === 'incomplete');
+  const visibleSets = exerciseSets.filter(
+    (set) => set === latestCompleted || set === nextIncomplete,
+  );
 
   return (
     <section className="active-workout">
       <header className="active-workout__header">
-        <h2>{state.title}</h2>
-        <span>
+        <h1 className="active-workout__session-title">{state.title}</h1>
+        <span className="active-workout__progress">
           {completed}/{total} sets
         </span>
       </header>
-      <h3>{exercise.name}</h3>
+      <div className="active-workout__current">
+        <div className="active-workout__current-top">
+          <span className="active-workout__position">
+            Exercise {exIdx + 1} of {state.exercises.length}
+          </span>
+        </div>
+        <h2 className="active-workout__name">{exercise.name}</h2>
+        <p className="active-workout__prescription">
+          {exercise.plannedSets.length} sets × {exercise.plannedSets[0]?.targetReps.minimum}–
+          {exercise.plannedSets[0]?.targetReps.maximum} reps @ RIR{' '}
+          {exercise.plannedSets[0]?.targetRir}
+        </p>
+        <ActiveProgressSummary exercise={exercise} />
+      </div>
       <ol className="active-workout__sets">
-        {state.sets[exIdx]?.map((set) => (
+        {visibleSets.map((set) => (
           <li
             key={set.setNumber}
             className={`active-set${set.status === 'completed' ? ' active-set--completed' : ''}`}
           >
-            <span>Set {set.setNumber}</span>
+            <div className="active-set__head">
+              <span className="active-set__number">Set {set.setNumber}</span>
+              <span className="active-set__target">
+                {exercise.plannedSets[set.setNumber - 1]?.targetReps.minimum}–
+                {exercise.plannedSets[set.setNumber - 1]?.targetReps.maximum} reps
+              </span>
+            </div>
             {set.status === 'completed' && set.logged ? (
               <div className="active-set__logged">
-                <span>{set.logged.weight} kg</span>
-                <span>{set.logged.reps} reps</span>
-                <span>RIR {set.logged.rir === null ? '\u2014' : set.logged.rir}</span>
-                <button onClick={() => handleEdit(set.setNumber)}>Edit</button>
+                <span className="active-set__logged-value">{set.logged.weight} kg</span>
+                <span className="active-set__logged-value">{set.logged.reps} reps</span>
+                <span className="active-set__logged-value">
+                  RIR {set.logged.rir === null ? 'Unknown' : set.logged.rir}
+                </span>
+                <button className="active-set__edit" onClick={() => handleEdit(set.setNumber)}>
+                  Edit
+                </button>
               </div>
             ) : (
               <SetEntryRow
@@ -170,12 +221,25 @@ export function ActiveWorkout({ client, userId, initialReview, onExit }: ActiveW
           onDismiss={() => session.clearRest()}
         />
       )}
-      <nav>
-        <button onClick={() => session.moveExercise(-1)} disabled={!canGoToPreviousExercise(state)}>
-          Previous
+      <nav className="active-workout__nav" aria-label="Exercise navigation">
+        <button
+          className="active-workout__nav-btn"
+          aria-label="Previous"
+          onClick={() => session.moveExercise(-1)}
+          disabled={!canGoToPreviousExercise(state)}
+        >
+          ← Previous
         </button>
-        <button onClick={() => session.moveExercise(1)} disabled={!canGoToNextExercise(state)}>
-          Next
+        <span className="active-workout__nav-position">
+          {exIdx + 1} of {state.exercises.length}
+        </span>
+        <button
+          className="active-workout__nav-btn"
+          aria-label="Next"
+          onClick={() => session.moveExercise(1)}
+          disabled={!canGoToNextExercise(state)}
+        >
+          Next →
         </button>
       </nav>
       {state.confirmingFinish ? (
@@ -273,16 +337,22 @@ function SetEntryRow({
       </label>
       <label className="active-set__field">
         <span className="active-set__field-label">RIR</span>
-        <input
-          className="active-set__input"
-          type="text"
-          inputMode="numeric"
+        <select
+          className="active-set__input active-set__rir-select"
           aria-label={`Set ${sn} RIR`}
-          placeholder={'\u2014'}
           value={entry.rir}
           onChange={(e) => onChange(sn, { rir: e.target.value })}
-        />
+        >
+          <option value="">Unknown</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5+</option>
+        </select>
       </label>
+      <p className="active-set__rir-guidance">{rirGuidance(entry.rir)}</p>
       <button
         className="active-set__complete"
         onClick={() => void onComplete(sn)}
@@ -291,5 +361,38 @@ function SetEntryRow({
         Complete
       </button>
     </div>
+  );
+}
+
+function rirGuidance(value: string): string {
+  switch (value) {
+    case '0':
+      return '0: no repetitions left';
+    case '1':
+      return '1: one repetition left';
+    case '2':
+      return '2: two repetitions left';
+    case '3':
+      return '3: three repetitions left';
+    case '4':
+      return '4: easy set';
+    case '5':
+      return '5+: very easy set';
+    default:
+      return 'Unknown: not sure';
+  }
+}
+
+function ActiveProgressSummary({ exercise }: { exercise: ReturnType<typeof currentExercise> }) {
+  const progress = exercise.progression;
+  if (!progress?.hasEnoughData) {
+    return <p className="active-workout__recommendation">Calibration recommended</p>;
+  }
+  return (
+    <p className="active-workout__recommendation">
+      Last: {progress.lastWeightKg ?? '—'} kg × {progress.lastReps ?? '—'}
+      {progress.lastRir === null ? '' : ` @ RIR ${progress.lastRir}`} · Next:{' '}
+      {progress.nextWeightKg === null ? 'Calibration recommended' : `${progress.nextWeightKg} kg`}
+    </p>
   );
 }

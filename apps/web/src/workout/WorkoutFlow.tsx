@@ -1,10 +1,13 @@
 import { useCallback, useReducer } from 'react';
 import {
   beginWorkoutGeneration,
+  beginExerciseReplacement,
   completeWorkoutGeneration,
+  completeExerciseReplacement,
   editWorkoutRequest,
   initialWorkoutFlowState,
   toggleReplaceExercise,
+  failExerciseReplacement,
   type WorkoutFlowState,
 } from './workout-flow';
 import { isWorkoutRequestValid, type WorkoutRequestDraft } from './workout-request';
@@ -26,6 +29,12 @@ export interface WorkoutFlowProps {
   /** Resolver injected by the parent. In production, calls the real gateway. */
   readonly generateReview: (draft: WorkoutRequestDraft) => Promise<WorkoutReview>;
   readonly onStartWorkout: (review: WorkoutReview) => void;
+  readonly replaceExercise: (
+    review: WorkoutReview,
+    draft: WorkoutRequestDraft,
+    position: number,
+    excludedReplacementIds: readonly string[],
+  ) => Promise<WorkoutReview['exercises'][number]>;
 }
 
 type FlowAction =
@@ -34,7 +43,14 @@ type FlowAction =
   | { readonly type: 'complete'; readonly review: WorkoutReview }
   | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'edit' }
-  | { readonly type: 'toggleReplace'; readonly position: number };
+  | { readonly type: 'toggleReplace'; readonly position: number }
+  | { readonly type: 'beginReplace'; readonly position: number }
+  | {
+      readonly type: 'completeReplace';
+      readonly position: number;
+      readonly replacement: WorkoutReview['exercises'][number];
+    }
+  | { readonly type: 'replaceError'; readonly message: string };
 
 function flowReducer(state: WorkoutFlowState, action: FlowAction): WorkoutFlowState {
   switch (action.type) {
@@ -50,10 +66,16 @@ function flowReducer(state: WorkoutFlowState, action: FlowAction): WorkoutFlowSt
       return editWorkoutRequest(state);
     case 'toggleReplace':
       return toggleReplaceExercise(state, action.position);
+    case 'beginReplace':
+      return beginExerciseReplacement(state, action.position);
+    case 'completeReplace':
+      return completeExerciseReplacement(state, action.position, action.replacement);
+    case 'replaceError':
+      return failExerciseReplacement(state, action.message);
   }
 }
 
-export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps) {
+export function WorkoutFlow({ generateReview, onStartWorkout, replaceExercise }: WorkoutFlowProps) {
   const [state, dispatch] = useReducer(flowReducer, initialWorkoutFlowState);
 
   const handleDraftChange = useCallback((draft: WorkoutRequestDraft) => {
@@ -78,6 +100,27 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
     dispatch({ type: 'edit' });
   }, []);
 
+  const handleReplace = useCallback(
+    (position: number) => {
+      if (state.stage !== 'review' || state.replacingPosition !== null) return;
+      const review = state.review;
+      const excluded = state.replacementHistory[position] ?? [];
+      dispatch({ type: 'beginReplace', position });
+      void replaceExercise(review, state.draft, position, excluded).then(
+        (replacement) => dispatch({ type: 'completeReplace', position, replacement }),
+        (error: unknown) =>
+          dispatch({
+            type: 'replaceError',
+            message:
+              error instanceof Error
+                ? error.message
+                : 'No valid substitute is available for this exercise.',
+          }),
+      );
+    },
+    [replaceExercise, state],
+  );
+
   if (state.stage === 'generating') {
     return (
       <section className="workout-flow workout-flow--generating" aria-busy="true">
@@ -95,7 +138,8 @@ export function WorkoutFlow({ generateReview, onStartWorkout }: WorkoutFlowProps
       <WorkoutReviewView
         review={state.review}
         replacingPosition={state.replacingPosition}
-        onReplaceExercise={(position) => dispatch({ type: 'toggleReplace', position })}
+        replacementError={state.replacementError}
+        onReplaceExercise={handleReplace}
         onStartWorkout={handleStart}
         onEditRequest={handleEdit}
       />

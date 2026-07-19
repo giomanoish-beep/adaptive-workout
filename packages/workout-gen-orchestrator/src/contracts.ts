@@ -26,6 +26,40 @@ export interface GenerateWorkoutRequest {
   readonly unavailableEquipment?: readonly string[];
 }
 
+/** Browser-safe request for replacing one exercise in the current workout only. */
+export interface ReplaceWorkoutExerciseRequest extends GenerateWorkoutRequest {
+  readonly action: 'replace_exercise';
+  readonly currentExerciseId: string;
+  readonly workoutExerciseIds: readonly string[];
+  /** Previously shown replacements, used to avoid an immediate cycle. */
+  readonly excludedReplacementIds?: readonly string[];
+}
+
+export interface ReplaceWorkoutExerciseSuccess {
+  readonly status: 'success';
+  readonly action: 'replace_exercise';
+  readonly replacement: {
+    readonly exerciseId: string;
+    readonly exerciseVersion: number;
+    readonly name: string;
+  };
+}
+
+export interface ReplaceWorkoutExerciseError {
+  readonly status: 'error';
+  readonly action: 'replace_exercise';
+  readonly code:
+    | 'INVALID_REQUEST'
+    | 'PROFILE_MISSING'
+    | 'DISCOMFORT_REVIEW_REQUIRED'
+    | 'CATALOG_UNAVAILABLE'
+    | 'NO_VALID_SUBSTITUTE';
+  readonly message: string;
+}
+
+export type ReplaceWorkoutExerciseResponse =
+  ReplaceWorkoutExerciseSuccess | ReplaceWorkoutExerciseError;
+
 /* ------------------------------------------------------------------ */
 /*  Server → Browser response (review DTO)                             */
 /* ------------------------------------------------------------------ */

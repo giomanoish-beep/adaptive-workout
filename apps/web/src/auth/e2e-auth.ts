@@ -284,10 +284,29 @@ export function createE2ESupabaseClient(): SupabaseClient {
         return that;
       },
       update(row: Row) {
-        const now = nowISO();
-        for (const target of [...filteredRows]) {
-          const idx = rows.indexOf(target);
-          if (idx >= 0) rows[idx] = { ...rows[idx], ...row, updated_at: now };
+        let applied = false;
+        function applyUpdate(): { data: null; error: Row | null } {
+          if (applied) return { data: null, error: null };
+          if (tableName === 'profiles') {
+            profileSaveAttempts += 1;
+            if (profileSaveFailuresRemaining > 0) {
+              profileSaveFailuresRemaining -= 1;
+              return {
+                data: null,
+                error: {
+                  code: 'E2E_PROFILE_SAVE_FAILED',
+                  message: 'Simulated private database error.',
+                },
+              };
+            }
+          }
+          const now = nowISO();
+          for (const target of [...filteredRows]) {
+            const idx = rows.indexOf(target);
+            if (idx >= 0) rows[idx] = { ...rows[idx], ...row, updated_at: now };
+          }
+          applied = true;
+          return { data: null, error: null };
         }
         const that: Record<string, unknown> = {
           eq(c: string, v: unknown) {
@@ -299,11 +318,24 @@ export function createE2ESupabaseClient(): SupabaseClient {
             return that;
           },
           single() {
+            const updateResult = applyUpdate();
+            if (updateResult.error) {
+              return Promise.resolve(updateResult);
+            }
             const t = [...filteredRows];
             return Promise.resolve({
               data: t.length > 0 ? selCols(t[0]!, selectColumns) : null,
               error: null,
             });
+          },
+          then(
+            resolve?: (value: { data: null; error: Row | null }) => unknown,
+            reject?: (reason: unknown) => unknown,
+          ) {
+            const value = applyUpdate();
+            return new Promise<typeof value>((complete) => {
+              setTimeout(() => complete(value), profileSaveDelayMs);
+            }).then(resolve, reject);
           },
         };
         return that;

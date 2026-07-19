@@ -59,3 +59,4 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1-006                 | Deploy V1 and verify iPhone PWA installation readiness       | BLOCKED | V1-005                                                       |
 | V1-007                 | Fix production workout equipment-context mapping             | DONE    | V1-005, DEPLOY-001                                           |
 | V1-008                 | Align production workout-session persistence contracts       | DONE    | V1-007, DATABASE-004                                         |
+| V1.1                   | UX, workout-only replacement, and immediate defects          | DONE    | V1-008                                                       |

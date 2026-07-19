@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+apps/web/playwright-report
+apps/web/test-results
 package-lock.json
 supabase/functions/generate-workout/index.bundle.ts
 supabase/functions/refresh-progression/index.bundle.ts

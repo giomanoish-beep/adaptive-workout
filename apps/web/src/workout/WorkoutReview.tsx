@@ -1,15 +1,9 @@
 import { formatRepRange, type WorkoutReview as WorkoutReviewModel } from './workout-review';
 
-/**
- * Presentational review screen for the Workout tab (WEB_APP-003). Renders the
- * review model — title, estimated duration, total working sets, ordered
- * exercise cards (sets, rep range, RIR), muscle-volume summary, a UI-only
- * Replace action per exercise, and the primary Start / secondary Edit actions.
- * Owns no state.
- */
 export interface WorkoutReviewProps {
   readonly review: WorkoutReviewModel;
   readonly replacingPosition: number | null;
+  readonly replacementError: string | null;
   readonly onReplaceExercise: (position: number) => void;
   readonly onStartWorkout: () => void;
   readonly onEditRequest: () => void;
@@ -18,6 +12,7 @@ export interface WorkoutReviewProps {
 export function WorkoutReview({
   review,
   replacingPosition,
+  replacementError,
   onReplaceExercise,
   onStartWorkout,
   onEditRequest,
@@ -52,27 +47,30 @@ export function WorkoutReview({
                 <span className="workout-card__name">{exercise.name}</span>
               </div>
               <div className="workout-card__metrics">
-                <span className="workout-card__metric">{exercise.sets} sets</span>
-                <span className="workout-card__metric">{formatRepRange(exercise.reps)} reps</span>
-                <span className="workout-card__metric">RIR {exercise.rir}</span>
+                <span>{exercise.sets} sets</span>
+                <span>{formatRepRange(exercise.reps)} reps</span>
+                <span>RIR {exercise.rir}</span>
               </div>
+              <ExerciseProgressionSummary exercise={exercise} />
               <button
                 type="button"
                 className="workout-card__replace"
-                aria-pressed={replacing}
+                aria-busy={replacing}
+                disabled={replacingPosition !== null}
                 onClick={() => onReplaceExercise(exercise.position)}
               >
-                {replacing ? 'Replacing…' : 'Replace'}
+                {replacing ? 'Finding substitute…' : 'Replace for this workout'}
               </button>
-              {replacing && (
-                <p className="workout-card__placeholder">
-                  Substitution arrives with server-side generation.
-                </p>
-              )}
             </li>
           );
         })}
       </ol>
+
+      {replacementError && (
+        <p className="workout-review__replacement-error" role="alert">
+          {replacementError}
+        </p>
+      )}
 
       <section className="workout-review__volume">
         <h3 className="workout-review__volume-title">Muscle volume</h3>
@@ -95,5 +93,33 @@ export function WorkoutReview({
         </button>
       </div>
     </section>
+  );
+}
+
+function ExerciseProgressionSummary({
+  exercise,
+}: {
+  exercise: WorkoutReviewModel['exercises'][number];
+}) {
+  const progress = exercise.progression;
+  if (!progress?.hasEnoughData) {
+    return <p className="exercise-progress exercise-progress--empty">Calibration recommended</p>;
+  }
+  const last =
+    progress.lastWeightKg !== null && progress.lastReps !== null
+      ? `Last: ${progress.lastWeightKg} kg × ${progress.lastReps}${
+          progress.lastRir === null ? '' : ` @ RIR ${progress.lastRir}`
+        }`
+      : 'Last: Not enough data';
+  const next =
+    progress.nextWeightKg === null
+      ? 'Next: Calibration recommended'
+      : `Next: ${progress.nextWeightKg} kg × ${formatRepRange(exercise.reps)} @ RIR ${exercise.rir}`;
+  return (
+    <div className="exercise-progress" aria-label={`Progress for ${exercise.name}`}>
+      <span>{last}</span>
+      <span>{next}</span>
+      {progress.trend && <span className="exercise-progress__trend">{progress.trend}</span>}
+    </div>
   );
 }

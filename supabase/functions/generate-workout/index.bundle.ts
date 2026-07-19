@@ -4686,6 +4686,136 @@ function mapEngineFailureToErrorCode(code) {
 }
 var ORCHESTRATOR_ENGINE_NAME2 = "@adaptive-workout/workout-engine";
 
+// packages/workout-gen-orchestrator/src/replacement.ts
+function selectReplacementCandidate(request, engineInput) {
+  const current = engineInput.exerciseCatalog.find(
+    (candidate) => candidate.exerciseId === request.currentExerciseId
+  );
+  if (!current) return null;
+  const primaryMuscles = new Set(
+    current.muscleContributions.filter((contribution) => contribution.role === "primary").map((contribution) => contribution.muscleId)
+  );
+  if (primaryMuscles.size === 0) return null;
+  const excluded = /* @__PURE__ */ new Set([
+    ...request.workoutExerciseIds,
+    ...request.excludedReplacementIds ?? []
+  ]);
+  const eligible = engineInput.exerciseCatalog.filter(
+    (candidate) => !excluded.has(candidate.exerciseId) && candidateIsAllowed(candidate, engineInput) && [...primaryMuscles].every(
+      (muscleId) => candidate.muscleContributions.some(
+        (contribution) => contribution.muscleId === muscleId && contribution.role !== "stabilizer"
+      )
+    )
+  );
+  return [...eligible].sort((left, right) => {
+    const leftSameFamily = left.exerciseFamilyId === current.exerciseFamilyId ? 1 : 0;
+    const rightSameFamily = right.exerciseFamilyId === current.exerciseFamilyId ? 1 : 0;
+    if (leftSameFamily !== rightSameFamily) return rightSameFamily - leftSameFamily;
+    const leftPrimary = sharedPrimaryCount(current, left);
+    const rightPrimary = sharedPrimaryCount(current, right);
+    return rightPrimary - leftPrimary || left.exerciseId.localeCompare(right.exerciseId);
+  })[0] ?? null;
+}
+function candidateIsAllowed(candidate, engineInput) {
+  if (!candidate.isActive) return false;
+  const availableEquipment = new Set(engineInput.availableEquipmentIds);
+  if (candidate.equipment.some(
+    (equipment) => equipment.requirement === "required" && !availableEquipment.has(equipment.equipmentId)
+  )) {
+    return false;
+  }
+  if (engineInput.exercisePreferences.some(
+    (preference) => preference.exerciseId === candidate.exerciseId && preference.preference === "dislike"
+  )) {
+    return false;
+  }
+  return engineInput.constraints.every((constraint) => {
+    switch (constraint.kind) {
+      case "excluded_exercises":
+        return !constraint.exerciseIds.includes(candidate.exerciseId);
+      case "excluded_exercise_families":
+        return !constraint.exerciseFamilyIds.includes(candidate.exerciseFamilyId);
+      case "unavailable_equipment":
+        return !candidate.equipment.some(
+          (equipment) => equipment.requirement === "required" && constraint.equipmentIds.includes(equipment.equipmentId)
+        );
+      case "excluded_muscles":
+        return !candidate.muscleContributions.some(
+          (contribution) => constraint.muscleIds.includes(contribution.muscleId)
+        );
+      default:
+        return true;
+    }
+  });
+}
+async function replaceWorkoutExercise(request, userId, deps) {
+  const generationValidation = validateGenerateWorkoutRequest(request);
+  if (!generationValidation.ok || !request.currentExerciseId || request.workoutExerciseIds.length === 0 || !request.workoutExerciseIds.includes(request.currentExerciseId)) {
+    return replacementError("INVALID_REQUEST", "The exercise replacement request is invalid.");
+  }
+  let profile;
+  try {
+    profile = await deps.profileLoader.loadProfile(userId);
+  } catch {
+    return replacementError("PROFILE_MISSING", "Unable to load your training profile.");
+  }
+  if (!profile) return replacementError("PROFILE_MISSING", "Complete your training profile first.");
+  if (mapProfileToGoalRules(profile).discomfortReviewRequired) {
+    return replacementError(
+      "DISCOMFORT_REVIEW_REQUIRED",
+      "Review your current discomfort before replacing this exercise."
+    );
+  }
+  let catalog;
+  try {
+    catalog = await deps.catalogLoader.loadActiveCatalog();
+  } catch {
+    return replacementError("CATALOG_UNAVAILABLE", "Exercise catalog is unavailable.");
+  }
+  const mapped = mapCatalogToEngineCandidates(
+    catalog.exercises,
+    catalog.muscles,
+    catalog.exerciseMuscles,
+    catalog.exerciseEquipment,
+    catalog.equipment
+  );
+  const engineInput = buildEngineInput(
+    request,
+    mapped,
+    deps.muscleIdMap,
+    deps.equipmentContextMap,
+    userId
+  );
+  const replacement = selectReplacementCandidate(request, engineInput);
+  if (!replacement) {
+    return replacementError(
+      "NO_VALID_SUBSTITUTE",
+      "No valid substitute is available for your equipment and restrictions."
+    );
+  }
+  const name = mapped.exerciseIdToName.get(replacement.exerciseId);
+  const exerciseVersion = mapped.exerciseIdToVersion.get(replacement.exerciseId);
+  if (!name || exerciseVersion === void 0) {
+    return replacementError("CATALOG_UNAVAILABLE", "The replacement details are unavailable.");
+  }
+  return {
+    status: "success",
+    action: "replace_exercise",
+    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name }
+  };
+}
+function sharedPrimaryCount(current, candidate) {
+  const candidatePrimary = new Set(
+    candidate.muscleContributions.filter((contribution) => contribution.role === "primary").map((contribution) => contribution.muscleId)
+  );
+  return current.muscleContributions.filter(
+    (contribution) => contribution.role === "primary" && candidatePrimary.has(contribution.muscleId)
+  ).length;
+}
+function replacementError(code, message) {
+  return { status: "error", action: "replace_exercise", code, message };
+}
+
 // supabase/functions/generate-workout/index.ts
 var equipmentContextMap = {
   "full-gym": [
@@ -4884,19 +5014,15 @@ serve(async (req) => {
   const catalogLoader = createSupabaseCatalogLoader(supabaseUrl, anonKey, token);
   const profileLoader = createSupabaseProfileLoader(supabaseUrl, anonKey, token);
   const sink = new ConsoleSink();
-  const result = await generateWorkout(
-    body,
-    userId,
-    {
-      profileLoader,
-      catalogLoader,
-      equipmentContextMap,
-      muscleIdMap
-    },
-    sink
-  );
+  const dependencies = {
+    profileLoader,
+    catalogLoader,
+    equipmentContextMap,
+    muscleIdMap
+  };
+  const result = "action" in body && body.action === "replace_exercise" ? await replaceWorkoutExercise(body, userId, dependencies) : await generateWorkout(body, userId, dependencies, sink);
   if (result.status === "error") {
-    const statusCode = result.code === "UNAUTHENTICATED" ? 401 : result.code === "INVALID_REQUEST" ? 400 : 500;
+    const statusCode = result.code === "UNAUTHENTICATED" ? 401 : result.code === "INVALID_REQUEST" || result.code === "PROFILE_MISSING" ? 400 : result.code === "NO_VALID_SUBSTITUTE" || result.code === "DISCOMFORT_REVIEW_REQUIRED" ? 409 : 500;
     return jsonResponse(statusCode, result);
   }
   return jsonResponse(200, result);

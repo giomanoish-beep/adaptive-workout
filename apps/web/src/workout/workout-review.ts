@@ -23,6 +23,16 @@ export interface WorkoutReviewExercise {
   readonly reps: WorkoutReviewRepRange;
   readonly rir: number;
   readonly restSeconds?: number | null;
+  readonly progression?: ExerciseProgressionSummary;
+}
+
+export interface ExerciseProgressionSummary {
+  readonly lastWeightKg: number | null;
+  readonly lastReps: number | null;
+  readonly lastRir: number | null;
+  readonly nextWeightKg: number | null;
+  readonly trend: 'Improving' | 'Stable' | 'Declining' | null;
+  readonly hasEnoughData: boolean;
 }
 
 export interface WorkoutReviewMuscleVolume {
@@ -96,4 +106,20 @@ export function totalReviewWorkingSets(review: WorkoutReview): number {
  */
 export function formatRepRange(reps: WorkoutReviewRepRange): string {
   return `${reps.minimum}\u2013${reps.maximum}`;
+}
+
+export function replaceReviewExercise(
+  review: WorkoutReview,
+  position: number,
+  replacement: Pick<
+    WorkoutReviewExercise,
+    'exerciseId' | 'exerciseVersion' | 'name' | 'progression'
+  >,
+): WorkoutReview {
+  return {
+    ...review,
+    exercises: review.exercises.map((exercise) =>
+      exercise.position === position ? { ...exercise, ...replacement } : exercise,
+    ),
+  };
 }

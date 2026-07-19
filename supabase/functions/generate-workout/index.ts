@@ -20,9 +20,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.5';
 // the orchestrator is imported from the workspace monorepo.
 // In the deployed Edge Function, use import maps or bundlers.
 import { generateWorkout } from '../../../packages/workout-gen-orchestrator/src/orchestrator.ts';
+import { replaceWorkoutExercise } from '../../../packages/workout-gen-orchestrator/src/replacement.ts';
 import { ConsoleSink } from '../../../packages/observability/src/sinks.ts';
 import type {
   GenerateWorkoutRequest,
+  ReplaceWorkoutExerciseRequest,
   CatalogLoader,
   ProfileLoader,
   ServerTrainingProfile,
@@ -299,9 +301,9 @@ serve(async (req: Request) => {
   const userId = userData.user.id;
 
   // Parse request body
-  let body: GenerateWorkoutRequest;
+  let body: GenerateWorkoutRequest | ReplaceWorkoutExerciseRequest;
   try {
-    body = (await req.json()) as GenerateWorkoutRequest;
+    body = (await req.json()) as GenerateWorkoutRequest | ReplaceWorkoutExerciseRequest;
   } catch {
     return jsonResponse(400, {
       status: 'error',
@@ -316,22 +318,27 @@ serve(async (req: Request) => {
 
   const sink = new ConsoleSink();
 
-  // Generate
-  const result = await generateWorkout(
-    body,
-    userId,
-    {
-      profileLoader,
-      catalogLoader,
-      equipmentContextMap,
-      muscleIdMap,
-    },
-    sink,
-  );
+  const dependencies = {
+    profileLoader,
+    catalogLoader,
+    equipmentContextMap,
+    muscleIdMap,
+  };
+
+  const result =
+    'action' in body && body.action === 'replace_exercise'
+      ? await replaceWorkoutExercise(body, userId, dependencies)
+      : await generateWorkout(body, userId, dependencies, sink);
 
   if (result.status === 'error') {
     const statusCode =
-      result.code === 'UNAUTHENTICATED' ? 401 : result.code === 'INVALID_REQUEST' ? 400 : 500;
+      result.code === 'UNAUTHENTICATED'
+        ? 401
+        : result.code === 'INVALID_REQUEST' || result.code === 'PROFILE_MISSING'
+          ? 400
+          : result.code === 'NO_VALID_SUBSTITUTE' || result.code === 'DISCOMFORT_REVIEW_REQUIRED'
+            ? 409
+            : 500;
     return jsonResponse(statusCode, result);
   }
 

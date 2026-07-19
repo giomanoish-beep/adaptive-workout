@@ -40,7 +40,7 @@ test.describe('Flow 3 — Set logging → rest timer → incomplete finish', () 
 
     await expect(page.locator('.active-set--completed')).toContainText('32 kg');
     await expect(page.locator('.active-set--completed')).toContainText('10 reps');
-    await expect(page.locator('.active-set--completed')).toContainText('RIR \u2014');
+    await expect(page.locator('.active-set--completed')).toContainText('RIR Unknown');
 
     // -- Rest timer --
     const restPanel = page.locator('.rest-panel');

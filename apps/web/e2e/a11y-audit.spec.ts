@@ -144,7 +144,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     // Fill Set 1 entry fields using their accessible labels
     await page.getByLabel('Set 1 weight').fill('60');
     await page.getByLabel('Set 1 reps').fill('10');
-    await page.getByLabel('Set 1 RIR').fill('2');
+    await page.getByLabel('Set 1 RIR').selectOption('2');
 
     // Click the Complete button scoped to Set 1 — the first set in the
     // ordered list (semantically "Set 1").
@@ -190,7 +190,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await completeOnboarding(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training preferences' })).toBeVisible();
 
     await a11yScan(page);
   });
@@ -202,9 +202,7 @@ test.describe('HARDENING-003 — accessibility audits', () => {
     await completeOnboarding(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'Edit training goal' }).click();
-
-    await expect(page.getByRole('radio', { name: 'Recomposition' })).toBeVisible();
+    await expect(page.getByLabel('Goal')).toBeVisible();
 
     await a11yScan(page);
   });

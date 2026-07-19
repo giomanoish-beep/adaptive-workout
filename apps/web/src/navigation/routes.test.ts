@@ -12,11 +12,18 @@ import {
 
 describe('route definitions', () => {
   it('defines exactly the documented destinations plus the active-workout focused flow', () => {
-    expect(appRoutes).toEqual(['today', 'workout', 'progress', 'settings', 'active_workout']);
+    expect(appRoutes).toEqual([
+      'today',
+      'program',
+      'workout',
+      'progress',
+      'settings',
+      'active_workout',
+    ]);
   });
 
-  it('exposes four bottom navigation destinations in a stable order', () => {
-    expect(bottomNavRoutes).toEqual(['today', 'workout', 'progress', 'settings']);
+  it('exposes five bottom navigation destinations in a stable order', () => {
+    expect(bottomNavRoutes).toEqual(['today', 'program', 'workout', 'progress', 'settings']);
     expect(bottomNavDestinations.map((d) => d.route)).toEqual(bottomNavRoutes);
   });
 
@@ -48,6 +55,7 @@ describe('focused flow semantics', () => {
 describe('resolveActiveBottomNav', () => {
   it('maps each bottom-tab route to itself', () => {
     expect(resolveActiveBottomNav('today')).toBe('today');
+    expect(resolveActiveBottomNav('program')).toBe('program');
     expect(resolveActiveBottomNav('workout')).toBe('workout');
     expect(resolveActiveBottomNav('progress')).toBe('progress');
     expect(resolveActiveBottomNav('settings')).toBe('settings');

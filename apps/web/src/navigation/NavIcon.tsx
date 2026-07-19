@@ -39,6 +39,13 @@ export function NavIcon({
           <path d="M6 10v9h12v-9" />
         </svg>
       );
+    case 'calendar':
+      return (
+        <svg {...common}>
+          <rect x="4" y="5" width="16" height="15" rx="2" />
+          <path d="M8 3v4M16 3v4M4 10h16M8 14h3M13 14h3" />
+        </svg>
+      );
     case 'sparkles':
       return (
         <svg {...common}>

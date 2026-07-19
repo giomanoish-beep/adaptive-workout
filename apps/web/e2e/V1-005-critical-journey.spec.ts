@@ -71,9 +71,8 @@ test.describe('V1-005 — Critical Journey', () => {
 
     // Settings + goal change
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'Edit training goal' }).click();
-    await page.getByRole('radio', { name: 'Strength' }).click();
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByLabel('Goal').selectOption('gain_strength');
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
 
     // Reload persistence
     await preserveStoreAndReload(page);

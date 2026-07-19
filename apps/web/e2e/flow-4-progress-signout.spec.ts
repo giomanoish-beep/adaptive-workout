@@ -46,14 +46,10 @@ test.describe('Flow 4 — Progress → profile goal edit → sign out', () => {
     // -- Open Settings tab --
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    const goalCard = page.locator('.settings-card').filter({ hasText: 'Training goal' });
-    await expect(goalCard.locator('.settings-card__value')).toContainText('Recomposition');
-
-    await page.getByRole('button', { name: 'Edit training goal' }).click();
-    await page.getByRole('radio', { name: 'Build muscle' }).click();
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await expect(goalCard.locator('.settings-card__value')).toContainText('Build muscle');
+    await expect(page.getByLabel('Goal')).toHaveValue('recomposition');
+    await page.getByLabel('Goal').selectOption('build_muscle');
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Goal')).toHaveValue('build_muscle');
 
     // -- Sign out --
     await page.getByRole('button', { name: 'Sign out' }).click();

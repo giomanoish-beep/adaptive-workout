@@ -6,7 +6,14 @@
  * docs/ARCHITECTURE.md). Deterministic and testable in isolation.
  */
 
-export const appRoutes = ['today', 'workout', 'progress', 'settings', 'active_workout'] as const;
+export const appRoutes = [
+  'today',
+  'program',
+  'workout',
+  'progress',
+  'settings',
+  'active_workout',
+] as const;
 export type AppRoute = (typeof appRoutes)[number];
 
 /**
@@ -14,7 +21,13 @@ export type AppRoute = (typeof appRoutes)[number];
  * primary destinations an authenticated user switches between with one thumb.
  * `active_workout` is deliberately excluded — it is a focused flow.
  */
-export const bottomNavRoutes: readonly AppRoute[] = ['today', 'workout', 'progress', 'settings'];
+export const bottomNavRoutes: readonly AppRoute[] = [
+  'today',
+  'program',
+  'workout',
+  'progress',
+  'settings',
+];
 
 export interface BottomNavDestination {
   readonly route: AppRoute;
@@ -22,11 +35,12 @@ export interface BottomNavDestination {
   readonly icon: NavIcon;
 }
 
-export const navIcons = ['home', 'sparkles', 'chart', 'gear', 'bolt'] as const;
+export const navIcons = ['home', 'calendar', 'sparkles', 'chart', 'gear', 'bolt'] as const;
 export type NavIcon = (typeof navIcons)[number];
 
 export const bottomNavDestinations: readonly BottomNavDestination[] = [
   { route: 'today', label: 'Today', icon: 'home' },
+  { route: 'program', label: 'Program', icon: 'calendar' },
   { route: 'workout', label: 'Workout', icon: 'sparkles' },
   { route: 'progress', label: 'Progress', icon: 'chart' },
   { route: 'settings', label: 'Settings', icon: 'gear' },

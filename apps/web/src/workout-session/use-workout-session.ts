@@ -11,6 +11,7 @@ import {
   type WorkoutSessionRepository,
   type SessionExerciseRow,
   type SetLogRow,
+  type SessionCreateOptions,
 } from './workout-session-repository';
 import {
   buildLoadingState,
@@ -34,7 +35,7 @@ import type { LoggedSetValue } from '../active-workout/active-workout-validation
 
 export interface WorkoutSessionHook {
   readonly state: ActiveWorkoutState;
-  startSession(review: WorkoutReview): Promise<void>;
+  startSession(review: WorkoutReview, options?: SessionCreateOptions): Promise<void>;
   resumeSession(): Promise<void>;
   completeSetWithPersistence(
     exerciseIndex: number,
@@ -87,17 +88,19 @@ export function useWorkoutSession(client: SupabaseClient, userId: string): Worko
   const depsRef = useRef<RepositoryDeps | null>(null);
   // Hold session ID separately for finish callback access
   const sessionIdRef = useRef<string | null>(null);
+  const scheduledWorkoutIdRef = useRef<string | undefined>(undefined);
 
   const startSession = useCallback(
-    async (review: WorkoutReview) => {
+    async (review: WorkoutReview, options?: SessionCreateOptions) => {
       dispatch({
         type: 'setState',
 
         state: buildLoadingState(),
       });
       try {
-        const { sessionId, exercises } = await repo.createSession(review);
+        const { sessionId, exercises } = await repo.createSession(review, options);
         sessionIdRef.current = sessionId;
+        scheduledWorkoutIdRef.current = options?.scheduledProgramWorkoutId;
         depsRef.current = {
           repo,
           userId,
@@ -257,7 +260,7 @@ export function useWorkoutSession(client: SupabaseClient, userId: string): Worko
     const hasIncomplete = completed < total;
 
     try {
-      await deps.repo.finishSession(sessionId, hasIncomplete);
+      await deps.repo.finishSession(sessionId, hasIncomplete, scheduledWorkoutIdRef.current);
       // Success: transition to finished
       dispatch({ type: 'finish' });
     } catch {

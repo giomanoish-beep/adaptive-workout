@@ -21,6 +21,7 @@ export * from './validation.js';
 export * from './profile-mapping.js';
 export * from './catalog-mapping.js';
 export * from './result-mapping.js';
+export * from './replacement.js';
 export * from './engine-input.js';
 export * from './observability.js';
 export { packageName } from './package-name.js';

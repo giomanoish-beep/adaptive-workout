@@ -85,7 +85,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 320, height: 568 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training preferences' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 
@@ -115,7 +115,7 @@ test.describe('HARDENING-003 — mobile overflow', () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await setupWithOnboarding(page);
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Training profile' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Training preferences' })).toBeVisible();
     await assertNoHorizontalOverflow(page);
   });
 });
@@ -186,21 +186,14 @@ test.describe('HARDENING-003 — selected state semantics', () => {
     await expect(recompositionBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('settings goal edit radios expose aria-checked', async ({ page }) => {
+  test('settings goal select exposes and saves its value', async ({ page }) => {
     await setupWithOnboarding(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'Edit training goal' }).click();
-
-    const radio = page.getByRole('radio', { name: 'Recomposition' });
-    await expect(radio).toHaveAttribute('aria-checked', 'true');
-
-    const otherRadio = page.getByRole('radio', { name: 'Strength' });
-    await expect(otherRadio).toHaveAttribute('aria-checked', 'false');
-
-    await otherRadio.click();
-    await expect(radio).toHaveAttribute('aria-checked', 'false');
-    await expect(otherRadio).toHaveAttribute('aria-checked', 'true');
+    const goal = page.getByLabel('Goal');
+    await expect(goal).toHaveValue('recomposition');
+    await goal.selectOption('gain_strength');
+    await expect(goal).toHaveValue('gain_strength');
   });
 });
 
@@ -278,7 +271,7 @@ test.describe('HARDENING-003 — rest timer behavior', () => {
 
     await page.getByLabel('Set 1 weight').fill('60');
     await page.getByLabel('Set 1 reps').fill('10');
-    await page.getByLabel('Set 1 RIR').fill('2');
+    await page.getByLabel('Set 1 RIR').selectOption('2');
 
     // Complete Set 1 — scope to first .active-set
     await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
@@ -296,7 +289,7 @@ test.describe('HARDENING-003 — rest timer behavior', () => {
 
     await page.getByLabel('Set 1 weight').fill('60');
     await page.getByLabel('Set 1 reps').fill('10');
-    await page.getByLabel('Set 1 RIR').fill('2');
+    await page.getByLabel('Set 1 RIR').selectOption('2');
 
     await page.locator('.active-set').first().getByRole('button', { name: 'Complete' }).click();
 

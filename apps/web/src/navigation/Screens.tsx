@@ -15,6 +15,11 @@ const screenCopy: Record<
     title: 'Ready to train.',
     detail: 'Your next session and daily focus will appear here.',
   },
+  program: {
+    eyebrow: 'Program',
+    title: 'Your program.',
+    detail: 'Create a program from Today to see its weeks and prescriptions here.',
+  },
   workout: {
     eyebrow: 'Workout',
     title: 'Generate a session.',

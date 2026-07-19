@@ -31,6 +31,7 @@ export interface ActiveExercise {
   readonly position: number;
   readonly name: string;
   readonly plannedSets: readonly PlannedSet[];
+  readonly progression?: WorkoutReviewExercise['progression'];
 }
 
 export type SetStatus = 'incomplete' | 'completed';
@@ -176,6 +177,7 @@ function toActiveExercise(exercise: WorkoutReviewExercise): ActiveExercise {
     position: exercise.position,
     name: exercise.name,
     plannedSets,
+    ...(exercise.progression ? { progression: exercise.progression } : {}),
   };
 }
 

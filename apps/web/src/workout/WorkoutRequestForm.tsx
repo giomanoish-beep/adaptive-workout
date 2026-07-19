@@ -74,10 +74,11 @@ export function WorkoutRequestForm({
   return (
     <section className="workout-request">
       <header className="workout-request__header">
-        <p className="eyebrow">Workout</p>
+        <p className="eyebrow">Ad-hoc workout</p>
         <h2>Build your session</h2>
         <p className="workout-request__subtitle">
-          Pick your targets, time, and gear. We&rsquo;ll draft a balanced session.
+          Pick your targets, time, and gear. This session stays in History and does not change your
+          program.
         </p>
       </header>
 

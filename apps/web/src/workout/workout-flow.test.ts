@@ -3,6 +3,9 @@ import {
   beginWorkoutGeneration,
   clearReplaceExercise,
   completeWorkoutGeneration,
+  beginExerciseReplacement,
+  completeExerciseReplacement,
+  failExerciseReplacement,
   editWorkoutRequest,
   flowDraft,
   initialWorkoutFlowState,
@@ -78,7 +81,7 @@ describe('flow state machine', () => {
   });
 });
 
-describe('replace exercise placeholder (UI-only)', () => {
+describe('workout-only exercise replacement', () => {
   it('toggles a replace placeholder on a review exercise', () => {
     let state = completeWorkoutGeneration(
       beginWorkoutGeneration({ stage: 'idle', draft: requestedDraft() }),
@@ -106,5 +109,43 @@ describe('replace exercise placeholder (UI-only)', () => {
     const idle = initialWorkoutFlowState;
     expect(toggleReplaceExercise(idle, 1)).toBe(idle);
     expect(clearReplaceExercise(idle)).toBe(idle);
+  });
+
+  it('updates the review while preserving the prescription and tracks the previous exercise', () => {
+    let state = completeWorkoutGeneration(
+      beginWorkoutGeneration({ stage: 'idle', draft: requestedDraft() }),
+      workoutReviewFixture,
+    );
+    state = beginExerciseReplacement(state, 1);
+    state = completeExerciseReplacement(state, 1, {
+      exerciseId: 'replacement-1',
+      exerciseVersion: 2,
+      name: 'Incline Dumbbell Bench Press',
+      progression: undefined,
+    });
+    expect(state.stage).toBe('review');
+    if (state.stage === 'review') {
+      expect(state.review.exercises[0]).toMatchObject({
+        name: 'Incline Dumbbell Bench Press',
+        sets: 4,
+        reps: { minimum: 8, maximum: 10 },
+        rir: 2,
+      });
+      expect(state.replacementHistory[1]).toEqual([]);
+      expect(state.replacingPosition).toBeNull();
+    }
+  });
+
+  it('surfaces a controlled replacement failure', () => {
+    let state = completeWorkoutGeneration(
+      beginWorkoutGeneration({ stage: 'idle', draft: requestedDraft() }),
+      workoutReviewFixture,
+    );
+    state = beginExerciseReplacement(state, 1);
+    state = failExerciseReplacement(state, 'No valid substitute is available.');
+    if (state.stage === 'review') {
+      expect(state.replacementError).toBe('No valid substitute is available.');
+      expect(state.replacingPosition).toBeNull();
+    }
   });
 });

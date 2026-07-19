@@ -1,6 +1,7 @@
 import type { AppRoute } from '../navigation/routes';
 import { initialWorkoutRequestDraft, type WorkoutRequestDraft } from './workout-request';
 import type { WorkoutReview } from './workout-review';
+import { replaceReviewExercise, type WorkoutReviewExercise } from './workout-review';
 
 /**
  * Pure, React-free state machine for the Workout request and review flow
@@ -41,6 +42,8 @@ export interface WorkoutFlowReview {
   readonly review: WorkoutReview;
   /** Position of the exercise with an active Replace placeholder, or null. */
   readonly replacingPosition: number | null;
+  readonly replacementError: string | null;
+  readonly replacementHistory: Readonly<Record<number, readonly string[]>>;
 }
 
 export type WorkoutFlowState = WorkoutFlowIdle | WorkoutFlowGenerating | WorkoutFlowReview;
@@ -84,7 +87,14 @@ export function completeWorkoutGeneration(
   state: WorkoutFlowState,
   review: WorkoutReview,
 ): WorkoutFlowState {
-  return { stage: 'review', draft: state.draft, review, replacingPosition: null };
+  return {
+    stage: 'review',
+    draft: state.draft,
+    review,
+    replacingPosition: null,
+    replacementError: null,
+    replacementHistory: {},
+  };
 }
 
 /**
@@ -104,6 +114,48 @@ export function toggleReplaceExercise(state: WorkoutFlowState, position: number)
   }
   const replacingPosition = state.replacingPosition === position ? null : position;
   return { ...state, replacingPosition };
+}
+
+export function beginExerciseReplacement(
+  state: WorkoutFlowState,
+  position: number,
+): WorkoutFlowState {
+  if (state.stage !== 'review') return state;
+  return { ...state, replacingPosition: position, replacementError: null };
+}
+
+export function completeExerciseReplacement(
+  state: WorkoutFlowState,
+  position: number,
+  replacement: Pick<
+    WorkoutReviewExercise,
+    'exerciseId' | 'exerciseVersion' | 'name' | 'progression'
+  >,
+): WorkoutFlowState {
+  if (state.stage !== 'review') return state;
+  const previousId = state.review.exercises.find(
+    (exercise) => exercise.position === position,
+  )?.exerciseId;
+  return {
+    ...state,
+    review: replaceReviewExercise(state.review, position, replacement),
+    replacingPosition: null,
+    replacementError: null,
+    replacementHistory: {
+      ...state.replacementHistory,
+      [position]: previousId
+        ? [...(state.replacementHistory[position] ?? []), previousId]
+        : (state.replacementHistory[position] ?? []),
+    },
+  };
+}
+
+export function failExerciseReplacement(
+  state: WorkoutFlowState,
+  message: string,
+): WorkoutFlowState {
+  if (state.stage !== 'review') return state;
+  return { ...state, replacingPosition: null, replacementError: message };
 }
 
 /**

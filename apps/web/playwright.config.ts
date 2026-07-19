@@ -60,6 +60,27 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: 'narrow 320px',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 320, height: 568 },
+        isMobile: true,
+        hasTouch: true,
+        browserName: 'chromium',
+        headless: true,
+        launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] },
+      },
+    },
+    {
+      name: 'iPhone 14',
+      use: {
+        ...devices['iPhone 14'],
+        browserName: 'chromium',
+        headless: true,
+        launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] },
+      },
+    },
   ],
 
   webServer: {
