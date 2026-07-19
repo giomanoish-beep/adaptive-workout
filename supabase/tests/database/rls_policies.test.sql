@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(10);
+select plan(12);
 
 select results_eq(
   $$
@@ -113,10 +113,25 @@ select results_eq(
   'a user can read only their own profile'
 );
 
-select results_eq(
-  $$select id from public.muscles order by id$$,
-  $$values ('30000000-0000-0000-0000-000000000003'::uuid)$$,
-  'authenticated users can read only active shared catalog rows'
+select ok(
+  exists (
+    select 1 from public.muscles where id = '30000000-0000-0000-0000-000000000003'
+  ),
+  'active test muscle is visible to authenticated users'
+);
+
+select ok(
+  not exists (
+    select 1 from public.muscles where id = '40000000-0000-0000-0000-000000000004'
+  ),
+  'inactive test muscle is hidden from authenticated users'
+);
+
+select ok(
+  not exists (
+    select 1 from public.muscles where not is_active
+  ),
+  'authenticated users see no inactive catalog rows'
 );
 
 select throws_ok(

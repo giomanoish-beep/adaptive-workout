@@ -36,3 +36,7 @@ verify_jwt = false
 [functions.refresh-progression]
 entrypoint = "functions/refresh-progression/index.bundle.ts"
 verify_jwt = false
+
+[functions.generate-program]
+entrypoint = "functions/generate-program/index.bundle.ts"
+verify_jwt = false
