@@ -6,3 +6,8 @@ apps/web/test-results
 package-lock.json
 supabase/functions/generate-workout/index.bundle.ts
 supabase/functions/refresh-progression/index.bundle.ts
+.vercel/
+supabase/.temp/
+supabase/functions/**/*.bundle.ts
+test-results/
+playwright-report/

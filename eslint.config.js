@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/security-hardening.test.ts',
       'supabase/functions/**',
+      '.vercel/**',
     ],
   },
   eslint.configs.recommended,
