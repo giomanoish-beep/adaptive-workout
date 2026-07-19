@@ -5,7 +5,13 @@
  * sessions and no fitness or workout data is stored locally.
  */
 
-export const authStatuses = ['loading', 'authenticated', 'unauthenticated', 'error'] as const;
+export const authStatuses = [
+  'loading',
+  'authenticated',
+  'unauthenticated',
+  'error',
+  'awaitingOtp',
+] as const;
 export type AuthStatus = (typeof authStatuses)[number];
 
 export interface AuthUserSummary {
@@ -17,12 +23,15 @@ export interface AuthState {
   readonly status: AuthStatus;
   readonly user: AuthUserSummary | null;
   readonly errorMessage: string | null;
+  /** Email used for the OTP challenge; set only when status === 'awaitingOtp'. */
+  readonly otpEmail: string | null;
 }
 
 export const initialAuthState: AuthState = {
   status: 'loading',
   user: null,
   errorMessage: null,
+  otpEmail: null,
 };
 
 /** Loose Supabase session/user shape — only the fields the state machine reads. */
@@ -47,6 +56,7 @@ export function deriveAuthState(
       status: 'error',
       user: null,
       errorMessage: error.message ?? 'Authentication error.',
+      otpEmail: null,
     };
   }
   const user = session?.user;
@@ -58,9 +68,10 @@ export function deriveAuthState(
         email: readEmail(user),
       },
       errorMessage: null,
+      otpEmail: null,
     };
   }
-  return { status: 'unauthenticated', user: null, errorMessage: null };
+  return { status: 'unauthenticated', user: null, errorMessage: null, otpEmail: null };
 }
 
 function readEmail(user: { readonly email?: unknown }): string | null {

@@ -7,6 +7,7 @@ describe('initialAuthState', () => {
       status: 'loading',
       user: null,
       errorMessage: null,
+      otpEmail: null,
     });
   });
 });
@@ -59,7 +60,7 @@ describe('deriveAuthState', () => {
     expect(state.user?.email).toBeNull();
   });
 
-  it('derives the four documented statuses without extras', () => {
+  it('derives the documented statuses without extras', () => {
     const statuses = new Set([
       deriveAuthState(null, null).status,
       deriveAuthState({ user: { id: 'x' } }, null).status,

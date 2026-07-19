@@ -7,7 +7,7 @@
  * - load and map the exercise catalog
  * - construct the deterministic workout-engine input
  * - invoke the deterministic workout engine
- * - apply the prescription layer (rep/RIR/rest)
+ * - apply the prescription layer (rep/RIR/rest/load)
  * - map the engine result to a browser-safe review DTO
  * - emit controlled observability events
  *
@@ -24,4 +24,5 @@ export * from './result-mapping.js';
 export * from './replacement.js';
 export * from './engine-input.js';
 export * from './observability.js';
+export * from './load-estimator.js';
 export { packageName } from './package-name.js';

@@ -18,13 +18,15 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #0b1120;
 }
 
 main {
   width: min(100% - 2rem, var(--content-max));
   margin: 0 auto;
-  padding: 20vh 0 3rem;
+  padding: 10vh 0 3rem;
+  padding-top: min(10vh, 10dvh);
 }
 
 .eyebrow {
@@ -1432,6 +1434,120 @@ main > p:last-child {
 .sign-in__primary:focus-visible {
   outline: 2px solid var(--nav-accent-dim);
   outline-offset: 3px;
+}
+
+/* ---------- OTP verification (V1.4) ---------- */
+
+.verify-otp {
+  display: flex;
+  flex-direction: column;
+}
+
+.verify-otp__title {
+  margin: 0 0 0.4rem;
+  color: #f1f5f9;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.verify-otp__detail {
+  margin: 0 0 1.2rem;
+  color: #94a3b8;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.verify-otp__email {
+  color: #f1f5f9;
+  font-weight: 650;
+}
+
+.verify-otp__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.verify-otp__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.verify-otp__label {
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verify-otp__input {
+  width: 100%;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.7rem;
+  background: rgba(2, 6, 23, 0.6);
+  color: #f1f5f9;
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.verify-otp__input:focus {
+  outline: 2px solid var(--nav-accent-dim);
+  outline-offset: 1px;
+  border-color: var(--nav-accent-dim);
+}
+
+.verify-otp__input:disabled {
+  opacity: 0.55;
+}
+
+.verify-otp__error {
+  margin: 0;
+  color: #f87171;
+  font-size: 0.9rem;
+}
+
+.verify-otp__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.verify-otp__back,
+.verify-otp__resend {
+  flex: 1 1 0;
+  min-height: 2.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--nav-border);
+  border-radius: 0.7rem;
+  background: transparent;
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.verify-otp__back:disabled,
+.verify-otp__resend:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.verify-otp__back:focus-visible,
+.verify-otp__resend:focus-visible {
+  outline: 2px solid var(--nav-accent-dim);
+  outline-offset: 2px;
 }
 
 /* ---------- Sign-in success ---------- */

@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from 'react';
+import { useCallback, useReducer, useRef } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeEmail } from './email';
 
@@ -9,9 +9,9 @@ import { normalizeEmail } from './email';
  * unchanged, while this owns only the form's idle/submitting/success/error
  * action lifecycle.
  *
- * The browser uses the existing Supabase client (anonymous key only) and calls
- * `signInWithOtp` with a normalized email. No passwords, no OAuth, no server
- * secrets, and no local workout/fitness persistence (docs/ARCHITECTURE.md).
+ * V1.4: Changed from magic-link flow to numeric 6-digit OTP. The success stage
+ * now transitions to OTP entry instead of "check your email". Rate-limit
+ * handling and resend cooldown are enforced here.
  */
 
 export const emailSignInStages = ['idle', 'submitting', 'success', 'error'] as const;
@@ -22,28 +22,39 @@ export interface EmailSignInState {
   /** Normalized email shown on success; empty until known. */
   readonly email: string;
   readonly errorMessage: string | null;
+  /** Unix timestamp in ms when the resend cooldown expires; 0 when no cooldown. */
+  readonly cooldownUntil: number;
 }
 
 export const initialEmailSignInState: EmailSignInState = {
   stage: 'idle',
   email: '',
   errorMessage: null,
+  cooldownUntil: 0,
 };
+
+/** Minimum seconds between sign-in OTP requests (Supabase default is 60s). */
+const RESEND_COOLDOWN_SECONDS = 60;
 
 type SignInAction =
   | { readonly type: 'submit'; readonly email: string }
-  | { readonly type: 'success'; readonly email: string }
+  | { readonly type: 'success'; readonly email: string; readonly cooldownUntil: number }
   | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'reset' };
 
 function signInReducer(_state: EmailSignInState, action: SignInAction): EmailSignInState {
   switch (action.type) {
     case 'submit':
-      return { stage: 'submitting', email: action.email, errorMessage: null };
+      return { stage: 'submitting', email: action.email, errorMessage: null, cooldownUntil: 0 };
     case 'success':
-      return { stage: 'success', email: action.email, errorMessage: null };
+      return {
+        stage: 'success',
+        email: action.email,
+        errorMessage: null,
+        cooldownUntil: action.cooldownUntil,
+      };
     case 'error':
-      return { stage: 'error', email: '', errorMessage: action.message };
+      return { stage: 'error', email: '', errorMessage: action.message, cooldownUntil: 0 };
     case 'reset':
       return initialEmailSignInState;
   }
@@ -51,22 +62,38 @@ function signInReducer(_state: EmailSignInState, action: SignInAction): EmailSig
 
 export interface UseEmailSignInResult {
   readonly state: EmailSignInState;
-  /** Validates, normalizes, and calls Supabase. Returns false on invalid input. */
+  /** Validates, normalizes, and calls Supabase. Returns false on invalid input or rate-limit. */
   readonly signIn: (rawEmail: string) => Promise<boolean>;
   /** Returns to idle so the user can edit the email. */
   readonly reset: () => void;
 }
 
 /**
+ * Translates a Supabase error into a user-facing message. Handles rate-limit
+ * (HTTP 429) specially so the UI can show a countdown.
+ */
+function translateError(error: { readonly message?: string; readonly status?: number }): string {
+  if (error.status === 429) {
+    return 'Too many attempts. Please wait before requesting another code.';
+  }
+  return error.message ?? 'Unable to send verification code.';
+}
+
+/**
  * Hook wrapping the form's action lifecycle around the existing Supabase
  * client. `signIn` normalizes the email, short-circuits on invalid input, and
  * otherwise calls `client.auth.signInWithOtp({ email })`.
+ *
+ * V1.4: Uses an in-flight ref to prevent double-submits. On success the caller
+ * is expected to transition to the OTP verification screen.
  */
 export function useEmailSignIn(client: SupabaseClient): UseEmailSignInResult {
   const [state, dispatch] = useReducer(signInReducer, initialEmailSignInState);
+  const inFlightRef = useRef(false);
 
   const signIn = useCallback(
     async (rawEmail: string): Promise<boolean> => {
+      if (inFlightRef.current) return false;
       const result = normalizeEmail(rawEmail);
       if (!result.ok) {
         dispatch({
@@ -76,15 +103,29 @@ export function useEmailSignIn(client: SupabaseClient): UseEmailSignInResult {
         return false;
       }
 
+      inFlightRef.current = true;
       dispatch({ type: 'submit', email: result.normalized });
 
-      const { error } = await client.auth.signInWithOtp({ email: result.normalized });
-      if (error !== null) {
-        dispatch({ type: 'error', message: error.message ?? 'Unable to send sign-in link.' });
-        return false;
+      try {
+        const { error } = await client.auth.signInWithOtp({
+          email: result.normalized,
+          options: {
+            shouldCreateUser: true,
+          },
+        });
+
+        if (error !== null) {
+          const translated = translateError(error as unknown as { message?: string; status?: number });
+          dispatch({ type: 'error', message: translated });
+          return false;
+        }
+
+        const cooldownUntil = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;
+        dispatch({ type: 'success', email: result.normalized, cooldownUntil });
+        return true;
+      } finally {
+        inFlightRef.current = false;
       }
-      dispatch({ type: 'success', email: result.normalized });
-      return true;
     },
     [client],
   );
@@ -105,6 +146,9 @@ export async function requestEmailSignIn(
   client: SupabaseClient,
   email: string,
 ): Promise<{ readonly error: string | null }> {
-  const { error } = await client.auth.signInWithOtp({ email });
-  return { error: error === null ? null : (error.message ?? 'Unable to send sign-in link.') };
+  const { error } = await client.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true },
+  });
+  return { error: error === null ? null : (error.message ?? 'Unable to send verification code.') };
 }
