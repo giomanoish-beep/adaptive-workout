@@ -353,8 +353,28 @@ main > p:last-child {
   .program-setup__field {
     padding: 0.75rem;
   }
-  .program-edit {
+  .program-edit,
+  .program-adaptations {
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .program-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  .program-edit label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+  .program-edit input,
+  .program-edit select {
+    min-width: 0;
+    width: 100%;
+  }
+  .program-adaptations > button + .program-edit {
+    margin-top: 0.5rem;
   }
   .today-card__actions label,
   .program-session__actions label {

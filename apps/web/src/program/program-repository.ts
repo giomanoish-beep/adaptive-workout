@@ -192,6 +192,7 @@ export function createProgramRepository(client: SupabaseClient) {
       generated,
       setup: revision['setup_snapshot'] as ProgramSetupDraft,
       schedule: (schedules ?? [])
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         .filter((row) => generatedByKey.has(String(row['schedule_key'])))
         .map((row) => mapSchedule(row as Record<string, unknown>, generatedByKey)),
       adaptations: (adaptations ?? []).map((row) => mapAdaptation(row as Record<string, unknown>)),
@@ -255,8 +256,10 @@ export function createProgramRepository(client: SupabaseClient) {
     if (workoutsError || !workoutRows?.length)
       throw new ProgramRepositoryError('The program templates could not be revised.');
     const templateIds = new Map(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       workoutRows.map((row) => [String(row['template_key']), String(row['id'])]),
     );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const fallbackTemplateId = String(workoutRows[0]?.['id']);
     const existingByKey = new Map(current.schedule.map((item) => [item.scheduleKey, item]));
     const nextKeys = new Set(generated.schedule.map((item) => item.scheduleKey));

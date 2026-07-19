@@ -17,6 +17,7 @@ export default defineConfig({
       '@adaptive-workout/domain': packageSource('domain'),
       '@adaptive-workout/observability': packageSource('observability'),
       '@adaptive-workout/pain-safety': packageSource('pain-safety'),
+      '@adaptive-workout/program-engine': packageSource('program-engine'),
       '@adaptive-workout/progression-decision-persistence': packageSource(
         'progression-decision-persistence',
       ),
