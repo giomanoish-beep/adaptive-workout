@@ -90,6 +90,10 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: {
       VITE_E2E_AUTH: 'true',
+      // Placeholder URL required by the workout/program/progression gateways
+      // to construct Edge Function fetch URLs. Actual requests are intercepted
+      // by route-mocks at the CDP level; no real network call leaves the browser.
+      VITE_SUPABASE_URL: 'http://localhost:9999',
     },
     timeout: 30_000,
   },
