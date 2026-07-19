@@ -134,10 +134,10 @@ security invoker
 set search_path = ''
 as $$
   select
-    'exercise_family'::text,
-    exercise_families.slug,
-    exercise_families.name,
-    count(distinct exercises.id)::bigint
+    'exercise_family'::text as filter_type,
+    exercise_families.slug as slug,
+    exercise_families.name as name,
+    count(distinct exercises.id)::bigint as exercise_count
   from public.exercise_families
   join public.exercises on exercises.exercise_family_id = exercise_families.id
   where exercise_families.is_active
@@ -147,10 +147,10 @@ as $$
   union all
 
   select
-    'muscle'::text,
-    muscles.slug,
-    muscles.name,
-    count(distinct exercises.id)::bigint
+    'muscle'::text as filter_type,
+    muscles.slug as slug,
+    muscles.name as name,
+    count(distinct exercises.id)::bigint as exercise_count
   from public.muscles
   join public.exercise_muscles on exercise_muscles.muscle_id = muscles.id
   join public.exercises on exercises.id = exercise_muscles.exercise_id
@@ -162,10 +162,10 @@ as $$
   union all
 
   select
-    'equipment'::text,
-    equipment.slug,
-    equipment.name,
-    count(distinct exercises.id)::bigint
+    'equipment'::text as filter_type,
+    equipment.slug as slug,
+    equipment.name as name,
+    count(distinct exercises.id)::bigint as exercise_count
   from public.equipment
   join public.exercise_equipment on exercise_equipment.equipment_id = equipment.id
   join public.exercises on exercises.id = exercise_equipment.exercise_id
