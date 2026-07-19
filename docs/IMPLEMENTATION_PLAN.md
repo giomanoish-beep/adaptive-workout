@@ -60,3 +60,5 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1-007                 | Fix production workout equipment-context mapping             | DONE    | V1-005, DEPLOY-001                                           |
 | V1-008                 | Align production workout-session persistence contracts       | DONE    | V1-007, DATABASE-004                                         |
 | V1.1                   | UX, workout-only replacement, and immediate defects          | DONE    | V1-008                                                       |
+| V1.2                   | Multi-week program engine, program UI, and E2E tests         | DONE    | V1.1                                                        |
+| V1.3                   | Personal beta: deployable with real Supabase persistence     | DONE    | V1.2                                                        |

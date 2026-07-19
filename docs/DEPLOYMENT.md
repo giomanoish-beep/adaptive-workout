@@ -160,6 +160,7 @@ npx supabase migration up
 | `20260716120000_add_cloud_session_persistence.sql`             | Cloud session persistence                            |
 | `20260716200000_add_training_profile_fields.sql`               | Persist completed onboarding profiles                |
 | `20260716210000_add_progression_insufficient_data_support.sql` | Persist explicit insufficient-data progression state |
+| `20260719120000_add_multi_week_programs.sql`                     | Multi-week programs, adaptations, and revision history |
 
 ## Edge Function Deployment
 
@@ -169,6 +170,7 @@ npx supabase migration up
 | --------------------- | ----------------------------------------- | ------------ | ------------------------------------------------- |
 | `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation                  |
 | `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state |
+| `generate-program`    | `supabase/functions/generate-program/`    | JWT-verified | Deterministic multi-week program generation       |
 
 ### Deployment Prerequisite: Bundling
 
