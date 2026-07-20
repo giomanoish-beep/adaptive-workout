@@ -34,7 +34,7 @@ export const initialEmailSignInState: EmailSignInState = {
 };
 
 /** Minimum seconds between sign-in OTP requests (Supabase default is 60s). */
-const RESEND_COOLDOWN_SECONDS = 60;
+export const RESEND_COOLDOWN_SECONDS = 60;
 
 type SignInAction =
   | { readonly type: 'submit'; readonly email: string }
@@ -87,13 +87,13 @@ function translateError(error: { readonly message?: string; readonly status?: nu
  * V1.4: Uses an in-flight ref to prevent double-submits. On success the caller
  * is expected to transition to the OTP verification screen.
  */
-export function useEmailSignIn(client: SupabaseClient): UseEmailSignInResult {
+export function useEmailSignIn(client: SupabaseClient | undefined): UseEmailSignInResult {
   const [state, dispatch] = useReducer(signInReducer, initialEmailSignInState);
   const inFlightRef = useRef(false);
 
   const signIn = useCallback(
     async (rawEmail: string): Promise<boolean> => {
-      if (inFlightRef.current) return false;
+      if (inFlightRef.current || !client) return false;
       const result = normalizeEmail(rawEmail);
       if (!result.ok) {
         dispatch({
@@ -115,7 +115,10 @@ export function useEmailSignIn(client: SupabaseClient): UseEmailSignInResult {
         });
 
         if (error !== null) {
-          const translated = translateError(error as unknown as { message?: string; status?: number });
+          const translated = translateError({
+            message: error.message,
+            status: error.status,
+          });
           dispatch({ type: 'error', message: translated });
           return false;
         }

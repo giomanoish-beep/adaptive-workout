@@ -4169,6 +4169,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     const list = equipmentRequirementsByExercise.get(ee.exerciseId) ?? [];
     equipmentRequirementsByExercise.set(ee.exerciseId, [...list, ee]);
   }
+  const exerciseIdToEquipmentSlugs = /* @__PURE__ */ new Map();
   const candidates = [];
   for (const ex of activeExercises) {
     exerciseIdToName.set(ex.id, ex.name);
@@ -4184,6 +4185,8 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
       equipmentId: row.equipmentId,
       requirement: row.requirement
     }));
+    const equipmentSlugs = equipmentRows2.map((row) => row.equipmentSlug);
+    exerciseIdToEquipmentSlugs.set(ex.id, equipmentSlugs);
     candidates.push({
       exerciseId: ex.id,
       exerciseFamilyId: ex.exerciseFamilyId,
@@ -4200,7 +4203,8 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     exerciseIdToName,
     exerciseIdToVersion,
     equipmentIdToSlug,
-    familyIdToSlug
+    familyIdToSlug,
+    exerciseIdToEquipmentSlugs
   };
 }
 
@@ -4529,13 +4533,13 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
   const name = catalogResult.exerciseIdToName.get(fitted.exerciseId) ?? String(fitted.exerciseId);
   const familySlug = catalogResult.familyIdToSlug?.get(fitted.exerciseFamilyId) ?? "unknown";
   const equipmentCategory = inferEquipmentCategory(fitted.exerciseId, catalogResult);
+  const isUnilateral = inferIsUnilateral(name);
   const loadEstimate = estimateInitialLoad({
     familySlug,
     equipmentCategory,
-    isUnilateral: false,
-    // we don't have this info yet with current catalog — default to bilateral
+    isUnilateral,
     bodyWeightKg: void 0,
-    // profile body weight not yet stored
+    // profile body weight not yet stored in ServerTrainingProfile
     experienceLevel: normalizeExperienceLevel(profile?.experience ?? "intermediate")
   });
   const prescription = prescribeExercise(
@@ -4559,8 +4563,36 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
     loadEstimateLabel: prescription.loadEstimateLabel
   };
 }
-function inferEquipmentCategory(_exerciseId, _catalogResult) {
+function inferEquipmentCategory(exerciseId, catalogResult) {
+  const slugs = catalogResult.exerciseIdToEquipmentSlugs.get(exerciseId);
+  if (!slugs || slugs.length === 0) return "machine";
+  for (const slug of slugs) {
+    if (slug === "barbell") return "barbell";
+    if (slug === "dumbbell") return "dumbbell";
+    if (slug === "smith-machine") return "smith";
+    if (slug === "cable") return "cable";
+    if (slug === "bodyweight" || slug === "dip-station" || slug === "pull-up-station")
+      return "bodyweight";
+  }
+  for (const slug of slugs) {
+    if (slug === "selectorized-machine" || slug === "plate-loaded-machine" || slug === "leg-press" || slug === "hack-squat") {
+      return "machine";
+    }
+  }
   return "machine";
+}
+function inferIsUnilateral(exerciseName) {
+  const lower = exerciseName.toLowerCase();
+  const unilateralPatterns = [
+    "single-arm",
+    "single-leg",
+    "one-arm",
+    "one-leg",
+    "single-limb",
+    "unilateral",
+    "alternating"
+  ];
+  return unilateralPatterns.some((pattern) => lower.includes(pattern));
 }
 function normalizeExperienceLevel(exp) {
   const lower = exp.toLowerCase();

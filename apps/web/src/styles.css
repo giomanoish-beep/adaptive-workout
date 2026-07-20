@@ -25,8 +25,7 @@ body {
 main {
   width: min(100% - 2rem, var(--content-max));
   margin: 0 auto;
-  padding: 10vh 0 3rem;
-  padding-top: min(10vh, 10dvh);
+  padding: min(10vh, 10dvh) 0 3rem;
 }
 
 .eyebrow {
@@ -1338,6 +1337,8 @@ main > p:last-child {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
   padding: 0 1rem;
 }
 

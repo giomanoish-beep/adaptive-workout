@@ -40,29 +40,12 @@ export function VerifyOtp({
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const verifyOtpRef = useRef<(token: string) => Promise<void>>();
 
   // Auto-focus the input when the component mounts.
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  const handleChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      // Only accept digits; ignore non-numeric input.
-      const value = event.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH);
-      setDigits(value);
-      if (errorMessage) {
-        setErrorMessage(null);
-      }
-
-      // Auto-submit when all digits are entered.
-      if (value.length === OTP_LENGTH) {
-        verifyOtp(value);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- verifyOtp is in the closure but we reference it before it's defined in the same scope; handle by using a ref pattern
-    [errorMessage],
-  );
 
   const verifyOtp = useCallback(
     async (token: string) => {
@@ -92,6 +75,28 @@ export function VerifyOtp({
       }
     },
     [client, email, onVerified],
+  );
+
+  // Keep ref in sync so handleChange can call the latest verifyOtp.
+  useEffect(() => {
+    verifyOtpRef.current = verifyOtp;
+  }, [verifyOtp]);
+
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      // Only accept digits; ignore non-numeric input.
+      const value = event.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH);
+      setDigits(value);
+      if (errorMessage) {
+        setErrorMessage(null);
+      }
+
+      // Auto-submit when all digits are entered.
+      if (value.length === OTP_LENGTH) {
+        void verifyOtpRef.current?.(value);
+      }
+    },
+    [errorMessage],
   );
 
   const handleSubmit = useCallback(
@@ -148,9 +153,7 @@ export function VerifyOtp({
             onClick={onResend}
             disabled={!canResend}
           >
-            {cooldownSeconds > 0
-              ? `Resend in ${cooldownSeconds}s`
-              : 'Resend code'}
+            {cooldownSeconds > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend code'}
           </button>
         </div>
       </form>
@@ -158,7 +161,10 @@ export function VerifyOtp({
   );
 }
 
-function translateVerifyError(error: { readonly message?: string; readonly status?: number }): string {
+function translateVerifyError(error: {
+  readonly message?: string;
+  readonly status?: number;
+}): string {
   if (error.status === 429) {
     return 'Too many attempts. Please wait before trying again.';
   }

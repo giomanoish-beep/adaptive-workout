@@ -9,14 +9,10 @@
  * Rules are versioned and explicitly documented. No AI, no randomization.
  */
 
-import type { TrainingGoalRuleProfile } from '@adaptive-workout/workout-engine';
-
 export const LOAD_ESTIMATOR_VERSION = 'load-estimator/1' as const;
 
 export type LoadEstimateSource =
-  | 'first_session_coefficient'
-  | 'bodyweight_reference'
-  | 'calibration_required';
+  'first_session_coefficient' | 'bodyweight_reference' | 'calibration_required';
 
 export interface LoadEstimate {
   /** Suggested load in kg; 0 means bodyweight or unloaded. */

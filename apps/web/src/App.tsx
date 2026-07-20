@@ -30,7 +30,9 @@ function BrowserApp() {
         ? 'Supabase URL is not configured.'
         : 'Supabase anonymous key is not configured.';
     return (
-      <AuthShell state={{ status: 'error', user: null, errorMessage: message, otpEmail: null }}>{null}</AuthShell>
+      <AuthShell state={{ status: 'error', user: null, errorMessage: message, otpEmail: null }}>
+        {null}
+      </AuthShell>
     );
   }
 
