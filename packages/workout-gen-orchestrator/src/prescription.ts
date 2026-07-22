@@ -17,6 +17,11 @@ export interface ExercisePrescription {
   readonly repMax: number;
   readonly targetRir: number;
   readonly restSeconds: number;
+  /** Conservative initial load estimate for first-session workouts. */
+  readonly initialLoadKg: number;
+  /** Source of the load estimate (for UI labeling). */
+  readonly loadEstimateSource: string;
+  readonly loadEstimateLabel: string;
 }
 
 /**
@@ -29,6 +34,9 @@ export interface ExercisePrescription {
 export function prescribeExercise(
   goalProfile: TrainingGoalRuleProfile,
   exerciseFamilySlug: string,
+  initialLoadKg?: number,
+  loadEstimateSource?: string,
+  loadEstimateLabel?: string,
 ): ExercisePrescription {
   const isCompound = isCompoundFamily(exerciseFamilySlug);
   const guidance = goalProfile.repRangeGuidance;
@@ -39,6 +47,9 @@ export function prescribeExercise(
     repMax: guidance.maximum,
     targetRir: computeTargetRir(goalProfile.goal),
     restSeconds: computeRestSeconds(restTendency, isCompound),
+    initialLoadKg: initialLoadKg ?? 0,
+    loadEstimateSource: loadEstimateSource ?? 'calibration_required',
+    loadEstimateLabel: loadEstimateLabel ?? 'Calibration needed',
   };
 }
 

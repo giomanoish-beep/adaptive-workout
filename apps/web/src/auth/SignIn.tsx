@@ -5,16 +5,18 @@ import { useEmailSignIn } from './use-email-sign-in';
 /**
  * Email sign-in form rendered for unauthenticated users (WEB_APP-001).
  *
- * Uses Supabase Auth email OTP (magic link) via the existing browser client.
+ * V1.4: Uses numeric 6-digit email OTP instead of magic links. On successful
+ * sign-in, calls `onOtpRequested` to transition to the OTP verification screen.
  * No passwords and no OAuth. The form owns only its action lifecycle
  * (idle/submitting/success/error); session state stays in {@link useAuth}.
  */
 export interface SignInProps {
   readonly client: SupabaseClient;
+  readonly onOtpRequested?: (email: string) => void;
 }
 
-export function SignIn({ client }: SignInProps) {
-  const { state, signIn, reset } = useEmailSignIn(client);
+export function SignIn({ client, onOtpRequested }: SignInProps) {
+  const { state, signIn } = useEmailSignIn(client);
   const [emailInput, setEmailInput] = useState('');
 
   const submitting = state.stage === 'submitting';
@@ -22,22 +24,13 @@ export function SignIn({ client }: SignInProps) {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
-    void signIn(emailInput);
+    const email = emailInput;
+    void signIn(email).then((success) => {
+      if (success && onOtpRequested) {
+        onOtpRequested(email);
+      }
+    });
   };
-
-  if (state.stage === 'success') {
-    return (
-      <div className="sign-in__success" role="status">
-        <p className="sign-in__success-title">Check your email</p>
-        <p className="sign-in__success-detail">
-          We sent a sign-in link to <span className="sign-in__email">{state.email}</span>.
-        </p>
-        <button type="button" className="sign-in__secondary" onClick={reset}>
-          Use a different email
-        </button>
-      </div>
-    );
-  }
 
   const errorMessage = state.stage === 'error' ? state.errorMessage : null;
 
@@ -65,7 +58,7 @@ export function SignIn({ client }: SignInProps) {
         </p>
       )}
       <button type="submit" className="sign-in__primary" disabled={submitting}>
-        {submitting ? 'Sending…' : 'Continue with email'}
+        {submitting ? 'Sending code…' : 'Continue with email'}
       </button>
     </form>
   );

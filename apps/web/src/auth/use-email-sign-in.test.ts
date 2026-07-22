@@ -20,7 +20,10 @@ describe('requestEmailSignIn', () => {
     const { client, signInWithOtp } = mockClient(null);
     await requestEmailSignIn(client, 'athlete@example.com');
     expect(signInWithOtp).toHaveBeenCalledTimes(1);
-    expect(signInWithOtp).toHaveBeenCalledWith({ email: 'athlete@example.com' });
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: 'athlete@example.com',
+      options: { shouldCreateUser: true },
+    });
   });
 
   it('returns null error when Supabase succeeds', async () => {
@@ -44,7 +47,7 @@ describe('requestEmailSignIn', () => {
       },
     } as unknown as SupabaseClient;
     await expect(requestEmailSignIn(client, 'athlete@example.com')).resolves.toEqual({
-      error: 'Unable to send sign-in link.',
+      error: 'Unable to send verification code.',
     });
   });
 });

@@ -121,7 +121,7 @@ describe('App profile lifecycle (V1-001)', () => {
 
   it('keeps the unauthenticated path on the existing SignIn flow', () => {
     // App still hands the unauthenticated shell to AuthShell + SignIn.
-    expect(appSource).toMatch(/AuthShell state=\{auth\}/);
+    expect(appSource).toMatch(/AuthShell\s+state=\{auth\}/);
   });
 });
 

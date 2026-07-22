@@ -14,7 +14,7 @@ import emailSource from './email.ts?raw';
 describe('AuthShell sign-in wiring (WEB_APP-001 fix)', () => {
   it('renders the SignIn form in the unauthenticated state', () => {
     expect(authShellSource).toMatch(/status === 'unauthenticated'/);
-    expect(authShellSource).toMatch(/<SignIn client=\{client\} \/>/);
+    expect(authShellSource).toMatch(/<SignIn client=\{client\}/);
   });
 
   it('accepts an optional Supabase client prop', () => {
@@ -49,7 +49,8 @@ describe('SignIn form contract', () => {
 
 describe('sign-in action wiring', () => {
   it('calls Supabase email OTP with the normalized email', () => {
-    expect(useEmailSignInSource).toMatch(/signInWithOtp\(\{ email: result\.normalized \}\)/);
+    expect(useEmailSignInSource).toMatch(/signInWithOtp\(\{/);
+    expect(useEmailSignInSource).toMatch(/email: result\.normalized/);
   });
 
   it('imports only the client type, never server-only session internals', () => {

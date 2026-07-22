@@ -27,6 +27,9 @@ export interface CatalogMappingResult {
   readonly exerciseIdToName: ReadonlyMap<string, string>;
   readonly exerciseIdToVersion: ReadonlyMap<string, number>;
   readonly equipmentIdToSlug: ReadonlyMap<string, string>;
+  readonly familyIdToSlug: ReadonlyMap<string, string>;
+  /** Maps exercise ID to the list of equipment slugs required/available for that exercise. */
+  readonly exerciseIdToEquipmentSlugs: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -52,6 +55,7 @@ export function mapCatalogToEngineCandidates(
   const exerciseIdToName = new Map<string, string>();
   const exerciseIdToVersion = new Map<string, number>();
   const equipmentIdToSlug = new Map<string, string>();
+  const familyIdToSlug = new Map<string, string>();
 
   for (const m of muscles) {
     muscleIdToSlug.set(m.id, m.slug);
@@ -74,6 +78,8 @@ export function mapCatalogToEngineCandidates(
     equipmentRequirementsByExercise.set(ee.exerciseId, [...list, ee]);
   }
 
+  const exerciseIdToEquipmentSlugs = new Map<string, readonly string[]>();
+
   const candidates: WorkoutExerciseCandidate[] = [];
 
   for (const ex of activeExercises) {
@@ -94,6 +100,10 @@ export function mapCatalogToEngineCandidates(
       requirement: row.requirement,
     }));
 
+    // Collect equipment slugs for this exercise (for load estimation)
+    const equipmentSlugs = equipmentRows.map((row) => row.equipmentSlug);
+    exerciseIdToEquipmentSlugs.set(ex.id, equipmentSlugs);
+
     candidates.push({
       exerciseId: ex.id as ExerciseId,
       exerciseFamilyId: ex.exerciseFamilyId as ExerciseFamilyId,
@@ -101,6 +111,8 @@ export function mapCatalogToEngineCandidates(
       muscleContributions,
       equipment,
     });
+
+    familyIdToSlug.set(ex.exerciseFamilyId, ex.exerciseFamilySlug);
   }
 
   return {
@@ -110,5 +122,7 @@ export function mapCatalogToEngineCandidates(
     exerciseIdToName,
     exerciseIdToVersion,
     equipmentIdToSlug,
+    familyIdToSlug,
+    exerciseIdToEquipmentSlugs,
   };
 }

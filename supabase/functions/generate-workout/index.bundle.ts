@@ -4151,6 +4151,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
   const exerciseIdToName = /* @__PURE__ */ new Map();
   const exerciseIdToVersion = /* @__PURE__ */ new Map();
   const equipmentIdToSlug = /* @__PURE__ */ new Map();
+  const familyIdToSlug = /* @__PURE__ */ new Map();
   for (const m of muscles) {
     muscleIdToSlug.set(m.id, m.slug);
     muscleIdToName.set(m.id, m.name);
@@ -4168,6 +4169,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     const list = equipmentRequirementsByExercise.get(ee.exerciseId) ?? [];
     equipmentRequirementsByExercise.set(ee.exerciseId, [...list, ee]);
   }
+  const exerciseIdToEquipmentSlugs = /* @__PURE__ */ new Map();
   const candidates = [];
   for (const ex of activeExercises) {
     exerciseIdToName.set(ex.id, ex.name);
@@ -4183,6 +4185,8 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
       equipmentId: row.equipmentId,
       requirement: row.requirement
     }));
+    const equipmentSlugs = equipmentRows2.map((row) => row.equipmentSlug);
+    exerciseIdToEquipmentSlugs.set(ex.id, equipmentSlugs);
     candidates.push({
       exerciseId: ex.id,
       exerciseFamilyId: ex.exerciseFamilyId,
@@ -4190,6 +4194,7 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
       muscleContributions,
       equipment
     });
+    familyIdToSlug.set(ex.exerciseFamilyId, ex.exerciseFamilySlug);
   }
   return {
     candidates,
@@ -4197,7 +4202,9 @@ function mapCatalogToEngineCandidates(exercises, muscles, exerciseMuscles, exerc
     muscleIdToName,
     exerciseIdToName,
     exerciseIdToVersion,
-    equipmentIdToSlug
+    equipmentIdToSlug,
+    familyIdToSlug,
+    exerciseIdToEquipmentSlugs
   };
 }
 
@@ -4313,7 +4320,7 @@ function findEquipmentIdBySlug(catalogResult, slug) {
 
 // packages/workout-gen-orchestrator/src/prescription.ts
 var PRESCRIPTION_RULES_VERSION = "prescription/1";
-function prescribeExercise(goalProfile, exerciseFamilySlug) {
+function prescribeExercise(goalProfile, exerciseFamilySlug, initialLoadKg, loadEstimateSource, loadEstimateLabel) {
   const isCompound = isCompoundFamily(exerciseFamilySlug);
   const guidance = goalProfile.repRangeGuidance;
   const restTendency = goalProfile.restTendency;
@@ -4321,7 +4328,10 @@ function prescribeExercise(goalProfile, exerciseFamilySlug) {
     repMin: guidance.minimum,
     repMax: guidance.maximum,
     targetRir: computeTargetRir(goalProfile.goal),
-    restSeconds: computeRestSeconds(restTendency, isCompound)
+    restSeconds: computeRestSeconds(restTendency, isCompound),
+    initialLoadKg: initialLoadKg ?? 0,
+    loadEstimateSource: loadEstimateSource ?? "calibration_required",
+    loadEstimateLabel: loadEstimateLabel ?? "Calibration needed"
   };
 }
 function computeTargetRir(goal) {
@@ -4365,10 +4375,137 @@ function isCompoundFamily(familySlug) {
   return compoundFamilies.has(familySlug);
 }
 
+// packages/workout-gen-orchestrator/src/load-estimator.ts
+var FAMILY_BARBELL_BW_COEFFICIENTS = {
+  "knee-dominant-squat": 0.8,
+  "hip-hinge": 0.9,
+  "horizontal-press": 0.6,
+  "incline-press": 0.45,
+  "vertical-press": 0.4,
+  "horizontal-pull": 0.55,
+  "vertical-pull": 0.5,
+  "unilateral-knee-dominant": 0.35,
+  "hip-extension": 0.6,
+  "arm-curl": 0.12,
+  "triceps-extension": 0.1,
+  "shoulder-raise": 0.08,
+  "calf-raise": 0.3
+};
+var FAMILY_DUMBBELL_BASES = {
+  "horizontal-press": 10,
+  "incline-press": 8,
+  "vertical-press": 6,
+  "horizontal-pull": 8,
+  "vertical-pull": 6,
+  "arm-curl": 6,
+  "triceps-extension": 5,
+  "shoulder-raise": 5,
+  "shoulder-press": 6,
+  "lateral-raise": 4,
+  "rear-delt-fly": 3,
+  "calf-raise": 8,
+  "unilateral-knee-dominant": 8,
+  "hip-extension": 8
+};
+var FAMILY_MACHINE_BASES = {
+  "chest-press-machine": 25,
+  "shoulder-press-machine": 15,
+  "lat-pulldown": 25,
+  "seated-row": 25,
+  "leg-press": 60,
+  "hack-squat": 20,
+  "leg-extension": 20,
+  "leg-curl": 20,
+  "hip-adduction": 20,
+  "hip-abduction": 20,
+  "glute-drive": 30,
+  "back-extension": 10,
+  "abdominal-crunch": 15,
+  "pec-fly": 15,
+  "rear-delt-machine": 10,
+  "biceps-curl-machine": 10,
+  "triceps-extension-machine": 10,
+  "calf-raise-machine": 25,
+  "rotary-torso": 15
+};
+var EXPERIENCE_MULTIPLIERS = {
+  beginner: 0.4,
+  intermediate: 0.6,
+  advanced: 0.8
+};
+var DEFAULT_LOAD_INCREMENT = 2.5;
+var MIN_BARBELL_LOAD = 20;
+var MIN_DUMBBELL_LOAD = 2;
+var MIN_MACHINE_LOAD = 5;
+function estimateInitialLoad(input) {
+  const experienceMultiplier = EXPERIENCE_MULTIPLIERS[input.experienceLevel] ?? EXPERIENCE_MULTIPLIERS.beginner;
+  if (input.equipmentCategory === "bodyweight") {
+    return {
+      loadKg: 0,
+      source: "bodyweight_reference",
+      label: "Bodyweight"
+    };
+  }
+  if (input.equipmentCategory === "machine" || input.equipmentCategory === "cable") {
+    const base = FAMILY_MACHINE_BASES[input.familySlug] ?? 15;
+    const raw = base * experienceMultiplier;
+    const rounded = roundToIncrement(raw, 5);
+    const clamped = Math.max(rounded, MIN_MACHINE_LOAD);
+    return {
+      loadKg: clamped,
+      source: "calibration_required",
+      label: "Estimated \u2014 machine weight not standardized"
+    };
+  }
+  if (input.equipmentCategory === "smith") {
+    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
+    const bodyWeight = input.bodyWeightKg ?? 75;
+    const raw = bwCoeff * bodyWeight * experienceMultiplier * 0.85;
+    const perSide = input.isUnilateral ? raw * 0.5 : raw;
+    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
+    return {
+      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
+      source: "first_session_coefficient",
+      label: "Estimated \u2014 Smith machine assisted"
+    };
+  }
+  if (input.equipmentCategory === "barbell") {
+    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
+    const bodyWeight = input.bodyWeightKg ?? 75;
+    const raw = bwCoeff * bodyWeight * experienceMultiplier;
+    const perSide = input.isUnilateral ? raw * 0.5 : raw;
+    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
+    return {
+      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
+      source: "first_session_coefficient",
+      label: "Estimated \u2014 confirm after first set"
+    };
+  }
+  if (input.equipmentCategory === "dumbbell") {
+    const base = FAMILY_DUMBBELL_BASES[input.familySlug] ?? 5;
+    const raw = base * experienceMultiplier;
+    const rounded = roundToIncrement(raw, 2);
+    const clamped = Math.max(rounded, MIN_DUMBBELL_LOAD);
+    return {
+      loadKg: clamped,
+      source: "first_session_coefficient",
+      label: "Estimated \u2014 confirm after first set"
+    };
+  }
+  return {
+    loadKg: 0,
+    source: "calibration_required",
+    label: "Calibration needed"
+  };
+}
+function roundToIncrement(value, increment) {
+  return Math.round(value / increment) * increment;
+}
+
 // packages/workout-gen-orchestrator/src/result-mapping.ts
-function mapEngineResultToReview(engineResult, catalogResult, goalProfile, generationId) {
+function mapEngineResultToReview(engineResult, catalogResult, goalProfile, generationId, profile) {
   const exercises = engineResult.exercises.map(
-    (fitted, index) => mapExercise(fitted, index, catalogResult, goalProfile)
+    (fitted, index) => mapExercise(fitted, index, catalogResult, goalProfile, profile)
   );
   const muscleVolume = engineResult.muscleVolumeSummary.map((summary) => {
     const name = catalogResult.muscleIdToName.get(summary.muscleId) ?? String(summary.muscleId);
@@ -4392,11 +4529,26 @@ function mapEngineResultToReview(engineResult, catalogResult, goalProfile, gener
     traceSummary: null
   };
 }
-function mapExercise(fitted, index, catalogResult, goalProfile) {
+function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
   const name = catalogResult.exerciseIdToName.get(fitted.exerciseId) ?? String(fitted.exerciseId);
-  const candidate = findCandidateInfo(catalogResult, fitted.exerciseId);
-  const familySlug = candidate?.familySlug ?? "unknown";
-  const prescription = prescribeExercise(goalProfile, familySlug);
+  const familySlug = catalogResult.familyIdToSlug?.get(fitted.exerciseFamilyId) ?? "unknown";
+  const equipmentCategory = inferEquipmentCategory(fitted.exerciseId, catalogResult);
+  const isUnilateral = inferIsUnilateral(name);
+  const loadEstimate = estimateInitialLoad({
+    familySlug,
+    equipmentCategory,
+    isUnilateral,
+    bodyWeightKg: void 0,
+    // profile body weight not yet stored in ServerTrainingProfile
+    experienceLevel: normalizeExperienceLevel(profile?.experience ?? "intermediate")
+  });
+  const prescription = prescribeExercise(
+    goalProfile,
+    familySlug,
+    loadEstimate.loadKg,
+    loadEstimate.source,
+    loadEstimate.label
+  );
   return {
     position: index + 1,
     exerciseId: fitted.exerciseId,
@@ -4405,13 +4557,48 @@ function mapExercise(fitted, index, catalogResult, goalProfile) {
     sets: fitted.plannedWorkingSets,
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },
     rir: prescription.targetRir,
-    restSeconds: prescription.restSeconds
+    restSeconds: prescription.restSeconds,
+    initialLoadKg: prescription.initialLoadKg,
+    loadEstimateSource: prescription.loadEstimateSource,
+    loadEstimateLabel: prescription.loadEstimateLabel
   };
 }
-function findCandidateInfo(_catalogResult, _exerciseId) {
-  void _catalogResult;
-  void _exerciseId;
-  return void 0;
+function inferEquipmentCategory(exerciseId, catalogResult) {
+  const slugs = catalogResult.exerciseIdToEquipmentSlugs.get(exerciseId);
+  if (!slugs || slugs.length === 0) return "machine";
+  for (const slug of slugs) {
+    if (slug === "barbell") return "barbell";
+    if (slug === "dumbbell") return "dumbbell";
+    if (slug === "smith-machine") return "smith";
+    if (slug === "cable") return "cable";
+    if (slug === "bodyweight" || slug === "dip-station" || slug === "pull-up-station")
+      return "bodyweight";
+  }
+  for (const slug of slugs) {
+    if (slug === "selectorized-machine" || slug === "plate-loaded-machine" || slug === "leg-press" || slug === "hack-squat") {
+      return "machine";
+    }
+  }
+  return "machine";
+}
+function inferIsUnilateral(exerciseName) {
+  const lower = exerciseName.toLowerCase();
+  const unilateralPatterns = [
+    "single-arm",
+    "single-leg",
+    "one-arm",
+    "one-leg",
+    "single-limb",
+    "unilateral",
+    "alternating"
+  ];
+  return unilateralPatterns.some((pattern) => lower.includes(pattern));
+}
+function normalizeExperienceLevel(exp) {
+  const lower = exp.toLowerCase();
+  if (lower === "beginner" || lower === "novice") return "beginner";
+  if (lower === "advanced" || lower === "expert") return "advanced";
+  return "intermediate";
 }
 function deriveTitle(engineResult, catalogResult) {
   const muscleNames = engineResult.muscleVolumeSummary.map((s) => catalogResult.muscleIdToName.get(s.muscleId)).filter((n) => n !== void 0);
@@ -4628,7 +4815,7 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
       defaultWorkingSetsPerExercise: 3,
       maximumWorkingSetsPerExercise: 5,
       maximumWorkingSetsPerMuscle: 12,
-      maximumSelectedExercises: 8,
+      maximumSelectedExercises: 10,
       minimumDistinctExerciseFamilies: 2,
       primarySetContribution: 1,
       secondarySetContribution: 0.6
@@ -4637,13 +4824,13 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
       contractVersion: ORCHESTRATOR_CONTRACT_VERSION,
       ruleSetVersion: ORCHESTRATOR_RULE_SET_VERSION,
       defaultSetExecutionSeconds: 45,
-      defaultRestSecondsBetweenSets: 120,
-      defaultExerciseSetupSeconds: 60,
-      transitionSecondsBetweenExercises: 30,
+      defaultRestSecondsBetweenSets: 90,
+      defaultExerciseSetupSeconds: 45,
+      transitionSecondsBetweenExercises: 45,
       minimumWorkingSetsPerExercise: 2,
-      targetDurationUtilization: 0.45,
-      minimumExpansionBudgetSeconds: 120,
-      preferredVolumeExpansionMultiplier: 1.4
+      targetDurationUtilization: 0.85,
+      minimumExpansionBudgetSeconds: 180,
+      preferredVolumeExpansionMultiplier: 1.6
     },
     goalProfile
   );
@@ -4671,7 +4858,7 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     prescriptionVersion: PRESCRIPTION_RULES_VERSION,
     latencyMs
   });
-  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId);
+  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId, profile);
 }
 function mapEngineFailureToErrorCode(code) {
   const noFeasibleCodes = /* @__PURE__ */ new Set([

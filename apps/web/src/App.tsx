@@ -30,7 +30,9 @@ function BrowserApp() {
         ? 'Supabase URL is not configured.'
         : 'Supabase anonymous key is not configured.';
     return (
-      <AuthShell state={{ status: 'error', user: null, errorMessage: message }}>{null}</AuthShell>
+      <AuthShell state={{ status: 'error', user: null, errorMessage: message, otpEmail: null }}>
+        {null}
+      </AuthShell>
     );
   }
 
@@ -137,10 +139,23 @@ function AuthedApp({ client }: { readonly client: SupabaseClient }) {
     }
   }, [auth.user?.id, retryLoad]);
 
+  // OTP flow: after verifyOtp succeeds, onAuthStateChange fires and sets
+  // status='authenticated'. The OTP screen then sees onVerified and we
+  // don't need to do anything — the session is already restored.
+  const handleOtpVerified = useCallback(() => {
+    // The session is already restored by onAuthStateChange — no-op at this level.
+  }, []);
+
   // Show loading inside AuthShell when profile is loading.
   // AuthShell already handles the auth loading/error/sign-in states.
   return (
-    <AuthShell state={auth} client={client}>
+    <AuthShell
+      state={auth}
+      client={client}
+      onOtpRequested={auth.setAwaitingOtp}
+      onOtpVerified={handleOtpVerified}
+      onOtpBack={auth.clearAwaitingOtp}
+    >
       <ProfileRenderer
         client={client}
         profileState={profileState}

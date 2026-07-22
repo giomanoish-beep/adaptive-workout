@@ -146,21 +146,21 @@ npx supabase migration up
 
 ### Migration Inventory
 
-| Migration File                                                 | Purpose                                              |
-| -------------------------------------------------------------- | ---------------------------------------------------- |
-| `20260714105900_database_baseline.sql`                         | Core schema                                          |
-| `20260714110435_create_profiles_and_exercise_taxonomy.sql`     | Profiles + exercise catalog                          |
-| `20260714111319_create_programs_and_workout_templates.sql`     | Programs                                             |
-| `20260714112146_create_workout_history.sql`                    | Sessions/sets                                        |
-| `20260714112815_create_performance_and_muscle_state.sql`       | Performance state                                    |
-| `20260714113406_create_pain_preferences_and_audits.sql`        | Pain, preferences, audits                            |
-| `20260714114141_add_rls_policies_and_policy_tests.sql`         | RLS on all 22 tables                                 |
-| `20260714121000_seed_initial_exercise_catalog.sql`             | Seed exercise data                                   |
-| `20260714121550_add_exercise_catalog_search_and_filters.sql`   | Catalog indexes                                      |
-| `20260716120000_add_cloud_session_persistence.sql`             | Cloud session persistence                            |
-| `20260716200000_add_training_profile_fields.sql`               | Persist completed onboarding profiles                |
-| `20260716210000_add_progression_insufficient_data_support.sql` | Persist explicit insufficient-data progression state |
-| `20260719120000_add_multi_week_programs.sql`                     | Multi-week programs, adaptations, and revision history |
+| Migration File                                                 | Purpose                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------ |
+| `20260714105900_database_baseline.sql`                         | Core schema                                            |
+| `20260714110435_create_profiles_and_exercise_taxonomy.sql`     | Profiles + exercise catalog                            |
+| `20260714111319_create_programs_and_workout_templates.sql`     | Programs                                               |
+| `20260714112146_create_workout_history.sql`                    | Sessions/sets                                          |
+| `20260714112815_create_performance_and_muscle_state.sql`       | Performance state                                      |
+| `20260714113406_create_pain_preferences_and_audits.sql`        | Pain, preferences, audits                              |
+| `20260714114141_add_rls_policies_and_policy_tests.sql`         | RLS on all 22 tables                                   |
+| `20260714121000_seed_initial_exercise_catalog.sql`             | Seed exercise data                                     |
+| `20260714121550_add_exercise_catalog_search_and_filters.sql`   | Catalog indexes                                        |
+| `20260716120000_add_cloud_session_persistence.sql`             | Cloud session persistence                              |
+| `20260716200000_add_training_profile_fields.sql`               | Persist completed onboarding profiles                  |
+| `20260716210000_add_progression_insufficient_data_support.sql` | Persist explicit insufficient-data progression state   |
+| `20260719120000_add_multi_week_programs.sql`                   | Multi-week programs, adaptations, and revision history |
 
 ## Edge Function Deployment
 

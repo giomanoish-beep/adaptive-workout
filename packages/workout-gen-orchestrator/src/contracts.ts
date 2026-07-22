@@ -81,6 +81,12 @@ export interface WorkoutReviewExercise {
   readonly rir: number;
   /** Planned rest in seconds, or null if not prescribed. */
   readonly restSeconds: number | null;
+  /** Conservative initial load estimate in kg (V1.4). 0 = bodyweight/unloaded. */
+  readonly initialLoadKg: number;
+  /** Source of the load estimate. */
+  readonly loadEstimateSource: string;
+  /** Human-readable label for the load estimate. */
+  readonly loadEstimateLabel: string;
 }
 
 export interface WorkoutReviewMuscleVolume {

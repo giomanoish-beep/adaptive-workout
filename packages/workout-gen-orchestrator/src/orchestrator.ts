@@ -202,7 +202,7 @@ export async function generateWorkout(
       defaultWorkingSetsPerExercise: 3,
       maximumWorkingSetsPerExercise: 5,
       maximumWorkingSetsPerMuscle: 12,
-      maximumSelectedExercises: 8,
+      maximumSelectedExercises: 10,
       minimumDistinctExerciseFamilies: 2,
       primarySetContribution: 1.0,
       secondarySetContribution: 0.6,
@@ -211,13 +211,13 @@ export async function generateWorkout(
       contractVersion: ORCHESTRATOR_CONTRACT_VERSION,
       ruleSetVersion: ORCHESTRATOR_RULE_SET_VERSION,
       defaultSetExecutionSeconds: 45,
-      defaultRestSecondsBetweenSets: 120,
-      defaultExerciseSetupSeconds: 60,
-      transitionSecondsBetweenExercises: 30,
+      defaultRestSecondsBetweenSets: 90,
+      defaultExerciseSetupSeconds: 45,
+      transitionSecondsBetweenExercises: 45,
       minimumWorkingSetsPerExercise: 2,
-      targetDurationUtilization: 0.45,
-      minimumExpansionBudgetSeconds: 120,
-      preferredVolumeExpansionMultiplier: 1.4,
+      targetDurationUtilization: 0.85,
+      minimumExpansionBudgetSeconds: 180,
+      preferredVolumeExpansionMultiplier: 1.6,
     },
     goalProfile,
   );
@@ -252,7 +252,7 @@ export async function generateWorkout(
     latencyMs,
   });
 
-  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId);
+  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId, profile);
 }
 
 function mapEngineFailureToErrorCode(code: string): 'NO_FEASIBLE_WORKOUT' | 'GENERATION_FAILED' {
