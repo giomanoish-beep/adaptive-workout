@@ -1,0 +1,56 @@
+begin;
+
+create extension if not exists pgtap with schema extensions;
+
+select plan(11);
+
+-- Column existence
+select has_column('public', 'profiles', 'body_weight_kg', 'profiles has body_weight_kg column');
+select has_column('public', 'workout_session_exercises', 'planned_load_kind', 'workout_session_exercises has planned_load_kind');
+select has_column('public', 'workout_session_exercises', 'planned_load_kg', 'workout_session_exercises has planned_load_kg');
+select has_column('public', 'workout_session_exercises', 'planned_load_increment', 'workout_session_exercises has planned_load_increment');
+
+-- Constraint existence
+select has_check('public', 'profiles', 'profiles has check constraints');
+select col_has_check('public', 'workout_session_exercises', 'planned_load_kind',
+  'workout_session_exercises has planned_load_kind check');
+
+-- Body weight bounds: valid value accepted
+select lives_ok(
+  $$ insert into public.profiles (id, body_weight_kg) values ('11111111-1111-1111-1111-111111111111', 75.0) on conflict do nothing $$,
+  'body_weight_kg of 75.0 is accepted'
+);
+
+-- Body weight bounds: implausible low rejected
+select throws_ok(
+  $$ insert into public.profiles (id, body_weight_kg) values ('22222222-2222-2222-2222-222222222222', 10.0) on conflict do nothing $$,
+  '23514',
+  'body_weight_kg below 30 is rejected'
+);
+
+-- Load kind: invalid kind rejected
+select throws_ok(
+  $$ insert into public.workout_session_exercises (workout_session_id, position, status, planned_exercise_name, planned_sets, planned_reps_min, planned_reps_max, planned_load_kind, planned_load_kg)
+    values ('00000000-0000-0000-0000-000000000000', 1, 'planned', 'test', 3, 8, 10, 'invalid_kind', 50.0) $$,
+  '23514',
+  'invalid planned_load_kind is rejected'
+);
+
+-- Load kind/kg consistency: external_numeric without numeric load rejected
+select throws_ok(
+  $$ insert into public.workout_session_exercises (workout_session_id, position, status, planned_exercise_name, planned_sets, planned_reps_min, planned_reps_max, planned_load_kind, planned_load_kg)
+    values ('00000000-0000-0000-0000-000000000000', 2, 'planned', 'test', 3, 8, 10, 'external_numeric', null) $$,
+  '23514',
+  'external_numeric without planned_load_kg is rejected'
+);
+
+-- Load kind/kg consistency: bodyweight with numeric load rejected
+select throws_ok(
+  $$ insert into public.workout_session_exercises (workout_session_id, position, status, planned_exercise_name, planned_sets, planned_reps_min, planned_reps_max, planned_load_kind, planned_load_kg)
+    values ('00000000-0000-0000-0000-000000000000', 3, 'planned', 'test', 3, 8, 10, 'bodyweight', 50.0) $$,
+  '23514',
+  'bodyweight with planned_load_kg is rejected'
+);
+
+select finish();
+rollback;
