@@ -42,6 +42,7 @@ export interface ReplaceWorkoutExerciseSuccess {
     readonly exerciseId: string;
     readonly exerciseVersion: number;
     readonly name: string;
+    readonly loadPrescription: LoadPrescription;
   };
 }
 
@@ -64,6 +65,26 @@ export type ReplaceWorkoutExerciseResponse =
 /*  Server → Browser response (review DTO)                             */
 /* ------------------------------------------------------------------ */
 
+export type LoadPrescriptionKind =
+  'external_numeric' | 'bodyweight' | 'unloaded_bar' | 'calibration_required';
+
+/**
+ * Browser-safe load prescription for a single exercise.
+ *
+ * Distinguishes external numeric loads, bodyweight exercises, unloaded bars,
+ * and calibration-required states explicitly — never uses an ambiguous 0.
+ */
+export interface LoadPrescription {
+  readonly kind: LoadPrescriptionKind;
+  /** Suggested external load in kg when kind is 'external_numeric'; null otherwise. */
+  readonly suggestedLoadKg: number | null;
+  readonly unit: 'kg';
+  /** Human-readable label for the UI (e.g. "Estimated — confirm after first set"). */
+  readonly label: string;
+  /** Realistic adjustment increment in kg (e.g. 2.5 for barbells, 2 for dumbbells). */
+  readonly incrementKg: number;
+}
+
 export interface WorkoutReviewRepRange {
   readonly minimum: number;
   readonly maximum: number;
@@ -81,12 +102,8 @@ export interface WorkoutReviewExercise {
   readonly rir: number;
   /** Planned rest in seconds, or null if not prescribed. */
   readonly restSeconds: number | null;
-  /** Conservative initial load estimate in kg (V1.4). 0 = bodyweight/unloaded. */
-  readonly initialLoadKg: number;
-  /** Source of the load estimate. */
-  readonly loadEstimateSource: string;
-  /** Human-readable label for the load estimate. */
-  readonly loadEstimateLabel: string;
+  /** Complete load prescription (never ambiguous). */
+  readonly loadPrescription: LoadPrescription;
 }
 
 export interface WorkoutReviewMuscleVolume {
@@ -151,6 +168,8 @@ export interface ServerTrainingProfile {
   readonly environment: string;
   readonly programPreference: string;
   readonly hasCurrentDiscomfort: boolean;
+  /** User body weight in kg. May be null when not yet provided. */
+  readonly bodyWeightKg: number | null;
 }
 
 /* ------------------------------------------------------------------ */

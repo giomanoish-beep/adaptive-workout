@@ -3318,6 +3318,10 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
   const goalMultipliers = resolveGoalMultipliers(goalProfile);
   const effectiveDurationRuleSet = {
     ...durationRuleSet,
+    defaultRestSecondsBetweenSets: resolveGoalRestSeconds(
+      durationRuleSet.defaultRestSecondsBetweenSets,
+      goalProfile?.restTendency
+    ),
     targetDurationUtilization: clamp(
       durationRuleSet.targetDurationUtilization * goalMultipliers.expansionFactor,
       0,
@@ -3363,7 +3367,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     durationExerciseInputs(exercises),
     candidates,
     input,
-    durationRuleSet
+    effectiveDurationRuleSet
   );
   while (estimate.totalSeconds > maximumDurationSeconds) {
     const option = chooseReduction(
@@ -3372,7 +3376,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       candidates,
       input,
       allocationRuleSet,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
     if (option === void 0) {
       return durationFailure("DURATION_CONSTRAINT_IMPOSSIBLE", input, durationRuleSet, {
@@ -3395,7 +3399,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       durationExerciseInputs(exercises),
       candidates,
       input,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
   }
   const expanded = expandToUseDurationBudget(
@@ -3422,7 +3426,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     const restSecondsBetweenSets = exerciseRestSeconds(
       exercise2.selected.exerciseId,
       input,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
     return {
       ...exercise2.selected,
@@ -3432,7 +3436,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
         exercise2.workingSets,
         candidate,
         restSecondsBetweenSets,
-        durationRuleSet
+        effectiveDurationRuleSet
       ),
       restSecondsBetweenSets
     };
@@ -3447,9 +3451,21 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     exercises: fittedExercises,
     muscleVolumeSummary,
     estimatedDuration: estimate,
+    durationExpansionStopReason: expanded.stopReason,
     decisions,
     allocation
   };
+}
+function resolveGoalRestSeconds(defaultRestSeconds, restTendency) {
+  switch (restTendency) {
+    case "longer":
+      return defaultRestSeconds * 2;
+    case "shorter":
+      return Math.round(defaultRestSeconds * (2 / 3));
+    case "moderate":
+    case void 0:
+      return defaultRestSeconds;
+  }
 }
 function expandToUseDurationBudget(initialExercises, allocation, candidates, input, allocationRuleSet, durationRuleSet, maximumDurationSeconds, diversityFactor) {
   let exercises = cloneExercises(initialExercises);
@@ -3469,15 +3485,35 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
       )
     ])
   );
+  const hardMaximums = new Map(
+    allocation.muscleVolumeSummary.map((summary) => [summary.muscleId, summary.maximumWorkingSets])
+  );
+  let expansionMaximums = preferredMaximums;
+  let usingHardMaximums = false;
+  let stopReason = expansionStopReason(
+    estimate,
+    maximumDurationSeconds,
+    durationRuleSet
+  );
   while (estimate.totalSeconds / maximumDurationSeconds < durationRuleSet.targetDurationUtilization && maximumDurationSeconds - estimate.totalSeconds >= durationRuleSet.minimumExpansionBudgetSeconds) {
+    stopReason = "movement_pattern_constraint";
     const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
     const targetMuscles = allocation.muscleVolumeSummary.filter(
-      ({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (preferredMaximums.get(muscleId) ?? 0)
+      ({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (expansionMaximums.get(muscleId) ?? 0)
     ).sort((left, right) => {
-      const leftRatio = (volumes.get(left.muscleId) ?? 0) / Math.max(preferredMaximums.get(left.muscleId) ?? 0, Number.EPSILON);
-      const rightRatio = (volumes.get(right.muscleId) ?? 0) / Math.max(preferredMaximums.get(right.muscleId) ?? 0, Number.EPSILON);
+      const leftRatio = (volumes.get(left.muscleId) ?? 0) / Math.max(expansionMaximums.get(left.muscleId) ?? 0, Number.EPSILON);
+      const rightRatio = (volumes.get(right.muscleId) ?? 0) / Math.max(expansionMaximums.get(right.muscleId) ?? 0, Number.EPSILON);
       return leftRatio - rightRatio || left.muscleId.localeCompare(right.muscleId);
     });
+    if (targetMuscles.length === 0) {
+      if (!usingHardMaximums && hasExpansionHeadroom(exercises, candidates, allocationRuleSet, hardMaximums)) {
+        expansionMaximums = hardMaximums;
+        usingHardMaximums = true;
+        continue;
+      }
+      stopReason = "maximum_useful_volume_reached";
+      break;
+    }
     let accepted = false;
     for (const target of targetMuscles) {
       const selectedCandidates = exercises.filter(
@@ -3515,7 +3551,7 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
           expandedExercises,
           candidates,
           allocationRuleSet,
-          preferredMaximums
+          expansionMaximums
         )) {
           decisions.push({
             code: "ADDED_WORKING_SET_FOR_DURATION_BUDGET",
@@ -3575,7 +3611,7 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
           expandedExercises,
           candidates,
           allocationRuleSet,
-          preferredMaximums
+          expansionMaximums
         )) {
           decisions.push({
             code: "ADDED_EXERCISE_FOR_DURATION_BUDGET",
@@ -3594,10 +3630,133 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
       }
     }
     if (!accepted) {
+      if (!usingHardMaximums && hasExpansionHeadroom(exercises, candidates, allocationRuleSet, hardMaximums)) {
+        expansionMaximums = hardMaximums;
+        usingHardMaximums = true;
+        continue;
+      }
+      stopReason = expansionCandidateStopReason(
+        exercises,
+        allocation,
+        candidates,
+        input,
+        allocationRuleSet,
+        durationRuleSet,
+        maximumDurationSeconds
+      );
       break;
     }
+    stopReason = expansionStopReason(estimate, maximumDurationSeconds, durationRuleSet);
   }
-  return { exercises, decisions, estimate };
+  return { exercises, decisions, estimate, stopReason };
+}
+function expansionStopReason(estimate, maximumDurationSeconds, ruleSet) {
+  if (estimate.totalSeconds / maximumDurationSeconds >= ruleSet.targetDurationUtilization) {
+    return "target_duration_reached";
+  }
+  if (maximumDurationSeconds - estimate.totalSeconds < ruleSet.minimumExpansionBudgetSeconds) {
+    return "minimum_expansion_budget_remaining";
+  }
+  return "movement_pattern_constraint";
+}
+function expansionCandidateStopReason(exercises, allocation, candidates, input, allocationRuleSet, durationRuleSet, maximumDurationSeconds) {
+  const selectedExerciseIds = new Set(exercises.map(({ selected }) => selected.exerciseId));
+  const selectedFamilyIds = new Set(exercises.map(({ selected }) => selected.exerciseFamilyId));
+  const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
+  const hardMaximums = resolveHardMaximums(allocation, input, allocationRuleSet);
+  const selectedTargetRelevantExercises = exercises.filter((exercise2) => {
+    const candidate = requiredCandidate(candidates, exercise2.selected.exerciseId);
+    return input.targetMuscles.some(
+      ({ muscleId }) => calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) > 0
+    );
+  });
+  const unselectedTargetRelevantCandidates = allocation.scoring.rankedCandidates.filter(
+    ({ candidate }) => !selectedExerciseIds.has(candidate.exerciseId) && input.targetMuscles.some(
+      ({ muscleId }) => calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) > 0
+    )
+  );
+  if (unselectedTargetRelevantCandidates.length === 0 && selectedTargetRelevantExercises.every(
+    (exercise2) => exercise2.workingSets >= allocationRuleSet.maximumWorkingSetsPerExercise
+  )) {
+    return "candidate_saturation";
+  }
+  const selectedIncrementsBlockedByHardMaximums = selectedTargetRelevantExercises.filter((exercise2) => exercise2.workingSets < allocationRuleSet.maximumWorkingSetsPerExercise).every(
+    (exercise2) => exceedsHardMaximums(
+      requiredCandidate(candidates, exercise2.selected.exerciseId),
+      1,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    )
+  );
+  const candidateInsertionsBlockedByHardMaximums = unselectedTargetRelevantCandidates.every(
+    ({ candidate }) => exceedsHardMaximums(
+      candidate,
+      durationRuleSet.minimumWorkingSetsPerExercise,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    )
+  );
+  if (selectedIncrementsBlockedByHardMaximums && candidateInsertionsBlockedByHardMaximums) {
+    return "maximum_useful_volume_reached";
+  }
+  const familyConstraintBlocksInsertion = unselectedTargetRelevantCandidates.some(
+    ({ candidate }) => selectedFamilyIds.has(candidate.exerciseFamilyId) && !exceedsHardMaximums(
+      candidate,
+      durationRuleSet.minimumWorkingSetsPerExercise,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    ) && estimateWorkoutDuration(
+      [
+        ...durationExerciseInputs(exercises),
+        {
+          exerciseId: candidate.exerciseId,
+          workingSets: durationRuleSet.minimumWorkingSetsPerExercise
+        }
+      ],
+      candidates,
+      input,
+      durationRuleSet
+    ).totalSeconds <= maximumDurationSeconds
+  );
+  if (familyConstraintBlocksInsertion) {
+    return "movement_pattern_constraint";
+  }
+  return "minimum_expansion_budget_remaining";
+}
+function hasExpansionHeadroom(exercises, candidates, allocationRuleSet, maximums) {
+  const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
+  return [...maximums.entries()].some(
+    ([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < maximum
+  );
+}
+function resolveHardMaximums(allocation, input, allocationRuleSet) {
+  const hardMaximums = new Map(
+    allocation.muscleVolumeSummary.map(({ muscleId, maximumWorkingSets }) => [
+      muscleId,
+      maximumWorkingSets
+    ])
+  );
+  input.constraints.forEach((constraint) => {
+    if (constraint.kind === "muscle_volume_limit") {
+      hardMaximums.set(
+        constraint.muscleId,
+        Math.min(
+          hardMaximums.get(constraint.muscleId) ?? allocationRuleSet.maximumWorkingSetsPerMuscle,
+          constraint.maximumWorkingSets
+        )
+      );
+    }
+  });
+  return hardMaximums;
+}
+function exceedsHardMaximums(candidate, additionalSets, volumes, hardMaximums, allocationRuleSet) {
+  return [...hardMaximums.entries()].some(([muscleId, maximum]) => {
+    const added = calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) * additionalSets;
+    return (volumes.get(muscleId) ?? 0) + added > maximum + Number.EPSILON;
+  });
 }
 function respectsPreferredExpansionMaximums(exercises, candidates, allocationRuleSet, preferredMaximums) {
   const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
@@ -4320,7 +4479,7 @@ function findEquipmentIdBySlug(catalogResult, slug) {
 
 // packages/workout-gen-orchestrator/src/prescription.ts
 var PRESCRIPTION_RULES_VERSION = "prescription/1";
-function prescribeExercise(goalProfile, exerciseFamilySlug, initialLoadKg, loadEstimateSource, loadEstimateLabel) {
+function prescribeExercise(goalProfile, exerciseFamilySlug, loadPrescription) {
   const isCompound = isCompoundFamily(exerciseFamilySlug);
   const guidance = goalProfile.repRangeGuidance;
   const restTendency = goalProfile.restTendency;
@@ -4329,9 +4488,7 @@ function prescribeExercise(goalProfile, exerciseFamilySlug, initialLoadKg, loadE
     repMax: guidance.maximum,
     targetRir: computeTargetRir(goalProfile.goal),
     restSeconds: computeRestSeconds(restTendency, isCompound),
-    initialLoadKg: initialLoadKg ?? 0,
-    loadEstimateSource: loadEstimateSource ?? "calibration_required",
-    loadEstimateLabel: loadEstimateLabel ?? "Calibration needed"
+    loadPrescription
   };
 }
 function computeTargetRir(goal) {
@@ -4438,65 +4595,72 @@ var MIN_BARBELL_LOAD = 20;
 var MIN_DUMBBELL_LOAD = 2;
 var MIN_MACHINE_LOAD = 5;
 function estimateInitialLoad(input) {
-  const experienceMultiplier = EXPERIENCE_MULTIPLIERS[input.experienceLevel] ?? EXPERIENCE_MULTIPLIERS.beginner;
+  const experienceMultiplier = EXPERIENCE_MULTIPLIERS[input.experienceLevel];
   if (input.equipmentCategory === "bodyweight") {
     return {
-      loadKg: 0,
-      source: "bodyweight_reference",
-      label: "Bodyweight"
+      kind: "bodyweight",
+      suggestedLoadKg: null,
+      unit: "kg",
+      label: "Bodyweight",
+      incrementKg: 0
     };
   }
   if (input.equipmentCategory === "machine" || input.equipmentCategory === "cable") {
     const base = FAMILY_MACHINE_BASES[input.familySlug] ?? 15;
-    const raw = base * experienceMultiplier;
-    const rounded = roundToIncrement(raw, 5);
-    const clamped = Math.max(rounded, MIN_MACHINE_LOAD);
+    const suggestedLoadKg = safeRoundedLoad(base * experienceMultiplier, 5, MIN_MACHINE_LOAD);
     return {
-      loadKg: clamped,
-      source: "calibration_required",
-      label: "Estimated \u2014 machine weight not standardized"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: "Estimated - machine weight not standardized",
+      incrementKg: 5
     };
   }
-  if (input.equipmentCategory === "smith") {
-    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
-    const bodyWeight = input.bodyWeightKg ?? 75;
-    const raw = bwCoeff * bodyWeight * experienceMultiplier * 0.85;
-    const perSide = input.isUnilateral ? raw * 0.5 : raw;
-    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
+  if (input.equipmentCategory === "smith" || input.equipmentCategory === "barbell") {
+    if (!isValidBodyWeight(input.bodyWeightKg)) {
+      return calibrationRequired(2.5);
+    }
+    const coefficient = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
+    const smithMultiplier = input.equipmentCategory === "smith" ? 0.85 : 1;
+    const unilateralMultiplier = input.isUnilateral ? 0.5 : 1;
+    const raw = coefficient * input.bodyWeightKg * experienceMultiplier * smithMultiplier * unilateralMultiplier;
+    const suggestedLoadKg = safeRoundedLoad(raw, DEFAULT_LOAD_INCREMENT, MIN_BARBELL_LOAD);
     return {
-      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 Smith machine assisted"
-    };
-  }
-  if (input.equipmentCategory === "barbell") {
-    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
-    const bodyWeight = input.bodyWeightKg ?? 75;
-    const raw = bwCoeff * bodyWeight * experienceMultiplier;
-    const perSide = input.isUnilateral ? raw * 0.5 : raw;
-    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
-    return {
-      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 confirm after first set"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: input.equipmentCategory === "smith" ? "Estimated - Smith machine assisted" : "Estimated - confirm after first set",
+      incrementKg: DEFAULT_LOAD_INCREMENT
     };
   }
   if (input.equipmentCategory === "dumbbell") {
     const base = FAMILY_DUMBBELL_BASES[input.familySlug] ?? 5;
-    const raw = base * experienceMultiplier;
-    const rounded = roundToIncrement(raw, 2);
-    const clamped = Math.max(rounded, MIN_DUMBBELL_LOAD);
+    const suggestedLoadKg = safeRoundedLoad(base * experienceMultiplier, 2, MIN_DUMBBELL_LOAD);
     return {
-      loadKg: clamped,
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 confirm after first set"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: "Estimated - confirm after first set",
+      incrementKg: 2
     };
   }
+  return calibrationRequired(0, "Calibration needed");
+}
+function calibrationRequired(incrementKg, label = "Calibration needed - enter your body weight in settings") {
   return {
-    loadKg: 0,
-    source: "calibration_required",
-    label: "Calibration needed"
+    kind: "calibration_required",
+    suggestedLoadKg: null,
+    unit: "kg",
+    label,
+    incrementKg
   };
+}
+function isValidBodyWeight(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+function safeRoundedLoad(value, increment, minimum) {
+  if (!Number.isFinite(value) || value < 0) return minimum;
+  return Math.max(roundToIncrement(value, increment), minimum);
 }
 function roundToIncrement(value, increment) {
   return Math.round(value / increment) * increment;
@@ -4538,17 +4702,10 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
     familySlug,
     equipmentCategory,
     isUnilateral,
-    bodyWeightKg: void 0,
-    // profile body weight not yet stored in ServerTrainingProfile
+    bodyWeightKg: profile?.bodyWeightKg ?? null,
     experienceLevel: normalizeExperienceLevel(profile?.experience ?? "intermediate")
   });
-  const prescription = prescribeExercise(
-    goalProfile,
-    familySlug,
-    loadEstimate.loadKg,
-    loadEstimate.source,
-    loadEstimate.label
-  );
+  const prescription = prescribeExercise(goalProfile, familySlug, loadEstimate);
   return {
     position: index + 1,
     exerciseId: fitted.exerciseId,
@@ -4558,9 +4715,7 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },
     rir: prescription.targetRir,
     restSeconds: prescription.restSeconds,
-    initialLoadKg: prescription.initialLoadKg,
-    loadEstimateSource: prescription.loadEstimateSource,
-    loadEstimateLabel: prescription.loadEstimateLabel
+    loadPrescription: prescription.loadPrescription
   };
 }
 function inferEquipmentCategory(exerciseId, catalogResult) {
@@ -4985,11 +5140,30 @@ async function replaceWorkoutExercise(request, userId, deps) {
   if (!name || exerciseVersion === void 0) {
     return replacementError("CATALOG_UNAVAILABLE", "The replacement details are unavailable.");
   }
+  const loadPrescription = computeReplacementLoadPrescription(
+    replacement.exerciseId,
+    replacement.exerciseFamilyId,
+    name,
+    mapped,
+    profile
+  );
   return {
     status: "success",
     action: "replace_exercise",
-    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name }
+    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name, loadPrescription }
   };
+}
+function computeReplacementLoadPrescription(exerciseId, exerciseFamilyId, name, mapped, profile) {
+  const familySlug = mapped.familyIdToSlug.get(exerciseFamilyId) ?? "unknown";
+  const equipmentCategory = inferEquipmentCategory(exerciseId, mapped);
+  const isUnilateral = inferIsUnilateral(name);
+  return estimateInitialLoad({
+    familySlug,
+    equipmentCategory,
+    isUnilateral,
+    bodyWeightKg: profile.bodyWeightKg ?? null,
+    experienceLevel: normalizeExperienceLevel(profile.experience ?? "intermediate")
+  });
 }
 function sharedPrimaryCount(current, candidate) {
   const candidatePrimary = new Set(
@@ -5135,7 +5309,8 @@ function createSupabaseProfileLoader(supabaseUrl, anonKey, accessToken) {
         typicalDurationMinutes: row["typical_duration_minutes"] ?? 45,
         environment: row["training_environment"] ?? "",
         programPreference: row["program_preference"] ?? "",
-        hasCurrentDiscomfort: row["has_current_discomfort"] ?? false
+        hasCurrentDiscomfort: row["has_current_discomfort"] ?? false,
+        bodyWeightKg: row["body_weight_kg"] ?? null
       };
     }
   };

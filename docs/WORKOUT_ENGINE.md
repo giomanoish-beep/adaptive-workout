@@ -37,13 +37,17 @@ Allocation returns selected exercises, integer working sets, weighted muscle-vol
 
 ## Duration fitting
 
-`constructDurationFittedWorkout` reuses filtering, scoring, and allocation, then estimates setup, set execution, between-set rest, and between-exercise transitions from a validated versioned `WorkoutDurationRuleSet`. Candidate duration metadata and template rest guidance override configured defaults when present. Estimates are deterministic planning approximations, not exact predictions.
+`constructDurationFittedWorkout` reuses filtering, scoring, and allocation, then estimates setup, set execution, between-set rest, and between-exercise transitions from a validated versioned `WorkoutDurationRuleSet`. The exact total is:
+
+`setup + set execution + between-set rest + between-exercise transitions`
+
+Per exercise, setup uses candidate metadata or the configured setup default. Set execution is `working sets * per-set seconds`. Rest is `(working sets - 1) * rest seconds`, using template rest guidance when present or the goal-adjusted default otherwise. Transitions are `(exercise count - 1) * transition seconds`. Warm-up sets, cooldown, supersets, and buffer time are not modeled in this stage. Estimates are deterministic planning approximations, not exact predictions.
 
 The effective duration limit is the smaller of the request duration and any hard maximum-duration constraint. Oversized plans first remove sets only when target volume remains satisfied, then reduce lower-ranked optional volume while preserving hard minimum muscle coverage, and finally remove a lower-priority exercise when necessary. Candidate choice minimizes target-volume imbalance before using score rank and canonical identity tie-breaks. The engine fails rather than return a plan below required coverage.
 
-After downward fitting, duration also acts as a planning budget. When estimated utilization remains below a configured target and enough meaningful time remains, the engine adds sets to selected high-ranked exercises for the least-utilized target muscle, then considers high-ranked eligible exercises from unused families at the practical minimum set count. Expansion stops at configurable preferred-volume multipliers, hard muscle limits, exercise limits, or the duration maximum. It may leave spare time when no useful non-redundant volume fits; it never adds work merely to reach 100% utilization. Utilization, minimum expansion budget, and preferred-volume multiplier are versioned configurable product rules.
+After downward fitting, duration also acts as a planning budget. When estimated utilization remains below a configured target and enough meaningful time remains, the engine adds sets to selected high-ranked exercises for the least-utilized target muscle, then considers high-ranked eligible exercises from unused families at the practical minimum set count. The preferred-volume multiplier is a soft first expansion ceiling. If a longer session is still materially underfilled, expansion may continue toward the existing hard per-muscle maximums before stopping. Expansion stops with an explicit reason: target utilization reached, too little meaningful budget remains, maximum useful volume reached, candidate saturation, or movement-pattern constraints. It may leave spare time when no useful non-redundant volume fits; it never adds work merely to reach 100% utilization. For example, 75- and 90-minute requests may return the same plan only when the selected target muscles are at hard useful-volume caps and every remaining target-relevant candidate would exceed those caps; that state is reported as `maximum_useful_volume_reached`. Exercise count is therefore an outcome of useful volume, coverage, rest, setup, transition cost, candidate availability, and safety limits, not an input chosen directly from requested minutes.
 
-Selected exercises require a configurable minimum of at least two working sets. Existing one-set prescriptions are omitted when coverage remains valid or transferred without increasing total sets when another selected exercise can preserve coverage and hard limits. Otherwise construction returns a typed minimum-prescription failure. No warm-up sets, supersets, progression decisions, or pain classifications are introduced by this stage.
+Selected exercises require a configurable minimum of at least two working sets. Existing one-set prescriptions are omitted when coverage remains valid or transferred without increasing total sets when another selected exercise can preserve coverage and hard limits. Otherwise construction returns a typed minimum-prescription failure. No warm-up sets, cooldown, supersets, progression decisions, or pain classifications are introduced by this stage.
 
 ## Pipeline
 
@@ -51,7 +55,7 @@ Selected exercises require a configurable minimum of at least two working sets. 
 2. Filter candidates by hard constraints and record every exclusion reason.
 3. Score eligible candidates using versioned target relevance, preference, recency, and program-fit rules with stable tie-breakers.
 4. Select exercises while limiting repeated exercise families and redundant movement patterns, then allocate volume within configured bounds.
-5. Estimate duration from setup, warm-up, set execution, rest, transitions, and configurable buffer. Iteratively trim lowest-value optional work if over budget.
+5. Estimate duration from setup, set execution, rest, and transitions. Iteratively trim lowest-value optional work if over budget.
 6. Validate the final workout and emit unmet constraints rather than inventing invalid work.
 
 ## Substitutions
@@ -72,4 +76,4 @@ The current table has generated UUIDs but no operation ID or unique idempotency 
 
 `WorkoutEngineResult` conceptually contains `status`, `workout`, `exercisePrescriptions`, `volumeAllocation`, `estimatedDurationMinutes`, `unmetConstraints`, `warnings`, and `decisionTrace`. The output contains IDs and prescriptions, not display prose. No database, clock, random, React, Supabase, or AI access occurs inside the engine; time and seed are inputs.
 
-The implemented success contract contains an ordered plan, explicit warm-up and working sets, rep ranges, optional RIR and rest, duration estimates, target-muscle volume, decision evidence, and engine versions. Expected generation failures use a serializable `status: 'failure'` result with controlled failure and reason codes rather than exceptions.
+The implemented success contract contains an ordered plan, working sets, duration estimates, target-muscle volume, duration expansion stop reason, decision evidence, and engine versions. Expected generation failures use a serializable `status: 'failure'` result with controlled failure and reason codes rather than exceptions.

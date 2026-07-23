@@ -5,12 +5,20 @@ import type {
 import type {
   ReplaceWorkoutExerciseRequest,
   ReplaceWorkoutExerciseResponse,
+  LoadPrescription,
+  ServerTrainingProfile,
   WorkoutGenerationDependencies,
 } from './contracts.js';
 import { mapCatalogToEngineCandidates, type CatalogMappingResult } from './catalog-mapping.js';
 import { buildEngineInput } from './engine-input.js';
 import { mapProfileToGoalRules } from './profile-mapping.js';
 import { validateGenerateWorkoutRequest } from './validation.js';
+import { estimateInitialLoad } from './load-estimator.js';
+import {
+  inferEquipmentCategory,
+  inferIsUnilateral,
+  normalizeExperienceLevel,
+} from './result-mapping.js';
 
 export function selectReplacementCandidate(
   request: ReplaceWorkoutExerciseRequest,
@@ -161,11 +169,40 @@ export async function replaceWorkoutExercise(
   if (!name || exerciseVersion === undefined) {
     return replacementError('CATALOG_UNAVAILABLE', 'The replacement details are unavailable.');
   }
+
+  const loadPrescription = computeReplacementLoadPrescription(
+    replacement.exerciseId,
+    replacement.exerciseFamilyId,
+    name,
+    mapped,
+    profile,
+  );
+
   return {
     status: 'success',
     action: 'replace_exercise',
-    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name },
+    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name, loadPrescription },
   };
+}
+
+function computeReplacementLoadPrescription(
+  exerciseId: string,
+  exerciseFamilyId: string,
+  name: string,
+  mapped: CatalogMappingResult,
+  profile: ServerTrainingProfile,
+): LoadPrescription {
+  const familySlug = mapped.familyIdToSlug.get(exerciseFamilyId) ?? 'unknown';
+  const equipmentCategory = inferEquipmentCategory(exerciseId, mapped);
+  const isUnilateral = inferIsUnilateral(name);
+
+  return estimateInitialLoad({
+    familySlug,
+    equipmentCategory,
+    isUnilateral,
+    bodyWeightKg: profile.bodyWeightKg ?? null,
+    experienceLevel: normalizeExperienceLevel(profile.experience ?? 'intermediate'),
+  });
 }
 
 function sharedPrimaryCount(

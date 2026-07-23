@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  checks:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,11 +34,14 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Build
-        run: npm run build
-
       - name: Check formatting
         run: npm run format:check
+
+      - name: Catalog check
+        run: npm run catalog:check
+
+      - name: Build
+        run: npm run build
 
       - name: Audit production dependencies
         run: npm audit --omit=dev
@@ -48,3 +51,47 @@ jobs:
 
       - name: Verify production E2E guard
         run: npm run test:e2e-production-guard
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase
+        run: npx supabase start
+
+      - name: Reset local database from all migrations
+        run: npx supabase db reset --local
+
+      - name: Lint local database
+        run: npx supabase db lint --local --level warning --fail-on warning
+
+      - name: Run pgTAP tests
+        run: npx supabase test db
+
+      - name: Verify expected migration count
+        run: |
+          MIGRATION_COUNT=$(find supabase/migrations -name '*.sql' | wc -l)
+          echo "Found $MIGRATION_COUNT migrations"
+          if [ "$MIGRATION_COUNT" -ne 14 ]; then
+            echo "Expected 14 migrations but found $MIGRATION_COUNT"
+            exit 1
+          fi
+
+      - name: List local migration history
+        run: npx supabase migration list --local
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup

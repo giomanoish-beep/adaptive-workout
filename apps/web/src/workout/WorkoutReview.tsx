@@ -1,4 +1,8 @@
-import { formatRepRange, type WorkoutReview as WorkoutReviewModel } from './workout-review';
+import {
+  formatLoadPrescription,
+  formatRepRange,
+  type WorkoutReview as WorkoutReviewModel,
+} from './workout-review';
 
 export interface WorkoutReviewProps {
   readonly review: WorkoutReviewModel;
@@ -51,6 +55,9 @@ export function WorkoutReview({
                 <span>{formatRepRange(exercise.reps)} reps</span>
                 <span>RIR {exercise.rir}</span>
               </div>
+              <p className="workout-card__load">
+                Load: {formatLoadPrescription(exercise.loadPrescription)}
+              </p>
               <ExerciseProgressionSummary exercise={exercise} />
               <button
                 type="button"

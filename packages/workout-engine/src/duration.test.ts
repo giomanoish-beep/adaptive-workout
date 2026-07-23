@@ -78,14 +78,23 @@ describe('workout duration fitting', () => {
 
   it('estimates more duration for more working sets', () => {
     const input = chestOnlyInput(60);
-    const smaller = construct(input, {
-      ...allocationRuleSet(),
-      requiredMuscleTargetWorkingSets: 4,
-    });
-    const larger = construct(input, {
-      ...allocationRuleSet(),
-      requiredMuscleTargetWorkingSets: 6,
-    });
+    const noExpansion = { ...durationRuleSet(), targetDurationUtilization: 0.01 };
+    const smaller = construct(
+      input,
+      {
+        ...allocationRuleSet(),
+        requiredMuscleTargetWorkingSets: 4,
+      },
+      noExpansion,
+    );
+    const larger = construct(
+      input,
+      {
+        ...allocationRuleSet(),
+        requiredMuscleTargetWorkingSets: 6,
+      },
+      noExpansion,
+    );
 
     expect(totalSets(larger)).toBeGreaterThan(totalSets(smaller));
     expect(larger.estimatedDuration.totalSeconds).toBeGreaterThan(
@@ -242,6 +251,7 @@ describe('workout duration fitting', () => {
 
     expect(totalSets(result)).toBe(21);
     expect(result.estimatedDuration.totalMinutes).toBeGreaterThan(31);
+    expect(result.durationExpansionStopReason).toBe('target_duration_reached');
     expect(result.decisions).toContainEqual(
       expect.objectContaining({ code: 'ADDED_EXERCISE_FOR_DURATION_BUDGET' }),
     );
@@ -297,7 +307,7 @@ describe('workout duration fitting', () => {
     });
   });
 
-  it('allows unused spare time when target muscles are saturated', () => {
+  it('reports maximum useful volume when target muscles cannot safely expand', () => {
     const input = chestBackInput(60);
     const result = construct({
       ...input,
@@ -310,6 +320,21 @@ describe('workout duration fitting', () => {
     expect(result.status).toBe('success');
     expect(result.estimatedDuration.totalMinutes).toBeLessThan(60 * 0.8);
     expect(result.decisions.some(({ code }) => code.startsWith('ADDED_'))).toBe(false);
+    expect(result.durationExpansionStopReason).toBe('maximum_useful_volume_reached');
+  });
+
+  it('reports candidate saturation when no unselected target-relevant exercises remain', () => {
+    const result = construct(inputFor(75, [target(chestId)], [dumbbellBenchPress()]), {
+      ...allocationRuleSet(),
+      minimumDistinctExerciseFamilies: 1,
+      maximumWorkingSetsPerExercise: 5,
+      maximumWorkingSetsPerMuscle: 20,
+    });
+
+    expect(result.status).toBe('success');
+    expect(totalSets(result)).toBe(5);
+    expect(result.estimatedDuration.totalMinutes).toBeLessThan(75 * 0.8);
+    expect(result.durationExpansionStopReason).toBe('candidate_saturation');
   });
 
   it('fits a chest and back request within 45 minutes', () => {

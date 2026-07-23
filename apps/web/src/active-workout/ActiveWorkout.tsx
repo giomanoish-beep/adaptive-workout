@@ -17,12 +17,12 @@ import {
 } from './active-workout-rest';
 import {
   canCompleteSetEntry,
-  emptySetEntryInput,
   toLoggedSet,
   validateSetEntry,
   type SetEntryInput,
   type SetEntryValidationResult,
 } from './active-workout-validation';
+import { prefillSetEntry } from './prefill-set-entry';
 import type { WorkoutReview } from '../workout/workout-review';
 import type { SessionCreateOptions } from '../workout-session/workout-session-repository';
 
@@ -68,20 +68,21 @@ export function ActiveWorkout({
 
   // THESE HOOKS MUST FIRE EVERY RENDER regardless of stage.
   const setEntryFn = useCallback(
-    (sn: number): SetEntryInput => inputs.get(setKey(exIdx, sn)) ?? emptySetEntryInput,
-    [inputs, exIdx],
+    (sn: number): SetEntryInput =>
+      inputs.get(setKey(exIdx, sn)) ?? prefillSetEntry(exercise?.plannedSets[sn - 1]),
+    [inputs, exIdx, exercise],
   );
   const updateEntryFn = useCallback(
     (sn: number, patch: Partial<SetEntryInput>) => {
       setInputs((prev) => {
         const k = setKey(exIdx, sn);
-        const cur = prev.get(k) ?? emptySetEntryInput;
+        const cur = prev.get(k) ?? prefillSetEntry(exercise?.plannedSets[sn - 1]);
         const m = new Map(prev);
         m.set(k, { ...cur, ...patch });
         return m;
       });
     },
-    [exIdx],
+    [exIdx, exercise],
   );
   const handleComplete = useCallback(
     async (sn: number) => {

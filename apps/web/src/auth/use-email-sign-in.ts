@@ -39,13 +39,18 @@ export const RESEND_COOLDOWN_SECONDS = 60;
 type SignInAction =
   | { readonly type: 'submit'; readonly email: string }
   | { readonly type: 'success'; readonly email: string; readonly cooldownUntil: number }
-  | { readonly type: 'error'; readonly message: string }
+  | { readonly type: 'error'; readonly message: string; readonly cooldownUntil: number }
   | { readonly type: 'reset' };
 
-function signInReducer(_state: EmailSignInState, action: SignInAction): EmailSignInState {
+function signInReducer(state: EmailSignInState, action: SignInAction): EmailSignInState {
   switch (action.type) {
     case 'submit':
-      return { stage: 'submitting', email: action.email, errorMessage: null, cooldownUntil: 0 };
+      return {
+        stage: 'submitting',
+        email: action.email,
+        errorMessage: null,
+        cooldownUntil: state.cooldownUntil,
+      };
     case 'success':
       return {
         stage: 'success',
@@ -54,7 +59,12 @@ function signInReducer(_state: EmailSignInState, action: SignInAction): EmailSig
         cooldownUntil: action.cooldownUntil,
       };
     case 'error':
-      return { stage: 'error', email: '', errorMessage: action.message, cooldownUntil: 0 };
+      return {
+        stage: 'error',
+        email: state.email,
+        errorMessage: action.message,
+        cooldownUntil: action.cooldownUntil,
+      };
     case 'reset':
       return initialEmailSignInState;
   }
@@ -72,11 +82,18 @@ export interface UseEmailSignInResult {
  * Translates a Supabase error into a user-facing message. Handles rate-limit
  * (HTTP 429) specially so the UI can show a countdown.
  */
-function translateError(error: { readonly message?: string; readonly status?: number }): string {
+export function translateEmailSignInError(error: {
+  readonly message?: string;
+  readonly status?: number;
+}): string {
   if (error.status === 429) {
     return 'Too many attempts. Please wait before requesting another code.';
   }
-  return error.message ?? 'Unable to send verification code.';
+  const message = error.message ?? '';
+  if (/network|fetch|failed to fetch|offline/i.test(message)) {
+    return 'Network problem. Check your connection and try again.';
+  }
+  return 'Unable to send verification code. Please try again.';
 }
 
 /**
@@ -99,6 +116,7 @@ export function useEmailSignIn(client: SupabaseClient | undefined): UseEmailSign
         dispatch({
           type: 'error',
           message: result.code === 'EMPTY' ? 'Enter your email.' : 'Enter a valid email.',
+          cooldownUntil: state.cooldownUntil,
         });
         return false;
       }
@@ -115,11 +133,15 @@ export function useEmailSignIn(client: SupabaseClient | undefined): UseEmailSign
         });
 
         if (error !== null) {
-          const translated = translateError({
+          const translated = translateEmailSignInError({
             message: error.message,
             status: error.status,
           });
-          dispatch({ type: 'error', message: translated });
+          const cooldownUntil =
+            error.status === 429
+              ? Date.now() + RESEND_COOLDOWN_SECONDS * 1000
+              : state.cooldownUntil;
+          dispatch({ type: 'error', message: translated, cooldownUntil });
           return false;
         }
 
@@ -130,7 +152,7 @@ export function useEmailSignIn(client: SupabaseClient | undefined): UseEmailSign
         inFlightRef.current = false;
       }
     },
-    [client],
+    [client, state.cooldownUntil],
   );
 
   const reset = useCallback(() => {
@@ -153,5 +175,5 @@ export async function requestEmailSignIn(
     email,
     options: { shouldCreateUser: true },
   });
-  return { error: error === null ? null : (error.message ?? 'Unable to send verification code.') };
+  return { error: error === null ? null : translateEmailSignInError(error) };
 }

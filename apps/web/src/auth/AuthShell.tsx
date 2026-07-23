@@ -81,7 +81,12 @@ export function AuthShell({
   );
 
   const handleResend = useCallback(() => {
-    if (emailSignIn && state.otpEmail && cooldownSeconds <= 0) {
+    if (
+      emailSignIn &&
+      state.otpEmail &&
+      cooldownSeconds <= 0 &&
+      emailSignIn.state.stage !== 'submitting'
+    ) {
       void emailSignIn.signIn(state.otpEmail);
     }
   }, [emailSignIn, state.otpEmail, cooldownSeconds]);
@@ -118,6 +123,10 @@ export function AuthShell({
             client={client}
             email={state.otpEmail}
             cooldownSeconds={cooldownSeconds}
+            resendErrorMessage={
+              emailSignIn?.state.stage === 'error' ? emailSignIn.state.errorMessage : null
+            }
+            resendSubmitting={emailSignIn?.state.stage === 'submitting'}
             onVerified={() => onOtpVerified?.()}
             onResend={handleResend}
             onBack={handleBack}

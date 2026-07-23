@@ -63,3 +63,4 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1.2                   | Multi-week program engine, program UI, and E2E tests                | DONE    | V1.1                                                         |
 | V1.3                   | Personal beta: deployable with real Supabase persistence            | DONE    | V1.2                                                         |
 | V1.4                   | Mobile UX (100dvh), email OTP auth, duration tuning, load estimator | DONE    | V1.3                                                         |
+| STAB-002               | Add explicit load prescriptions and body-weight calibration         | DONE    | V1.4                                                         |

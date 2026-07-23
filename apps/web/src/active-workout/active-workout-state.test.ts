@@ -66,6 +66,15 @@ describe('fixture build', () => {
     expect(currentExercise(state).name).toBe('Dumbbell Bench Press');
   });
 
+  it('copies the load prescription onto every planned set', () => {
+    const first = built().exercises[0]?.plannedSets[0];
+    expect(first).toMatchObject({
+      suggestedLoadKg: 8,
+      loadKind: 'external_numeric',
+      loadLabel: 'Estimated per dumbbell — confirm after first set',
+    });
+  });
+
   it('starts with every set incomplete and no logged values', () => {
     const state = built();
     for (const exerciseSets of state.sets) {

@@ -14,6 +14,17 @@ export interface WorkoutReviewRepRange {
   readonly maximum: number;
 }
 
+export type LoadPrescriptionKind =
+  'external_numeric' | 'bodyweight' | 'unloaded_bar' | 'calibration_required';
+
+export interface LoadPrescription {
+  readonly kind: LoadPrescriptionKind;
+  readonly suggestedLoadKg: number | null;
+  readonly unit: 'kg';
+  readonly label: string;
+  readonly incrementKg: number;
+}
+
 export interface WorkoutReviewExercise {
   readonly position: number;
   readonly exerciseId?: string;
@@ -23,6 +34,7 @@ export interface WorkoutReviewExercise {
   readonly reps: WorkoutReviewRepRange;
   readonly rir: number;
   readonly restSeconds?: number | null;
+  readonly loadPrescription: LoadPrescription;
   readonly progression?: ExerciseProgressionSummary;
 }
 
@@ -64,6 +76,13 @@ export const workoutReviewFixture: WorkoutReview = {
       sets: 4,
       reps: { minimum: 8, maximum: 10 },
       rir: 2,
+      loadPrescription: {
+        kind: 'external_numeric',
+        suggestedLoadKg: 8,
+        unit: 'kg',
+        label: 'Estimated per dumbbell — confirm after first set',
+        incrementKg: 2,
+      },
     },
     {
       position: 2,
@@ -71,6 +90,13 @@ export const workoutReviewFixture: WorkoutReview = {
       sets: 4,
       reps: { minimum: 8, maximum: 10 },
       rir: 2,
+      loadPrescription: {
+        kind: 'calibration_required',
+        suggestedLoadKg: null,
+        unit: 'kg',
+        label: 'Choose a light stack and calibrate on the first set',
+        incrementKg: 5,
+      },
     },
     {
       position: 3,
@@ -78,6 +104,13 @@ export const workoutReviewFixture: WorkoutReview = {
       sets: 4,
       reps: { minimum: 10, maximum: 12 },
       rir: 2,
+      loadPrescription: {
+        kind: 'calibration_required',
+        suggestedLoadKg: null,
+        unit: 'kg',
+        label: 'Choose a light stack and calibrate on the first set',
+        incrementKg: 5,
+      },
     },
     {
       position: 4,
@@ -85,6 +118,13 @@ export const workoutReviewFixture: WorkoutReview = {
       sets: 4,
       reps: { minimum: 8, maximum: 10 },
       rir: 2,
+      loadPrescription: {
+        kind: 'external_numeric',
+        suggestedLoadKg: 6,
+        unit: 'kg',
+        label: 'Estimated per dumbbell — confirm after first set',
+        incrementKg: 2,
+      },
     },
   ],
   muscleVolume: [
@@ -108,12 +148,19 @@ export function formatRepRange(reps: WorkoutReviewRepRange): string {
   return `${reps.minimum}\u2013${reps.maximum}`;
 }
 
+export function formatLoadPrescription(load: LoadPrescription): string {
+  if (load.kind === 'external_numeric' && load.suggestedLoadKg !== null) {
+    return `${load.suggestedLoadKg} ${load.unit} · ${load.label}`;
+  }
+  return load.label;
+}
+
 export function replaceReviewExercise(
   review: WorkoutReview,
   position: number,
   replacement: Pick<
     WorkoutReviewExercise,
-    'exerciseId' | 'exerciseVersion' | 'name' | 'progression'
+    'exerciseId' | 'exerciseVersion' | 'name' | 'progression' | 'loadPrescription'
   >,
 ): WorkoutReview {
   return {

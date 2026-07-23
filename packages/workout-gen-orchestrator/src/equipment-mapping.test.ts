@@ -105,6 +105,7 @@ describe('equipment context mapping', () => {
               environment: 'commercial_gym',
               programPreference: 'app_decide',
               hasCurrentDiscomfort: false,
+              bodyWeightKg: null,
             }),
         },
         catalogLoader: {

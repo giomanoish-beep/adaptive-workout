@@ -226,6 +226,7 @@ function createSupabaseProfileLoader(
         environment: (row['training_environment'] as string) ?? '',
         programPreference: (row['program_preference'] as string) ?? '',
         hasCurrentDiscomfort: (row['has_current_discomfort'] as boolean) ?? false,
+        bodyWeightKg: (row['body_weight_kg'] as number) ?? null,
       };
     },
   };
