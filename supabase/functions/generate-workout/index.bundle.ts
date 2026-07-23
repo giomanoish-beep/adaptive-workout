@@ -4320,7 +4320,7 @@ function findEquipmentIdBySlug(catalogResult, slug) {
 
 // packages/workout-gen-orchestrator/src/prescription.ts
 var PRESCRIPTION_RULES_VERSION = "prescription/1";
-function prescribeExercise(goalProfile, exerciseFamilySlug, initialLoadKg, loadEstimateSource, loadEstimateLabel) {
+function prescribeExercise(goalProfile, exerciseFamilySlug, loadPrescription) {
   const isCompound = isCompoundFamily(exerciseFamilySlug);
   const guidance = goalProfile.repRangeGuidance;
   const restTendency = goalProfile.restTendency;
@@ -4329,9 +4329,7 @@ function prescribeExercise(goalProfile, exerciseFamilySlug, initialLoadKg, loadE
     repMax: guidance.maximum,
     targetRir: computeTargetRir(goalProfile.goal),
     restSeconds: computeRestSeconds(restTendency, isCompound),
-    initialLoadKg: initialLoadKg ?? 0,
-    loadEstimateSource: loadEstimateSource ?? "calibration_required",
-    loadEstimateLabel: loadEstimateLabel ?? "Calibration needed"
+    loadPrescription
   };
 }
 function computeTargetRir(goal) {
@@ -4438,65 +4436,72 @@ var MIN_BARBELL_LOAD = 20;
 var MIN_DUMBBELL_LOAD = 2;
 var MIN_MACHINE_LOAD = 5;
 function estimateInitialLoad(input) {
-  const experienceMultiplier = EXPERIENCE_MULTIPLIERS[input.experienceLevel] ?? EXPERIENCE_MULTIPLIERS.beginner;
+  const experienceMultiplier = EXPERIENCE_MULTIPLIERS[input.experienceLevel];
   if (input.equipmentCategory === "bodyweight") {
     return {
-      loadKg: 0,
-      source: "bodyweight_reference",
-      label: "Bodyweight"
+      kind: "bodyweight",
+      suggestedLoadKg: null,
+      unit: "kg",
+      label: "Bodyweight",
+      incrementKg: 0
     };
   }
   if (input.equipmentCategory === "machine" || input.equipmentCategory === "cable") {
     const base = FAMILY_MACHINE_BASES[input.familySlug] ?? 15;
-    const raw = base * experienceMultiplier;
-    const rounded = roundToIncrement(raw, 5);
-    const clamped = Math.max(rounded, MIN_MACHINE_LOAD);
+    const suggestedLoadKg = safeRoundedLoad(base * experienceMultiplier, 5, MIN_MACHINE_LOAD);
     return {
-      loadKg: clamped,
-      source: "calibration_required",
-      label: "Estimated \u2014 machine weight not standardized"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: "Estimated - machine weight not standardized",
+      incrementKg: 5
     };
   }
-  if (input.equipmentCategory === "smith") {
-    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
-    const bodyWeight = input.bodyWeightKg ?? 75;
-    const raw = bwCoeff * bodyWeight * experienceMultiplier * 0.85;
-    const perSide = input.isUnilateral ? raw * 0.5 : raw;
-    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
+  if (input.equipmentCategory === "smith" || input.equipmentCategory === "barbell") {
+    if (!isValidBodyWeight(input.bodyWeightKg)) {
+      return calibrationRequired(2.5);
+    }
+    const coefficient = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
+    const smithMultiplier = input.equipmentCategory === "smith" ? 0.85 : 1;
+    const unilateralMultiplier = input.isUnilateral ? 0.5 : 1;
+    const raw = coefficient * input.bodyWeightKg * experienceMultiplier * smithMultiplier * unilateralMultiplier;
+    const suggestedLoadKg = safeRoundedLoad(raw, DEFAULT_LOAD_INCREMENT, MIN_BARBELL_LOAD);
     return {
-      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 Smith machine assisted"
-    };
-  }
-  if (input.equipmentCategory === "barbell") {
-    const bwCoeff = FAMILY_BARBELL_BW_COEFFICIENTS[input.familySlug] ?? 0.3;
-    const bodyWeight = input.bodyWeightKg ?? 75;
-    const raw = bwCoeff * bodyWeight * experienceMultiplier;
-    const perSide = input.isUnilateral ? raw * 0.5 : raw;
-    const rounded = roundToIncrement(perSide, DEFAULT_LOAD_INCREMENT);
-    return {
-      loadKg: Math.max(rounded, MIN_BARBELL_LOAD),
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 confirm after first set"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: input.equipmentCategory === "smith" ? "Estimated - Smith machine assisted" : "Estimated - confirm after first set",
+      incrementKg: DEFAULT_LOAD_INCREMENT
     };
   }
   if (input.equipmentCategory === "dumbbell") {
     const base = FAMILY_DUMBBELL_BASES[input.familySlug] ?? 5;
-    const raw = base * experienceMultiplier;
-    const rounded = roundToIncrement(raw, 2);
-    const clamped = Math.max(rounded, MIN_DUMBBELL_LOAD);
+    const suggestedLoadKg = safeRoundedLoad(base * experienceMultiplier, 2, MIN_DUMBBELL_LOAD);
     return {
-      loadKg: clamped,
-      source: "first_session_coefficient",
-      label: "Estimated \u2014 confirm after first set"
+      kind: "external_numeric",
+      suggestedLoadKg,
+      unit: "kg",
+      label: "Estimated - confirm after first set",
+      incrementKg: 2
     };
   }
+  return calibrationRequired(0, "Calibration needed");
+}
+function calibrationRequired(incrementKg, label = "Calibration needed - enter your body weight in settings") {
   return {
-    loadKg: 0,
-    source: "calibration_required",
-    label: "Calibration needed"
+    kind: "calibration_required",
+    suggestedLoadKg: null,
+    unit: "kg",
+    label,
+    incrementKg
   };
+}
+function isValidBodyWeight(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+function safeRoundedLoad(value, increment, minimum) {
+  if (!Number.isFinite(value) || value < 0) return minimum;
+  return Math.max(roundToIncrement(value, increment), minimum);
 }
 function roundToIncrement(value, increment) {
   return Math.round(value / increment) * increment;
@@ -4538,17 +4543,10 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
     familySlug,
     equipmentCategory,
     isUnilateral,
-    bodyWeightKg: void 0,
-    // profile body weight not yet stored in ServerTrainingProfile
+    bodyWeightKg: profile?.bodyWeightKg ?? null,
     experienceLevel: normalizeExperienceLevel(profile?.experience ?? "intermediate")
   });
-  const prescription = prescribeExercise(
-    goalProfile,
-    familySlug,
-    loadEstimate.loadKg,
-    loadEstimate.source,
-    loadEstimate.label
-  );
+  const prescription = prescribeExercise(goalProfile, familySlug, loadEstimate);
   return {
     position: index + 1,
     exerciseId: fitted.exerciseId,
@@ -4558,9 +4556,7 @@ function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },
     rir: prescription.targetRir,
     restSeconds: prescription.restSeconds,
-    initialLoadKg: prescription.initialLoadKg,
-    loadEstimateSource: prescription.loadEstimateSource,
-    loadEstimateLabel: prescription.loadEstimateLabel
+    loadPrescription: prescription.loadPrescription
   };
 }
 function inferEquipmentCategory(exerciseId, catalogResult) {
@@ -4985,11 +4981,30 @@ async function replaceWorkoutExercise(request, userId, deps) {
   if (!name || exerciseVersion === void 0) {
     return replacementError("CATALOG_UNAVAILABLE", "The replacement details are unavailable.");
   }
+  const loadPrescription = computeReplacementLoadPrescription(
+    replacement.exerciseId,
+    replacement.exerciseFamilyId,
+    name,
+    mapped,
+    profile
+  );
   return {
     status: "success",
     action: "replace_exercise",
-    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name }
+    replacement: { exerciseId: replacement.exerciseId, exerciseVersion, name, loadPrescription }
   };
+}
+function computeReplacementLoadPrescription(exerciseId, exerciseFamilyId, name, mapped, profile) {
+  const familySlug = mapped.familyIdToSlug.get(exerciseFamilyId) ?? "unknown";
+  const equipmentCategory = inferEquipmentCategory(exerciseId, mapped);
+  const isUnilateral = inferIsUnilateral(name);
+  return estimateInitialLoad({
+    familySlug,
+    equipmentCategory,
+    isUnilateral,
+    bodyWeightKg: profile.bodyWeightKg ?? null,
+    experienceLevel: normalizeExperienceLevel(profile.experience ?? "intermediate")
+  });
 }
 function sharedPrimaryCount(current, candidate) {
   const candidatePrimary = new Set(
@@ -5135,7 +5150,8 @@ function createSupabaseProfileLoader(supabaseUrl, anonKey, accessToken) {
         typicalDurationMinutes: row["typical_duration_minutes"] ?? 45,
         environment: row["training_environment"] ?? "",
         programPreference: row["program_preference"] ?? "",
-        hasCurrentDiscomfort: row["has_current_discomfort"] ?? false
+        hasCurrentDiscomfort: row["has_current_discomfort"] ?? false,
+        bodyWeightKg: row["body_weight_kg"] ?? null
       };
     }
   };

@@ -222,6 +222,7 @@ export async function installE2ERouteMocks(
         reps: { minimum: ex.reps.minimum, maximum: ex.reps.maximum },
         rir: ex.rir,
         restSeconds: 120,
+        loadPrescription: ex.loadPrescription,
       })),
       muscleVolume: workoutReviewFixture.muscleVolume.map((mv) => ({
         muscle: mv.muscle,

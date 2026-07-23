@@ -150,6 +150,15 @@ export function useWorkoutSession(client: SupabaseClient, userId: string): Worko
             maximum: exercise.plannedRepsMax ?? 0,
           },
           rir: exercise.plannedRir ?? 0,
+          restSeconds: exercise.plannedRestSeconds,
+          loadPrescription: {
+            kind: exercise.plannedLoadKind ?? 'calibration_required',
+            suggestedLoadKg:
+              exercise.plannedLoadKind === 'external_numeric' ? exercise.plannedLoadKg : null,
+            unit: 'kg',
+            label: exercise.plannedLoadLabel ?? 'Calibration needed',
+            incrementKg: exercise.plannedLoadIncrementKg ?? 2.5,
+          },
         })),
         muscleVolume: [],
       };
@@ -162,11 +171,17 @@ export function useWorkoutSession(client: SupabaseClient, userId: string): Worko
               log.weight !== null &&
               log.reps !== null,
           )
-          .map((log) => ({
-            exerciseIndex,
-            setNumber: log.setNumber,
-            logged: { weight: log.weight!, reps: log.reps!, rir: log.rir },
-          })),
+          .flatMap((log) =>
+            log.weight === null || log.reps === null
+              ? []
+              : [
+                  {
+                    exerciseIndex,
+                    setNumber: log.setNumber,
+                    logged: { weight: log.weight, reps: log.reps, rir: log.rir },
+                  },
+                ],
+          ),
       );
 
       sessionIdRef.current = loaded.session.id;

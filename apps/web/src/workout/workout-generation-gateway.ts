@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { LoadPrescriptionKind, WorkoutReview } from './workout-review';
 
 /* ------------------------------------------------------------------ */
 /*  Request/Response shapes (mirrors server contracts)                 */
@@ -37,6 +38,13 @@ export interface GatewayReviewExercise {
   readonly reps: GatewayReviewRepRange;
   readonly rir: number;
   readonly restSeconds: number | null;
+  readonly loadPrescription: {
+    readonly kind: string;
+    readonly suggestedLoadKg: number | null;
+    readonly unit: 'kg';
+    readonly label: string;
+    readonly incrementKg: number;
+  };
 }
 
 export interface GatewayReviewMuscleVolume {
@@ -94,6 +102,13 @@ export interface GatewayReplacementResponse {
     readonly exerciseId: string;
     readonly exerciseVersion: number;
     readonly name: string;
+    readonly loadPrescription: {
+      readonly kind: string;
+      readonly suggestedLoadKg: number | null;
+      readonly unit: 'kg';
+      readonly label: string;
+      readonly incrementKg: number;
+    };
   };
   readonly code?: string;
   readonly message?: string;
@@ -268,7 +283,7 @@ export async function replaceExerciseViaGateway(
  * Maps the gateway success response to the existing WorkoutReview shape
  * so the rest of the app (WorkoutReview, ActiveWorkout) works unchanged.
  */
-export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess) {
+export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess): WorkoutReview {
   return {
     title: gateway.title,
     estimatedDurationMinutes: gateway.estimatedDurationMinutes,
@@ -282,12 +297,31 @@ export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess) {
       reps: { minimum: ex.reps.minimum, maximum: ex.reps.maximum },
       rir: ex.rir,
       restSeconds: ex.restSeconds,
+      loadPrescription: {
+        kind: toLoadPrescriptionKind(ex.loadPrescription.kind),
+        suggestedLoadKg: ex.loadPrescription.suggestedLoadKg,
+        unit: ex.loadPrescription.unit,
+        label: ex.loadPrescription.label,
+        incrementKg: ex.loadPrescription.incrementKg,
+      },
     })),
     muscleVolume: gateway.muscleVolume.map((mv) => ({
       muscle: mv.muscle,
       volume: mv.volume,
     })),
   };
+}
+
+export function toLoadPrescriptionKind(kind: string): LoadPrescriptionKind {
+  switch (kind) {
+    case 'external_numeric':
+    case 'bodyweight':
+    case 'unloaded_bar':
+    case 'calibration_required':
+      return kind;
+    default:
+      return 'calibration_required';
+  }
 }
 
 /**
