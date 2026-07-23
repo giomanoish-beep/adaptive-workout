@@ -3318,6 +3318,10 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
   const goalMultipliers = resolveGoalMultipliers(goalProfile);
   const effectiveDurationRuleSet = {
     ...durationRuleSet,
+    defaultRestSecondsBetweenSets: resolveGoalRestSeconds(
+      durationRuleSet.defaultRestSecondsBetweenSets,
+      goalProfile?.restTendency
+    ),
     targetDurationUtilization: clamp(
       durationRuleSet.targetDurationUtilization * goalMultipliers.expansionFactor,
       0,
@@ -3363,7 +3367,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     durationExerciseInputs(exercises),
     candidates,
     input,
-    durationRuleSet
+    effectiveDurationRuleSet
   );
   while (estimate.totalSeconds > maximumDurationSeconds) {
     const option = chooseReduction(
@@ -3372,7 +3376,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       candidates,
       input,
       allocationRuleSet,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
     if (option === void 0) {
       return durationFailure("DURATION_CONSTRAINT_IMPOSSIBLE", input, durationRuleSet, {
@@ -3395,7 +3399,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
       durationExerciseInputs(exercises),
       candidates,
       input,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
   }
   const expanded = expandToUseDurationBudget(
@@ -3422,7 +3426,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     const restSecondsBetweenSets = exerciseRestSeconds(
       exercise2.selected.exerciseId,
       input,
-      durationRuleSet
+      effectiveDurationRuleSet
     );
     return {
       ...exercise2.selected,
@@ -3432,7 +3436,7 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
         exercise2.workingSets,
         candidate,
         restSecondsBetweenSets,
-        durationRuleSet
+        effectiveDurationRuleSet
       ),
       restSecondsBetweenSets
     };
@@ -3447,9 +3451,21 @@ function constructDurationFittedWorkout(input, scoringRuleSet, allocationRuleSet
     exercises: fittedExercises,
     muscleVolumeSummary,
     estimatedDuration: estimate,
+    durationExpansionStopReason: expanded.stopReason,
     decisions,
     allocation
   };
+}
+function resolveGoalRestSeconds(defaultRestSeconds, restTendency) {
+  switch (restTendency) {
+    case "longer":
+      return defaultRestSeconds * 2;
+    case "shorter":
+      return Math.round(defaultRestSeconds * (2 / 3));
+    case "moderate":
+    case void 0:
+      return defaultRestSeconds;
+  }
 }
 function expandToUseDurationBudget(initialExercises, allocation, candidates, input, allocationRuleSet, durationRuleSet, maximumDurationSeconds, diversityFactor) {
   let exercises = cloneExercises(initialExercises);
@@ -3469,15 +3485,35 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
       )
     ])
   );
+  const hardMaximums = new Map(
+    allocation.muscleVolumeSummary.map((summary) => [summary.muscleId, summary.maximumWorkingSets])
+  );
+  let expansionMaximums = preferredMaximums;
+  let usingHardMaximums = false;
+  let stopReason = expansionStopReason(
+    estimate,
+    maximumDurationSeconds,
+    durationRuleSet
+  );
   while (estimate.totalSeconds / maximumDurationSeconds < durationRuleSet.targetDurationUtilization && maximumDurationSeconds - estimate.totalSeconds >= durationRuleSet.minimumExpansionBudgetSeconds) {
+    stopReason = "movement_pattern_constraint";
     const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
     const targetMuscles = allocation.muscleVolumeSummary.filter(
-      ({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (preferredMaximums.get(muscleId) ?? 0)
+      ({ muscleId }) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < (expansionMaximums.get(muscleId) ?? 0)
     ).sort((left, right) => {
-      const leftRatio = (volumes.get(left.muscleId) ?? 0) / Math.max(preferredMaximums.get(left.muscleId) ?? 0, Number.EPSILON);
-      const rightRatio = (volumes.get(right.muscleId) ?? 0) / Math.max(preferredMaximums.get(right.muscleId) ?? 0, Number.EPSILON);
+      const leftRatio = (volumes.get(left.muscleId) ?? 0) / Math.max(expansionMaximums.get(left.muscleId) ?? 0, Number.EPSILON);
+      const rightRatio = (volumes.get(right.muscleId) ?? 0) / Math.max(expansionMaximums.get(right.muscleId) ?? 0, Number.EPSILON);
       return leftRatio - rightRatio || left.muscleId.localeCompare(right.muscleId);
     });
+    if (targetMuscles.length === 0) {
+      if (!usingHardMaximums && hasExpansionHeadroom(exercises, candidates, allocationRuleSet, hardMaximums)) {
+        expansionMaximums = hardMaximums;
+        usingHardMaximums = true;
+        continue;
+      }
+      stopReason = "maximum_useful_volume_reached";
+      break;
+    }
     let accepted = false;
     for (const target of targetMuscles) {
       const selectedCandidates = exercises.filter(
@@ -3515,7 +3551,7 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
           expandedExercises,
           candidates,
           allocationRuleSet,
-          preferredMaximums
+          expansionMaximums
         )) {
           decisions.push({
             code: "ADDED_WORKING_SET_FOR_DURATION_BUDGET",
@@ -3575,7 +3611,7 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
           expandedExercises,
           candidates,
           allocationRuleSet,
-          preferredMaximums
+          expansionMaximums
         )) {
           decisions.push({
             code: "ADDED_EXERCISE_FOR_DURATION_BUDGET",
@@ -3594,10 +3630,133 @@ function expandToUseDurationBudget(initialExercises, allocation, candidates, inp
       }
     }
     if (!accepted) {
+      if (!usingHardMaximums && hasExpansionHeadroom(exercises, candidates, allocationRuleSet, hardMaximums)) {
+        expansionMaximums = hardMaximums;
+        usingHardMaximums = true;
+        continue;
+      }
+      stopReason = expansionCandidateStopReason(
+        exercises,
+        allocation,
+        candidates,
+        input,
+        allocationRuleSet,
+        durationRuleSet,
+        maximumDurationSeconds
+      );
       break;
     }
+    stopReason = expansionStopReason(estimate, maximumDurationSeconds, durationRuleSet);
   }
-  return { exercises, decisions, estimate };
+  return { exercises, decisions, estimate, stopReason };
+}
+function expansionStopReason(estimate, maximumDurationSeconds, ruleSet) {
+  if (estimate.totalSeconds / maximumDurationSeconds >= ruleSet.targetDurationUtilization) {
+    return "target_duration_reached";
+  }
+  if (maximumDurationSeconds - estimate.totalSeconds < ruleSet.minimumExpansionBudgetSeconds) {
+    return "minimum_expansion_budget_remaining";
+  }
+  return "movement_pattern_constraint";
+}
+function expansionCandidateStopReason(exercises, allocation, candidates, input, allocationRuleSet, durationRuleSet, maximumDurationSeconds) {
+  const selectedExerciseIds = new Set(exercises.map(({ selected }) => selected.exerciseId));
+  const selectedFamilyIds = new Set(exercises.map(({ selected }) => selected.exerciseFamilyId));
+  const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
+  const hardMaximums = resolveHardMaximums(allocation, input, allocationRuleSet);
+  const selectedTargetRelevantExercises = exercises.filter((exercise2) => {
+    const candidate = requiredCandidate(candidates, exercise2.selected.exerciseId);
+    return input.targetMuscles.some(
+      ({ muscleId }) => calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) > 0
+    );
+  });
+  const unselectedTargetRelevantCandidates = allocation.scoring.rankedCandidates.filter(
+    ({ candidate }) => !selectedExerciseIds.has(candidate.exerciseId) && input.targetMuscles.some(
+      ({ muscleId }) => calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) > 0
+    )
+  );
+  if (unselectedTargetRelevantCandidates.length === 0 && selectedTargetRelevantExercises.every(
+    (exercise2) => exercise2.workingSets >= allocationRuleSet.maximumWorkingSetsPerExercise
+  )) {
+    return "candidate_saturation";
+  }
+  const selectedIncrementsBlockedByHardMaximums = selectedTargetRelevantExercises.filter((exercise2) => exercise2.workingSets < allocationRuleSet.maximumWorkingSetsPerExercise).every(
+    (exercise2) => exceedsHardMaximums(
+      requiredCandidate(candidates, exercise2.selected.exerciseId),
+      1,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    )
+  );
+  const candidateInsertionsBlockedByHardMaximums = unselectedTargetRelevantCandidates.every(
+    ({ candidate }) => exceedsHardMaximums(
+      candidate,
+      durationRuleSet.minimumWorkingSetsPerExercise,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    )
+  );
+  if (selectedIncrementsBlockedByHardMaximums && candidateInsertionsBlockedByHardMaximums) {
+    return "maximum_useful_volume_reached";
+  }
+  const familyConstraintBlocksInsertion = unselectedTargetRelevantCandidates.some(
+    ({ candidate }) => selectedFamilyIds.has(candidate.exerciseFamilyId) && !exceedsHardMaximums(
+      candidate,
+      durationRuleSet.minimumWorkingSetsPerExercise,
+      volumes,
+      hardMaximums,
+      allocationRuleSet
+    ) && estimateWorkoutDuration(
+      [
+        ...durationExerciseInputs(exercises),
+        {
+          exerciseId: candidate.exerciseId,
+          workingSets: durationRuleSet.minimumWorkingSetsPerExercise
+        }
+      ],
+      candidates,
+      input,
+      durationRuleSet
+    ).totalSeconds <= maximumDurationSeconds
+  );
+  if (familyConstraintBlocksInsertion) {
+    return "movement_pattern_constraint";
+  }
+  return "minimum_expansion_budget_remaining";
+}
+function hasExpansionHeadroom(exercises, candidates, allocationRuleSet, maximums) {
+  const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);
+  return [...maximums.entries()].some(
+    ([muscleId, maximum]) => (volumes.get(muscleId) ?? 0) + Number.EPSILON < maximum
+  );
+}
+function resolveHardMaximums(allocation, input, allocationRuleSet) {
+  const hardMaximums = new Map(
+    allocation.muscleVolumeSummary.map(({ muscleId, maximumWorkingSets }) => [
+      muscleId,
+      maximumWorkingSets
+    ])
+  );
+  input.constraints.forEach((constraint) => {
+    if (constraint.kind === "muscle_volume_limit") {
+      hardMaximums.set(
+        constraint.muscleId,
+        Math.min(
+          hardMaximums.get(constraint.muscleId) ?? allocationRuleSet.maximumWorkingSetsPerMuscle,
+          constraint.maximumWorkingSets
+        )
+      );
+    }
+  });
+  return hardMaximums;
+}
+function exceedsHardMaximums(candidate, additionalSets, volumes, hardMaximums, allocationRuleSet) {
+  return [...hardMaximums.entries()].some(([muscleId, maximum]) => {
+    const added = calculateExerciseMuscleSetContribution(candidate, muscleId, allocationRuleSet) * additionalSets;
+    return (volumes.get(muscleId) ?? 0) + added > maximum + Number.EPSILON;
+  });
 }
 function respectsPreferredExpansionMaximums(exercises, candidates, allocationRuleSet, preferredMaximums) {
   const volumes = calculateVolumes(exercises, candidates, allocationRuleSet);

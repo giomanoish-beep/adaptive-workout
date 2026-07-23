@@ -63,10 +63,9 @@ export interface TrainingGoalRuleProfile {
   readonly repRangeGuidance: TrainingGoalRepRangeGuidance;
 
   /**
-   * Recommended rest tendency for this goal. Downstream guidance;
-   * the `WorkoutDurationRuleSet.defaultRestSecondsBetweenSets` is
-   * the authoring rule for between-set rest. Callers may use this
-   * to select a different default rest value per goal.
+   * Recommended rest tendency for this goal. Duration fitting derives a
+   * goal-aware default from this value, while template prescriptions may still
+   * override rest for specific exercises.
    */
   readonly restTendency: 'shorter' | 'moderate' | 'longer';
 }
