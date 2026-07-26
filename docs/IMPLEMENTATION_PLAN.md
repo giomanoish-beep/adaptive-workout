@@ -64,3 +64,4 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1.3                   | Personal beta: deployable with real Supabase persistence            | DONE    | V1.2                                                         |
 | V1.4                   | Mobile UX (100dvh), email OTP auth, duration tuning, load estimator | DONE    | V1.3                                                         |
 | STAB-002               | Add explicit load prescriptions and body-weight calibration         | DONE    | V1.4                                                         |
+| STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
