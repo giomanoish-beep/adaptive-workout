@@ -187,6 +187,13 @@ export async function installE2ERouteMocks(
             exerciseId: 'e2e-replacement-1',
             exerciseVersion: 1,
             name: 'Incline Dumbbell Bench Press',
+            loadPrescription: {
+              kind: 'external_numeric',
+              suggestedLoadKg: 10,
+              unit: 'kg',
+              label: 'Estimated per dumbbell — confirm after first set',
+              incrementKg: 2,
+            },
           },
         }),
       });

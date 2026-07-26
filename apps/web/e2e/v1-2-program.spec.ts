@@ -2,6 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { completeOnboarding, preserveStoreAndReload, readE2EStore, setupE2ETest } from './helpers';
 
+const VISUAL_SNAPSHOT_NOW = new Date('2026-07-23T12:00:00Z');
+const VISUAL_SNAPSHOT_TODAY = '2026-07-23';
+
 function monitor(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
@@ -165,12 +168,17 @@ test.describe('V1.2 visual snapshots', () => {
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'Stable visual baselines are captured once.');
+    await page.clock.install({ time: VISUAL_SNAPSHOT_NOW });
     await ready(page);
     await expect(page).toHaveScreenshot('v1-2-no-program-today.png', { fullPage: true });
     await page.getByRole('button', { name: 'Generate one session' }).click();
     await expect(page).toHaveScreenshot('v1-2-ad-hoc-entry.png', { fullPage: true });
     await page.getByRole('button', { name: 'Today', exact: true }).click();
     await createProgram(page);
+    await expect(page.getByLabel('New workout date')).toHaveValue(VISUAL_SNAPSHOT_TODAY);
+    await expect(page.getByText('Next scheduled workout').locator('..')).toContainText(
+      VISUAL_SNAPSHOT_TODAY,
+    );
     await expect(page).toHaveScreenshot('v1-2-today-scheduled.png', { fullPage: true });
     await page.getByRole('button', { name: 'Start today’s workout' }).click();
     await expect(page).toHaveScreenshot('v1-2-scheduled-review.png', { fullPage: true });
