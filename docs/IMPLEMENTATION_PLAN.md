@@ -65,3 +65,14 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1.4                   | Mobile UX (100dvh), email OTP auth, duration tuning, load estimator | DONE    | V1.3                                                         |
 | STAB-002               | Add explicit load prescriptions and body-weight calibration         | DONE    | V1.4                                                         |
 | STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
+| STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
+
+## STAB-005 evidence
+
+- Added `npm run release:check`, a deterministic static release-readiness guard
+  that does not read secrets or modify remote resources.
+- Added `docs/RELEASE_CHECKLIST.md` to separate automated release-candidate
+  checks from manual production, Supabase, OTP, deployment, and iPhone gates.
+- Wired the release-readiness guard into the GitHub Actions quality job.
+- Production deployment, remote Supabase changes, Edge Function deployment, and
+  iPhone installation verification remain manual human gates.

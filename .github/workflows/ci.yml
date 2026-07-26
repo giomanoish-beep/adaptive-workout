@@ -52,6 +52,9 @@ jobs:
       - name: Verify production E2E guard
         run: npm run test:e2e-production-guard
 
+      - name: Verify release readiness checklist
+        run: npm run release:check
+
   database:
     runs-on: ubuntu-latest
     steps:
