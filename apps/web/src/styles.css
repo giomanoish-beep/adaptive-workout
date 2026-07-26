@@ -58,6 +58,16 @@ main > p:last-child {
   flex-direction: column;
 }
 
+@media (max-width: 699px) {
+  .auth-shell--authenticated {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
 .app-nav__content {
   flex: 1 1 auto;
   width: min(100% - 2rem, var(--content-max));
