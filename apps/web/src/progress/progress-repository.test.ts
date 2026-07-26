@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   computeStreakWeeks,
   formatDateLabel,
@@ -7,6 +7,16 @@ import {
   isoWeekKey,
   mapProgressionRow,
 } from './progress-repository';
+
+const FIXED_NOW = new Date('2026-07-23T12:00:00Z');
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: FIXED_NOW });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // ─── Date formatting ─────────────────────────────────────────────────
 
