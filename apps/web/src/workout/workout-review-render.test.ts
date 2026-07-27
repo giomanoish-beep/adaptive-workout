@@ -23,4 +23,26 @@ describe('WorkoutReview load display', () => {
       html.indexOf('workout-card__metrics'),
     );
   });
+
+  it('renders the optional AI decision explanation without provider details', () => {
+    const html = renderToStaticMarkup(
+      createElement(WorkoutReview, {
+        review: {
+          ...workoutReviewFixture,
+          decisionExplanation: {
+            text: 'This workout fits the selected muscles and available time.',
+          },
+        },
+        replacingPosition: null,
+        replacementError: null,
+        onReplaceExercise: vi.fn(),
+        onStartWorkout: vi.fn(),
+        onEditRequest: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('Why this workout');
+    expect(html).toContain('This workout fits the selected muscles and available time.');
+    expect(html).not.toMatch(/deepseek|glm|provider|prompt|DEEPSEEK_API_KEY/i);
+  });
 });

@@ -79,6 +79,13 @@ export function WorkoutReview({
         </p>
       )}
 
+      {review.decisionExplanation && (
+        <section className="workout-review__explanation" aria-label="Workout decision explanation">
+          <h3 className="workout-review__explanation-title">Why this workout</h3>
+          <p>{review.decisionExplanation.text}</p>
+        </section>
+      )}
+
       <section className="workout-review__volume">
         <h3 className="workout-review__volume-title">Muscle volume</h3>
         <ul className="workout-review__volume-list">

@@ -58,6 +58,7 @@ export function mapEngineResultToReview(
     engineVersion: `${ORCHESTRATOR_ENGINE_NAME}@${String(ORCHESTRATOR_RULE_SET_VERSION)}`,
     ruleSetVersion: String(ORCHESTRATOR_RULE_SET_VERSION),
     traceSummary: null,
+    decisionExplanation: null,
   };
 }
 

@@ -17,11 +17,14 @@
 import {
   constructDurationFittedWorkout,
   validateWorkoutEngineInput,
+  type DurationFittedWorkoutSuccess,
 } from '@adaptive-workout/workout-engine';
 import { NoopSink, type ObservabilitySink } from '@adaptive-workout/observability';
 import type {
   GenerateWorkoutRequest,
+  WorkoutDecisionExplanationRequest,
   WorkoutReviewResponse,
+  WorkoutReviewSuccess,
   WorkoutGenerationDependencies,
 } from './contracts.js';
 import { validateGenerateWorkoutRequest } from './validation.js';
@@ -252,7 +255,15 @@ export async function generateWorkout(
     latencyMs,
   });
 
-  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId, profile);
+  const review = mapEngineResultToReview(
+    engineResult,
+    catalogResult,
+    goalProfile,
+    correlationId,
+    profile,
+  );
+
+  return withOptionalDecisionExplanation(review, engineResult, deps, correlationId, obs);
 }
 
 function mapEngineFailureToErrorCode(code: string): 'NO_FEASIBLE_WORKOUT' | 'GENERATION_FAILED' {
@@ -268,3 +279,114 @@ function mapEngineFailureToErrorCode(code: string): 'NO_FEASIBLE_WORKOUT' | 'GEN
 }
 
 const ORCHESTRATOR_ENGINE_NAME = '@adaptive-workout/workout-engine';
+
+async function withOptionalDecisionExplanation(
+  review: WorkoutReviewSuccess,
+  engineResult: DurationFittedWorkoutSuccess,
+  deps: WorkoutGenerationDependencies,
+  correlationId: string,
+  obs: ReturnType<typeof createGenerationObservability>,
+): Promise<WorkoutReviewSuccess> {
+  if (deps.decisionExplainer === undefined) {
+    return review;
+  }
+
+  const decidedAt = deps.clock?.() ?? new Date().toISOString();
+  const request: WorkoutDecisionExplanationRequest = {
+    requestId: deps.aiRequestIdFactory?.() ?? createUuid(),
+    decisionId: deps.aiDecisionIdFactory?.() ?? createUuid(),
+    decidedAt,
+    contractVersion: 'ai-contract-1',
+    engineVersion: {
+      engineName: engineResult.engineVersion.engineName,
+      engineVersion: engineResult.engineVersion.engineVersion,
+      ruleSetVersion: engineResult.engineVersion.ruleSetVersion,
+    },
+    action: { kind: 'generated_workout', origin: 'generated' },
+    reasonCodes: workoutReasonCodes(engineResult),
+    evidence: workoutDecisionEvidence(review, engineResult),
+    locale: 'en-US',
+    maximumCharacters: 360,
+    timeoutMilliseconds: 8_000,
+  };
+
+  const startedAt = Date.now();
+  try {
+    const result = await deps.decisionExplainer.explainWorkoutDecision(request);
+    if (result.status === 'success') {
+      obs.emitAiExplanationSucceeded({
+        correlationId,
+        latencyMs: Date.now() - startedAt,
+      });
+      return { ...review, decisionExplanation: result.explanation };
+    }
+
+    obs.emitAiExplanationSkipped({
+      correlationId,
+      reason: result.code,
+      retryable: result.retryable,
+    });
+    return review;
+  } catch {
+    obs.emitAiExplanationSkipped({
+      correlationId,
+      reason: 'provider_failure',
+      retryable: true,
+    });
+    return review;
+  }
+}
+
+function workoutReasonCodes(engineResult: DurationFittedWorkoutSuccess): readonly string[] {
+  const codes = new Set<string>([
+    'generated_workout',
+    `duration_stop_${engineResult.durationExpansionStopReason}`,
+  ]);
+  for (const decision of engineResult.decisions) {
+    codes.add(decision.code.toLocaleLowerCase('en-US'));
+  }
+  return [...codes].sort();
+}
+
+function workoutDecisionEvidence(
+  review: WorkoutReviewSuccess,
+  engineResult: DurationFittedWorkoutSuccess,
+): readonly WorkoutDecisionExplanationRequest['evidence'][number][] {
+  const exerciseNames = review.exercises.map((exercise) => exercise.name).join(', ');
+  const volume = review.muscleVolume.map((entry) => `${entry.muscle}: ${entry.volume}`).join('; ');
+  const durationFacts = [
+    `${review.estimatedDurationMinutes} minute estimate`,
+    `${review.totalWorkingSets} working sets`,
+    `${review.exercises.length} exercises`,
+  ].join(', ');
+
+  return [
+    {
+      evidenceId: 'workout.summary',
+      kind: 'rule',
+      fact: `Generated ${review.title}: ${durationFacts}.`,
+    },
+    {
+      evidenceId: 'workout.exercises',
+      kind: 'exercise',
+      fact: `Selected exercises: ${exerciseNames}.`,
+    },
+    {
+      evidenceId: 'workout.volume',
+      kind: 'set',
+      fact: `Target muscle volume summary: ${volume}.`,
+    },
+    {
+      evidenceId: 'workout.duration_stop',
+      kind: 'rule',
+      fact: `Duration expansion stopped because ${engineResult.durationExpansionStopReason}.`,
+    },
+  ];
+}
+
+function createUuid(): string {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return '00000000-0000-4000-8000-000000000000';
+}

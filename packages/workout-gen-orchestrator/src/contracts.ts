@@ -111,6 +111,16 @@ export interface WorkoutReviewMuscleVolume {
   readonly volume: number;
 }
 
+export interface WorkoutDecisionExplanation {
+  /**
+   * User-facing explanation generated from deterministic decision evidence.
+   *
+   * This field is browser-safe: it never carries provider identifiers, prompts,
+   * raw model responses, credentials, or routing metadata.
+   */
+  readonly text: string;
+}
+
 export interface WorkoutReviewSuccess {
   readonly status: 'success';
   /** Generation correlation ID. */
@@ -126,6 +136,8 @@ export interface WorkoutReviewSuccess {
   readonly ruleSetVersion: string;
   /** Controlled trace summary for UI debugging only. */
   readonly traceSummary: string | null;
+  /** Optional AI explanation of the deterministic workout decision. */
+  readonly decisionExplanation: WorkoutDecisionExplanation | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -249,6 +261,51 @@ export interface ProfileLoader {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Server-side AI explanation port                                    */
+/* ------------------------------------------------------------------ */
+
+export interface WorkoutDecisionExplanationEvidence {
+  readonly evidenceId: string;
+  readonly kind: 'constraint' | 'exercise' | 'exposure' | 'set' | 'observation' | 'rule';
+  readonly fact: string;
+}
+
+export interface WorkoutDecisionExplanationRequest {
+  readonly requestId: string;
+  readonly decisionId: string;
+  readonly decidedAt: string;
+  readonly contractVersion: string;
+  readonly engineVersion: {
+    readonly engineName: string;
+    readonly engineVersion: string;
+    readonly ruleSetVersion: string;
+  };
+  readonly action: { readonly kind: 'generated_workout'; readonly origin: 'generated' };
+  readonly reasonCodes: readonly string[];
+  readonly evidence: readonly WorkoutDecisionExplanationEvidence[];
+  readonly locale: string;
+  readonly maximumCharacters: number;
+  readonly timeoutMilliseconds: number;
+}
+
+export type WorkoutDecisionExplanationFailureCode =
+  'not_configured' | 'provider_failure' | 'provider_timeout' | 'invalid_output';
+
+export type WorkoutDecisionExplanationResult =
+  | { readonly status: 'success'; readonly explanation: WorkoutDecisionExplanation }
+  | {
+      readonly status: 'failure';
+      readonly code: WorkoutDecisionExplanationFailureCode;
+      readonly retryable: boolean;
+    };
+
+export interface WorkoutDecisionExplainer {
+  explainWorkoutDecision(
+    request: WorkoutDecisionExplanationRequest,
+  ): Promise<WorkoutDecisionExplanationResult>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Orchestrator dependencies                                          */
 /* ------------------------------------------------------------------ */
 
@@ -259,4 +316,10 @@ export interface WorkoutGenerationDependencies {
   readonly muscleIdMap: MuscleIdMap;
   /** Correlation ID for observability. */
   readonly correlationId?: string;
+  /** Optional server-only AI explanation dependency. */
+  readonly decisionExplainer?: WorkoutDecisionExplainer;
+  /** Injectable IDs/time keep tests deterministic. */
+  readonly aiRequestIdFactory?: () => string;
+  readonly aiDecisionIdFactory?: () => string;
+  readonly clock?: () => string;
 }

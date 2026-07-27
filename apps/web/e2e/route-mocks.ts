@@ -239,6 +239,7 @@ export async function installE2ERouteMocks(
       engineVersion: 'e2e-test-1.0.0',
       ruleSetVersion: 'e2e-test-1.0.0',
       traceSummary: null,
+      decisionExplanation: null,
     };
 
     await route.fulfill({

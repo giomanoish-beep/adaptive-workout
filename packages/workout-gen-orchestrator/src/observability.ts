@@ -43,6 +43,15 @@ export interface GenerationObservability {
     readonly errorCode: string;
     readonly latencyMs: number;
   }): void;
+  emitAiExplanationSucceeded(metadata: {
+    readonly correlationId: string;
+    readonly latencyMs: number;
+  }): void;
+  emitAiExplanationSkipped(metadata: {
+    readonly correlationId: string;
+    readonly reason: string;
+    readonly retryable: boolean;
+  }): void;
 }
 
 export function createGenerationObservability(sink: ObservabilitySink): GenerationObservability {
@@ -108,6 +117,28 @@ export function createGenerationObservability(sink: ObservabilitySink): Generati
       emitEvent({
         eventName: 'generation_engine_failed',
         level: 'error',
+        domain: 'workout_decision',
+        timestamp: new Date().toISOString(),
+        correlationId: metadata.correlationId,
+        metadata,
+      });
+    },
+
+    emitAiExplanationSucceeded(metadata) {
+      emitEvent({
+        eventName: 'generation_ai_explanation_succeeded',
+        level: 'info',
+        domain: 'workout_decision',
+        timestamp: new Date().toISOString(),
+        correlationId: metadata.correlationId,
+        metadata,
+      });
+    },
+
+    emitAiExplanationSkipped(metadata) {
+      emitEvent({
+        eventName: 'generation_ai_explanation_skipped',
+        level: metadata.retryable ? 'warn' : 'info',
         domain: 'workout_decision',
         timestamp: new Date().toISOString(),
         correlationId: metadata.correlationId,

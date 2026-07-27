@@ -64,6 +64,7 @@ export interface GatewayReviewSuccess {
   readonly engineVersion: string;
   readonly ruleSetVersion: string;
   readonly traceSummary: string | null;
+  readonly decisionExplanation: { readonly text: string } | null;
 }
 
 export type GatewayErrorCode =
@@ -309,6 +310,7 @@ export function mapGatewayToWorkoutReview(gateway: GatewayReviewSuccess): Workou
       muscle: mv.muscle,
       volume: mv.volume,
     })),
+    decisionExplanation: gateway.decisionExplanation,
   };
 }
 

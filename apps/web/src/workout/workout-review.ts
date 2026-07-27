@@ -52,12 +52,17 @@ export interface WorkoutReviewMuscleVolume {
   readonly volume: number;
 }
 
+export interface WorkoutDecisionExplanation {
+  readonly text: string;
+}
+
 export interface WorkoutReview {
   readonly title: string;
   readonly estimatedDurationMinutes: number;
   readonly totalWorkingSets: number;
   readonly exercises: readonly WorkoutReviewExercise[];
   readonly muscleVolume: readonly WorkoutReviewMuscleVolume[];
+  readonly decisionExplanation?: WorkoutDecisionExplanation | null;
 }
 
 /**

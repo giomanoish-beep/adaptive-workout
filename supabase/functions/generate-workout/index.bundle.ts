@@ -3240,6 +3240,9 @@ function isContributionWeight(value) {
   return Number.isFinite(value) && value >= 0 && value <= 1;
 }
 
+// packages/workout-engine/src/contracts.ts
+var workoutOrigins = ["generated", "programmed", "custom", "adapted"];
+
 // packages/workout-engine/src/duration.ts
 var DEFAULT_GOAL_MULTIPLIERS = {
   volumeMultiplier: 1.6,
@@ -4690,7 +4693,8 @@ function mapEngineResultToReview(engineResult, catalogResult, goalProfile, gener
     appliedGoal: goalProfile.goal,
     engineVersion: `${ORCHESTRATOR_ENGINE_NAME}@${String(ORCHESTRATOR_RULE_SET_VERSION)}`,
     ruleSetVersion: String(ORCHESTRATOR_RULE_SET_VERSION),
-    traceSummary: null
+    traceSummary: null,
+    decisionExplanation: null
   };
 }
 function mapExercise(fitted, index, catalogResult, goalProfile, profile) {
@@ -4829,6 +4833,26 @@ function createGenerationObservability(sink) {
       emitEvent({
         eventName: "generation_engine_failed",
         level: "error",
+        domain: "workout_decision",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        correlationId: metadata.correlationId,
+        metadata
+      });
+    },
+    emitAiExplanationSucceeded(metadata) {
+      emitEvent({
+        eventName: "generation_ai_explanation_succeeded",
+        level: "info",
+        domain: "workout_decision",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        correlationId: metadata.correlationId,
+        metadata
+      });
+    },
+    emitAiExplanationSkipped(metadata) {
+      emitEvent({
+        eventName: "generation_ai_explanation_skipped",
+        level: metadata.retryable ? "warn" : "info",
         domain: "workout_decision",
         timestamp: (/* @__PURE__ */ new Date()).toISOString(),
         correlationId: metadata.correlationId,
@@ -5013,7 +5037,14 @@ async function generateWorkout(request, userId, deps, sink = new NoopSink()) {
     prescriptionVersion: PRESCRIPTION_RULES_VERSION,
     latencyMs
   });
-  return mapEngineResultToReview(engineResult, catalogResult, goalProfile, correlationId, profile);
+  const review = mapEngineResultToReview(
+    engineResult,
+    catalogResult,
+    goalProfile,
+    correlationId,
+    profile
+  );
+  return withOptionalDecisionExplanation(review, engineResult, deps, correlationId, obs);
 }
 function mapEngineFailureToErrorCode(code) {
   const noFeasibleCodes = /* @__PURE__ */ new Set([
@@ -5027,6 +5058,100 @@ function mapEngineFailureToErrorCode(code) {
   return noFeasibleCodes.has(code) ? "NO_FEASIBLE_WORKOUT" : "GENERATION_FAILED";
 }
 var ORCHESTRATOR_ENGINE_NAME2 = "@adaptive-workout/workout-engine";
+async function withOptionalDecisionExplanation(review, engineResult, deps, correlationId, obs) {
+  if (deps.decisionExplainer === void 0) {
+    return review;
+  }
+  const decidedAt = deps.clock?.() ?? (/* @__PURE__ */ new Date()).toISOString();
+  const request = {
+    requestId: deps.aiRequestIdFactory?.() ?? createUuid(),
+    decisionId: deps.aiDecisionIdFactory?.() ?? createUuid(),
+    decidedAt,
+    contractVersion: "ai-contract-1",
+    engineVersion: {
+      engineName: engineResult.engineVersion.engineName,
+      engineVersion: engineResult.engineVersion.engineVersion,
+      ruleSetVersion: engineResult.engineVersion.ruleSetVersion
+    },
+    action: { kind: "generated_workout", origin: "generated" },
+    reasonCodes: workoutReasonCodes(engineResult),
+    evidence: workoutDecisionEvidence(review, engineResult),
+    locale: "en-US",
+    maximumCharacters: 360,
+    timeoutMilliseconds: 8e3
+  };
+  const startedAt = Date.now();
+  try {
+    const result = await deps.decisionExplainer.explainWorkoutDecision(request);
+    if (result.status === "success") {
+      obs.emitAiExplanationSucceeded({
+        correlationId,
+        latencyMs: Date.now() - startedAt
+      });
+      return { ...review, decisionExplanation: result.explanation };
+    }
+    obs.emitAiExplanationSkipped({
+      correlationId,
+      reason: result.code,
+      retryable: result.retryable
+    });
+    return review;
+  } catch {
+    obs.emitAiExplanationSkipped({
+      correlationId,
+      reason: "provider_failure",
+      retryable: true
+    });
+    return review;
+  }
+}
+function workoutReasonCodes(engineResult) {
+  const codes = /* @__PURE__ */ new Set([
+    "generated_workout",
+    `duration_stop_${engineResult.durationExpansionStopReason}`
+  ]);
+  for (const decision of engineResult.decisions) {
+    codes.add(decision.code.toLocaleLowerCase("en-US"));
+  }
+  return [...codes].sort();
+}
+function workoutDecisionEvidence(review, engineResult) {
+  const exerciseNames = review.exercises.map((exercise2) => exercise2.name).join(", ");
+  const volume = review.muscleVolume.map((entry) => `${entry.muscle}: ${entry.volume}`).join("; ");
+  const durationFacts = [
+    `${review.estimatedDurationMinutes} minute estimate`,
+    `${review.totalWorkingSets} working sets`,
+    `${review.exercises.length} exercises`
+  ].join(", ");
+  return [
+    {
+      evidenceId: "workout.summary",
+      kind: "rule",
+      fact: `Generated ${review.title}: ${durationFacts}.`
+    },
+    {
+      evidenceId: "workout.exercises",
+      kind: "exercise",
+      fact: `Selected exercises: ${exerciseNames}.`
+    },
+    {
+      evidenceId: "workout.volume",
+      kind: "set",
+      fact: `Target muscle volume summary: ${volume}.`
+    },
+    {
+      evidenceId: "workout.duration_stop",
+      kind: "rule",
+      fact: `Duration expansion stopped because ${engineResult.durationExpansionStopReason}.`
+    }
+  ];
+}
+function createUuid() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return "00000000-0000-4000-8000-000000000000";
+}
 
 // packages/workout-gen-orchestrator/src/replacement.ts
 function selectReplacementCandidate(request, engineInput) {
@@ -5175,6 +5300,2374 @@ function sharedPrimaryCount(current, candidate) {
 }
 function replacementError(code, message) {
   return { status: "error", action: "replace_exercise", code, message };
+}
+
+// packages/ai/src/contracts.ts
+var aiTaskKinds = [
+  "workout_intent_extraction",
+  "discomfort_observation_extraction",
+  "grounded_decision_explanation"
+];
+var workoutIntentInformationCodes = [
+  "target_muscles_unclear",
+  "duration_unclear",
+  "equipment_context_unclear",
+  "constraint_unclear"
+];
+var aiDecisionEvidenceKinds = [
+  "constraint",
+  "exercise",
+  "exposure",
+  "set",
+  "observation",
+  "rule"
+];
+var aiProviderFailureCodes = [
+  "UNSUPPORTED_TASK",
+  "INVALID_TASK_INPUT",
+  "PROVIDER_UNAVAILABLE",
+  "PROVIDER_TIMEOUT",
+  "PROVIDER_RATE_LIMITED",
+  "PROVIDER_AUTHENTICATION_FAILED",
+  "PROVIDER_PAYMENT_REQUIRED",
+  "MALFORMED_PROVIDER_RESPONSE",
+  "STRUCTURED_OUTPUT_VALIDATION_FAILED",
+  "UNSUPPORTED_PROVIDER_CAPABILITY",
+  "FALLBACK_EXHAUSTED"
+];
+
+// packages/pain-safety/src/contracts.ts
+var painSafetyTriStateValues = ["present", "absent", "unknown"];
+var discomfortBodyAreas = [
+  "head",
+  "neck",
+  "chest",
+  "upper_back",
+  "lower_back",
+  "shoulder",
+  "upper_arm",
+  "elbow",
+  "forearm",
+  "wrist",
+  "hand",
+  "abdomen",
+  "hip",
+  "groin",
+  "thigh",
+  "knee",
+  "lower_leg",
+  "ankle",
+  "foot",
+  "other"
+];
+var discomfortBodySides = [
+  "left",
+  "right",
+  "bilateral",
+  "midline",
+  "not_applicable"
+];
+var discomfortOnsetPatterns = ["sudden", "gradual", "unknown"];
+var discomfortActivityContexts = [
+  "training",
+  "daily_activity",
+  "rest",
+  "other",
+  "unknown"
+];
+var discomfortTrends = [
+  "improving",
+  "unchanged",
+  "worsening",
+  "resolved",
+  "unknown"
+];
+var discomfortMovementPatterns = [
+  "deep_flexion",
+  "pressing",
+  "pulling",
+  "squatting",
+  "hinging",
+  "overhead",
+  "rotation",
+  "impact",
+  "weight_bearing",
+  "other"
+];
+var painSafetyMissingQuestionCodes = [
+  "severity",
+  "traumatic_or_sudden_onset",
+  "swelling",
+  "instability_or_giving_way",
+  "weight_bearing_limitation",
+  "visible_deformity",
+  "numbness_or_weakness",
+  "systemic_warning_signals",
+  "movement_trigger",
+  "symptom_trend"
+];
+var painSafetyClassifications = ["GREEN", "ADAPT", "STOP"];
+var painSafetyClassificationReasonCodes = [
+  "NO_RULE_BASED_RESTRICTION_FOUND",
+  "REPORTED_DISCOMFORT_PRESENT",
+  "MOVEMENT_AGGRAVATION_REPORTED",
+  "TRAUMATIC_OR_SUDDEN_ONSET_REPORTED",
+  "MAJOR_WEIGHT_BEARING_LIMITATION_REPORTED",
+  "VISIBLE_DEFORMITY_REPORTED",
+  "SIGNIFICANT_SWELLING_REPORTED",
+  "INSTABILITY_OR_GIVING_WAY_REPORTED",
+  "NUMBNESS_OR_WEAKNESS_REPORTED",
+  "SYSTEMIC_WARNING_SIGNAL_REPORTED",
+  "SEVERE_REPORTED_DISCOMFORT",
+  "WORSENING_REPORTED"
+];
+var painSafetyInformationRequiredReasonCodes = [
+  "REQUIRED_INFORMATION_UNAVAILABLE"
+];
+
+// packages/pain-safety/src/missing-information.ts
+var maximumPainSafetyQuestionsPerBatch = painSafetyMissingQuestionCodes.length;
+var defaultPainSafetyMissingInformationRuleSet = {
+  contractVersion: "pain-safety-missing-rules-v2",
+  ruleSetVersion: "pain-safety-rules-v2",
+  questionBatch: {
+    contractVersion: "pain-safety-question-batch-v1",
+    maximumQuestions: 5
+  },
+  questions: [
+    question("severity", 10, "severity_0_to_10_or_unknown", "severity"),
+    question("traumatic_or_sudden_onset", 20, "tri_state", "safety_traumatic_or_sudden_onset"),
+    question("weight_bearing_limitation", 30, "tri_state", "safety_weight_bearing_limitation"),
+    question("visible_deformity", 40, "tri_state", "safety_visible_deformity"),
+    question("swelling", 50, "tri_state", "safety_swelling"),
+    question("instability_or_giving_way", 60, "tri_state", "safety_instability_or_giving_way"),
+    question("numbness_or_weakness", 70, "tri_state", "safety_numbness_or_weakness"),
+    question("systemic_warning_signals", 80, "tri_state", "safety_systemic_warning_signals"),
+    question("symptom_trend", 90, "trend", "trend"),
+    question("movement_trigger", 100, "movement_trigger_list", "movement_trigger_status")
+  ]
+};
+function question(questionCode, priority, expectedAnswerType, relatedField) {
+  return { questionCode, priority, expectedAnswerType, relatedField };
+}
+var questionMetadata = Object.fromEntries(
+  defaultPainSafetyMissingInformationRuleSet.questions.map(
+    ({ questionCode, expectedAnswerType, relatedField }) => [
+      questionCode,
+      { expectedAnswerType, relatedField }
+    ]
+  )
+);
+
+// packages/pain-safety/src/classification.ts
+var defaultPainSafetyClassificationRuleSet = {
+  contractVersion: "pain-safety-classification-rules-v1",
+  ruleSetVersion: "pain-safety-rules-v2",
+  missingInformationRuleSet: defaultPainSafetyMissingInformationRuleSet,
+  requiredQuestionCodes: [...painSafetyMissingQuestionCodes],
+  stopSignalRules: [
+    stopSignal("traumatic_or_sudden_onset", 10),
+    stopSignal("major_weight_bearing_limitation", 20),
+    stopSignal("visible_deformity", 30),
+    stopSignal("significant_swelling", 40),
+    stopSignal("instability_or_giving_way", 50),
+    stopSignal("numbness_or_weakness", 60),
+    stopSignal("systemic_warning_signal", 70)
+  ],
+  severeSeverityThreshold: 8,
+  severeSeverityPriority: 80,
+  stopOnWorsening: true,
+  worseningTrendPriority: 90,
+  maximumGreenSeverity: 1,
+  greenTrends: ["improving", "unchanged", "resolved"]
+};
+function stopSignal(signalCode, priority) {
+  return { signalCode, priority };
+}
+var stopSignalReasonCodes = {
+  traumatic_or_sudden_onset: "TRAUMATIC_OR_SUDDEN_ONSET_REPORTED",
+  major_weight_bearing_limitation: "MAJOR_WEIGHT_BEARING_LIMITATION_REPORTED",
+  visible_deformity: "VISIBLE_DEFORMITY_REPORTED",
+  significant_swelling: "SIGNIFICANT_SWELLING_REPORTED",
+  instability_or_giving_way: "INSTABILITY_OR_GIVING_WAY_REPORTED",
+  numbness_or_weakness: "NUMBNESS_OR_WEAKNESS_REPORTED",
+  systemic_warning_signal: "SYSTEMIC_WARNING_SIGNAL_REPORTED"
+};
+var stopReasonCodeOrder = [
+  ...Object.values(stopSignalReasonCodes),
+  "SEVERE_REPORTED_DISCOMFORT",
+  "WORSENING_REPORTED"
+];
+
+// packages/pain-safety/src/language-fixtures.ts
+var painSafetyLanguageContractVersion = "pain-safety-language-v1";
+var painSafetyLanguageFixtures = [
+  fixture(
+    "information_required",
+    "More reported information is needed before a training decision can be completed.",
+    [
+      "REQUIRED_INFORMATION_UNAVAILABLE",
+      "INFORMATION_REQUIRED",
+      "FOLLOW_UP_INFORMATION_UNRESOLVED"
+    ]
+  ),
+  fixture("green", "No rule-based training restriction was found from the reported information.", [
+    "NO_RULE_BASED_RESTRICTION_FOUND",
+    "NO_ADAPTATION_REQUIRED"
+  ]),
+  fixture("adapt", "The reported discomfort supports reviewing the listed training constraints.", [
+    "REPORTED_DISCOMFORT_PRESENT",
+    "MOVEMENT_AGGRAVATION_REPORTED",
+    "ADAPTATION_CONSTRAINTS_GENERATED",
+    "NO_SUPPORTED_REPORTED_TRIGGER"
+  ]),
+  fixture(
+    "stop",
+    "A reported warning signal means the affected training request should not continue. Consider seeking qualified medical care.",
+    [
+      "TRAUMATIC_OR_SUDDEN_ONSET_REPORTED",
+      "MAJOR_WEIGHT_BEARING_LIMITATION_REPORTED",
+      "VISIBLE_DEFORMITY_REPORTED",
+      "SIGNIFICANT_SWELLING_REPORTED",
+      "INSTABILITY_OR_GIVING_WAY_REPORTED",
+      "NUMBNESS_OR_WEAKNESS_REPORTED",
+      "SYSTEMIC_WARNING_SIGNAL_REPORTED",
+      "SEVERE_REPORTED_DISCOMFORT",
+      "WORSENING_REPORTED",
+      "TRAINING_NOT_AUTHORIZED"
+    ]
+  ),
+  fixture(
+    "follow_up_improving",
+    "The latest reported discomfort is improving. Review existing training constraints before changing them.",
+    ["MATERIAL_SEVERITY_DECREASE_REPORTED", "IMPROVING_TREND_REPORTED"]
+  ),
+  fixture(
+    "follow_up_unchanged",
+    "The latest reported discomfort is unchanged. Keep existing training constraints under review.",
+    ["STABLE_SEVERITY_REPORTED", "UNCHANGED_TREND_REPORTED"]
+  ),
+  fixture(
+    "follow_up_worsening",
+    "The latest reported discomfort is worsening. Reassessment is required before relying on prior training decisions.",
+    ["MATERIAL_SEVERITY_INCREASE_REPORTED", "WORSENING_TREND_REPORTED", "NEW_STOP_SIGNAL_REPORTED"]
+  ),
+  fixture(
+    "follow_up_resolved",
+    "The latest report explicitly marks the discomfort as resolved. Reassess before relaxing prior training constraints.",
+    ["EXPLICIT_RESOLUTION_REPORTED"]
+  ),
+  fixture(
+    "recurrence",
+    "A new reported discomfort event matches the body area and side of a prior resolved event. This is a recurrence signal only.",
+    ["RECURRENT_DISCOMFORT_CONTEXT_REPORTED"]
+  )
+];
+function fixture(fixtureCode, message, supportedReasonCodes2) {
+  return {
+    fixtureCode,
+    contractVersion: painSafetyLanguageContractVersion,
+    message,
+    supportedReasonCodes: supportedReasonCodes2
+  };
+}
+var supportedReasonCodes = new Set(
+  painSafetyLanguageFixtures.flatMap(({ supportedReasonCodes: codes }) => codes)
+);
+
+// packages/progression-engine/src/contracts.ts
+var progressionRecommendationActions = [
+  "increase_load",
+  "maintain_load",
+  "reduce_load",
+  "review_deload",
+  "change_rep_range",
+  "consider_substitution"
+];
+var progressionRecommendationReasonCodes = [
+  "TARGET_REPS_ACHIEVED",
+  "TARGET_RIR_ACHIEVED",
+  "BELOW_TARGET_REPS",
+  "RIR_BELOW_TARGET",
+  "INSUFFICIENT_HISTORY",
+  "MIXED_PERFORMANCE",
+  "PLATEAU_SIGNAL",
+  "PERFORMANCE_DECLINING",
+  "REPEATED_HIGH_EFFORT",
+  "DELOAD_REVIEW_SIGNAL",
+  "SUBSTITUTION_REVIEW_SIGNAL",
+  "LOAD_INCREMENT_APPLIED",
+  "LOAD_REDUCTION_APPLIED",
+  "WITHIN_TARGET_REP_RANGE",
+  "RIR_UNKNOWN",
+  "LOAD_MAINTAINED",
+  "REP_RANGE_CHANGE_RECOMMENDED"
+];
+
+// packages/ai/src/validation.ts
+var maximumIdentifierLength = 128;
+var maximumTextLength = 4e3;
+var maximumExplanationCharacters = 2e3;
+var maximumTimeoutMilliseconds = 12e4;
+var localePattern = /^[a-z]{2,3}(?:-[A-Z]{2})?$/;
+function success2(value) {
+  return { ok: true, value };
+}
+function failure2(code, issues) {
+  return { ok: false, failure: { code, issues } };
+}
+function issue(issues, path, reasonCode) {
+  issues.push({ path, reasonCode });
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function hasExactKeys(value, required, path, issues) {
+  const actual = Object.keys(value);
+  let valid = true;
+  for (const key of required) {
+    if (!Object.hasOwn(value, key)) {
+      issue(issues, `${path}.${key}`, "required_field_missing");
+      valid = false;
+    }
+  }
+  for (const key of actual) {
+    if (!required.includes(key)) {
+      issue(issues, `${path}.${key}`, "unsupported_field");
+      valid = false;
+    }
+  }
+  return valid;
+}
+function isNonEmptyString(value, maximumLength = maximumIdentifierLength) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maximumLength;
+}
+function isIsoTimestamp(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
+}
+function isNonNegativeInteger3(value) {
+  return Number.isInteger(value) && typeof value === "number" && value >= 0;
+}
+function isPositiveInteger3(value) {
+  return Number.isInteger(value) && typeof value === "number" && value > 0;
+}
+function isOneOf(value, values) {
+  return typeof value === "string" && values.includes(value);
+}
+function validateVersion(value, path, issues) {
+  if (typeof value !== "string" || !parseVersionIdentifier(value, "contract").ok) {
+    issue(issues, path, "version_invalid");
+    return false;
+  }
+  return true;
+}
+function validateEngineVersion(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return false;
+  }
+  hasExactKeys(value, ["engineName", "engineVersion", "ruleSetVersion"], path, issues);
+  if (!isNonEmptyString(value.engineName))
+    issue(issues, `${path}.engineName`, "identifier_invalid");
+  if (typeof value.engineVersion !== "string" || !parseVersionIdentifier(value.engineVersion, "engine").ok) {
+    issue(issues, `${path}.engineVersion`, "version_invalid");
+  }
+  if (typeof value.ruleSetVersion !== "string" || !parseVersionIdentifier(value.ruleSetVersion, "rule-set").ok) {
+    issue(issues, `${path}.ruleSetVersion`, "version_invalid");
+  }
+  return issues.length === 0;
+}
+function validateUniqueStringArray(value, path, issues, options = {}) {
+  if (!Array.isArray(value)) {
+    issue(issues, path, "array_required");
+    return false;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  value.forEach((entry, index) => {
+    if (typeof entry !== "string" || entry.length === 0 || options.uuid === true && !isUuid(entry) || options.allowed !== void 0 && !options.allowed.includes(entry)) {
+      issue(issues, `${path}[${index}]`, "controlled_value_invalid");
+    } else if (seen.has(entry)) {
+      issue(issues, `${path}[${index}]`, "duplicate_value");
+    } else {
+      seen.add(entry);
+    }
+  });
+  return true;
+}
+function validateVocabularyIds(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return false;
+  }
+  hasExactKeys(
+    value,
+    ["muscleIds", "equipmentIds", "exerciseIds", "exerciseFamilyIds"],
+    path,
+    issues
+  );
+  validateUniqueStringArray(value.muscleIds, `${path}.muscleIds`, issues, { uuid: true });
+  validateUniqueStringArray(value.equipmentIds, `${path}.equipmentIds`, issues, { uuid: true });
+  validateUniqueStringArray(value.exerciseIds, `${path}.exerciseIds`, issues, { uuid: true });
+  validateUniqueStringArray(value.exerciseFamilyIds, `${path}.exerciseFamilyIds`, issues, {
+    uuid: true
+  });
+  return true;
+}
+function validateCurrentWorkout(value, vocabulary, path, issues) {
+  if (value === null) return;
+  if (!isRecord(value)) {
+    issue(issues, path, "object_or_null_required");
+    return;
+  }
+  hasExactKeys(value, ["origin", "targetMuscleIds", "exerciseIds"], path, issues);
+  if (!isOneOf(value.origin, workoutOrigins))
+    issue(issues, `${path}.origin`, "controlled_value_invalid");
+  validateUniqueStringArray(value.targetMuscleIds, `${path}.targetMuscleIds`, issues, {
+    allowed: Array.isArray(vocabulary?.muscleIds) ? vocabulary.muscleIds : []
+  });
+  validateUniqueStringArray(value.exerciseIds, `${path}.exerciseIds`, issues, {
+    allowed: Array.isArray(vocabulary?.exerciseIds) ? vocabulary.exerciseIds : []
+  });
+}
+function validateWorkoutIntentExtractionInput(value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_INPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    ["task", "contractVersion", "requestText", "controlledVocabulary", "currentWorkout"],
+    "$",
+    issues
+  );
+  if (value.task !== "workout_intent_extraction") issue(issues, "$.task", "task_invalid");
+  validateVersion(value.contractVersion, "$.contractVersion", issues);
+  if (!isNonEmptyString(value.requestText, maximumTextLength)) {
+    issue(issues, "$.requestText", "request_text_invalid");
+  }
+  validateVocabularyIds(value.controlledVocabulary, "$.controlledVocabulary", issues);
+  validateCurrentWorkout(
+    value.currentWorkout,
+    isRecord(value.controlledVocabulary) ? value.controlledVocabulary : null,
+    "$.currentWorkout",
+    issues
+  );
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_INPUT", issues);
+}
+function validateSubsetIds(value, allowed, path, issues) {
+  validateUniqueStringArray(value, path, issues, {
+    allowed: Array.isArray(allowed) ? allowed : []
+  });
+}
+function validateEquipmentIntent(value, allowed, path, issues) {
+  if (!isRecord(value) || !isOneOf(value.kind, ["unspecified", "specified"])) {
+    issue(issues, path, "equipment_intent_invalid");
+    return;
+  }
+  if (value.kind === "unspecified") {
+    hasExactKeys(value, ["kind"], path, issues);
+    return;
+  }
+  hasExactKeys(value, ["kind", "availableEquipmentIds", "unavailableEquipmentIds"], path, issues);
+  validateSubsetIds(value.availableEquipmentIds, allowed, `${path}.availableEquipmentIds`, issues);
+  validateSubsetIds(
+    value.unavailableEquipmentIds,
+    allowed,
+    `${path}.unavailableEquipmentIds`,
+    issues
+  );
+  if (Array.isArray(value.availableEquipmentIds) && Array.isArray(value.unavailableEquipmentIds)) {
+    const unavailable = new Set(value.unavailableEquipmentIds);
+    value.availableEquipmentIds.forEach((entry, index) => {
+      if (unavailable.has(entry))
+        issue(issues, `${path}.availableEquipmentIds[${index}]`, "equipment_collision");
+    });
+  }
+}
+function validateWorkoutIntentConstraints(value, vocabulary, path, issues) {
+  if (!Array.isArray(value)) {
+    issue(issues, path, "array_required");
+    return;
+  }
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) {
+      issue(issues, entryPath, "object_required");
+      return;
+    }
+    if (entry.kind === "maximum_workout_duration") {
+      hasExactKeys(entry, ["kind", "maximumMinutes"], entryPath, issues);
+      if (!isPositiveInteger3(entry.maximumMinutes))
+        issue(issues, `${entryPath}.maximumMinutes`, "duration_invalid");
+      return;
+    }
+    if (entry.kind === "reduced_exercise_priority" || entry.kind === "preferred_exercises") {
+      hasExactKeys(entry, ["kind", "exerciseIds"], entryPath, issues);
+      validateSubsetIds(
+        entry.exerciseIds,
+        vocabulary.exerciseIds,
+        `${entryPath}.exerciseIds`,
+        issues
+      );
+      return;
+    }
+    issue(issues, `${entryPath}.kind`, "controlled_value_invalid");
+  });
+}
+function validateWorkoutIntentExtractionOutput(input, value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_OUTPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    [
+      "task",
+      "contractVersion",
+      "targetMuscleIds",
+      "excludedMuscleIds",
+      "availableDurationMinutes",
+      "equipmentIntent",
+      "excludedExerciseIds",
+      "excludedExerciseFamilyIds",
+      "preferredMuscleIds",
+      "constraints",
+      "missingInformation"
+    ],
+    "$",
+    issues
+  );
+  if (value.task !== input.task) issue(issues, "$.task", "task_mismatch");
+  if (value.contractVersion !== input.contractVersion)
+    issue(issues, "$.contractVersion", "version_mismatch");
+  validateSubsetIds(
+    value.targetMuscleIds,
+    input.controlledVocabulary.muscleIds,
+    "$.targetMuscleIds",
+    issues
+  );
+  validateSubsetIds(
+    value.excludedMuscleIds,
+    input.controlledVocabulary.muscleIds,
+    "$.excludedMuscleIds",
+    issues
+  );
+  validateSubsetIds(
+    value.preferredMuscleIds,
+    input.controlledVocabulary.muscleIds,
+    "$.preferredMuscleIds",
+    issues
+  );
+  if (Array.isArray(value.targetMuscleIds) && Array.isArray(value.excludedMuscleIds)) {
+    const excluded = new Set(value.excludedMuscleIds);
+    value.targetMuscleIds.forEach((entry, index) => {
+      if (excluded.has(entry))
+        issue(issues, `$.targetMuscleIds[${index}]`, "target_excluded_collision");
+    });
+  }
+  if (value.availableDurationMinutes !== null && !isPositiveInteger3(value.availableDurationMinutes)) {
+    issue(issues, "$.availableDurationMinutes", "duration_invalid");
+  }
+  validateEquipmentIntent(
+    value.equipmentIntent,
+    input.controlledVocabulary.equipmentIds,
+    "$.equipmentIntent",
+    issues
+  );
+  validateSubsetIds(
+    value.excludedExerciseIds,
+    input.controlledVocabulary.exerciseIds,
+    "$.excludedExerciseIds",
+    issues
+  );
+  validateSubsetIds(
+    value.excludedExerciseFamilyIds,
+    input.controlledVocabulary.exerciseFamilyIds,
+    "$.excludedExerciseFamilyIds",
+    issues
+  );
+  validateWorkoutIntentConstraints(
+    value.constraints,
+    input.controlledVocabulary,
+    "$.constraints",
+    issues
+  );
+  validateUniqueStringArray(value.missingInformation, "$.missingInformation", issues, {
+    allowed: workoutIntentInformationCodes
+  });
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_OUTPUT", issues);
+}
+function validateDiscomfortVocabulary(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return;
+  }
+  hasExactKeys(
+    value,
+    [
+      "bodyAreas",
+      "bodySides",
+      "movementPatterns",
+      "activityContexts",
+      "triStateValues",
+      "exerciseIds",
+      "exerciseFamilyIds"
+    ],
+    path,
+    issues
+  );
+  validateUniqueStringArray(value.bodyAreas, `${path}.bodyAreas`, issues, {
+    allowed: discomfortBodyAreas
+  });
+  validateUniqueStringArray(value.bodySides, `${path}.bodySides`, issues, {
+    allowed: discomfortBodySides
+  });
+  validateUniqueStringArray(value.movementPatterns, `${path}.movementPatterns`, issues, {
+    allowed: discomfortMovementPatterns
+  });
+  validateUniqueStringArray(value.activityContexts, `${path}.activityContexts`, issues, {
+    allowed: discomfortActivityContexts
+  });
+  validateUniqueStringArray(value.triStateValues, `${path}.triStateValues`, issues, {
+    allowed: painSafetyTriStateValues
+  });
+  validateUniqueStringArray(value.exerciseIds, `${path}.exerciseIds`, issues, { uuid: true });
+  validateUniqueStringArray(value.exerciseFamilyIds, `${path}.exerciseFamilyIds`, issues, {
+    uuid: true
+  });
+}
+function validateKnownEvent(value, vocabulary, path, issues) {
+  if (value === null) return;
+  if (!isRecord(value)) {
+    issue(issues, path, "object_or_null_required");
+    return;
+  }
+  hasExactKeys(value, ["eventId", "bodyArea", "side"], path, issues);
+  if (typeof value.eventId !== "string" || !isUuid(value.eventId))
+    issue(issues, `${path}.eventId`, "id_invalid");
+  if (value.bodyArea !== null && (!Array.isArray(vocabulary?.bodyAreas) || !vocabulary.bodyAreas.includes(value.bodyArea))) {
+    issue(issues, `${path}.bodyArea`, "controlled_value_invalid");
+  }
+  if (value.side !== null && (!Array.isArray(vocabulary?.bodySides) || !vocabulary.bodySides.includes(value.side))) {
+    issue(issues, `${path}.side`, "controlled_value_invalid");
+  }
+}
+function validateDiscomfortObservationExtractionInput(value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_INPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    ["task", "contractVersion", "reportText", "controlledVocabulary", "knownEvent"],
+    "$",
+    issues
+  );
+  if (value.task !== "discomfort_observation_extraction") issue(issues, "$.task", "task_invalid");
+  validateVersion(value.contractVersion, "$.contractVersion", issues);
+  if (!isNonEmptyString(value.reportText, maximumTextLength))
+    issue(issues, "$.reportText", "report_text_invalid");
+  validateDiscomfortVocabulary(value.controlledVocabulary, "$.controlledVocabulary", issues);
+  validateKnownEvent(
+    value.knownEvent,
+    isRecord(value.controlledVocabulary) ? value.controlledVocabulary : null,
+    "$.knownEvent",
+    issues
+  );
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_INPUT", issues);
+}
+function validateSafety(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return;
+  }
+  const fields = [
+    "traumaticOrSuddenOnset",
+    "swelling",
+    "instabilityOrGivingWay",
+    "weightBearingLimitation",
+    "visibleDeformity",
+    "numbnessOrWeakness",
+    "chestPainOrBreathingDifficulty",
+    "fainting",
+    "severeSystemicSymptoms"
+  ];
+  hasExactKeys(value, fields, path, issues);
+  for (const field of fields) {
+    if (!isOneOf(value[field], painSafetyTriStateValues)) {
+      issue(issues, `${path}.${field}`, "tri_state_invalid");
+    }
+  }
+}
+function validateMovementTriggers(value, vocabulary, path, issues) {
+  if (!Array.isArray(value)) {
+    issue(issues, path, "array_required");
+    return;
+  }
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) {
+      issue(issues, entryPath, "object_required");
+      return;
+    }
+    if (entry.kind === "movement_pattern") {
+      hasExactKeys(entry, ["kind", "movementPattern"], entryPath, issues);
+      if (!vocabulary.movementPatterns.includes(entry.movementPattern))
+        issue(issues, `${entryPath}.movementPattern`, "controlled_value_invalid");
+    } else if (entry.kind === "exercise") {
+      hasExactKeys(entry, ["kind", "exerciseId"], entryPath, issues);
+      if (!vocabulary.exerciseIds.includes(entry.exerciseId))
+        issue(issues, `${entryPath}.exerciseId`, "controlled_value_invalid");
+    } else if (entry.kind === "exercise_family") {
+      hasExactKeys(entry, ["kind", "exerciseFamilyId"], entryPath, issues);
+      if (!vocabulary.exerciseFamilyIds.includes(entry.exerciseFamilyId))
+        issue(issues, `${entryPath}.exerciseFamilyId`, "controlled_value_invalid");
+    } else if (entry.kind === "activity") {
+      hasExactKeys(entry, ["kind", "activityContext"], entryPath, issues);
+      if (!vocabulary.activityContexts.includes(entry.activityContext))
+        issue(issues, `${entryPath}.activityContext`, "controlled_value_invalid");
+    } else {
+      issue(issues, `${entryPath}.kind`, "movement_trigger_invalid");
+    }
+  });
+}
+function validateDiscomfortObservationExtractionOutput(input, value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_OUTPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    [
+      "task",
+      "contractVersion",
+      "bodyArea",
+      "side",
+      "severity",
+      "onsetPattern",
+      "activityContext",
+      "trend",
+      "movementTriggerStatus",
+      "movementTriggers",
+      "safety"
+    ],
+    "$",
+    issues
+  );
+  if (value.task !== input.task) issue(issues, "$.task", "task_mismatch");
+  if (value.contractVersion !== input.contractVersion)
+    issue(issues, "$.contractVersion", "version_mismatch");
+  if (value.bodyArea !== null && !input.controlledVocabulary.bodyAreas.includes(value.bodyArea))
+    issue(issues, "$.bodyArea", "controlled_value_invalid");
+  if (value.side !== null && !input.controlledVocabulary.bodySides.includes(value.side))
+    issue(issues, "$.side", "controlled_value_invalid");
+  if (value.severity !== null && (!Number.isInteger(value.severity) || typeof value.severity !== "number" || value.severity < 0 || value.severity > 10)) {
+    issue(issues, "$.severity", "severity_invalid");
+  }
+  if (!isOneOf(value.onsetPattern, discomfortOnsetPatterns))
+    issue(issues, "$.onsetPattern", "controlled_value_invalid");
+  if (!input.controlledVocabulary.activityContexts.includes(value.activityContext))
+    issue(issues, "$.activityContext", "controlled_value_invalid");
+  if (!isOneOf(value.trend, discomfortTrends)) issue(issues, "$.trend", "controlled_value_invalid");
+  if (!input.controlledVocabulary.triStateValues.includes(value.movementTriggerStatus))
+    issue(issues, "$.movementTriggerStatus", "tri_state_invalid");
+  validateMovementTriggers(
+    value.movementTriggers,
+    input.controlledVocabulary,
+    "$.movementTriggers",
+    issues
+  );
+  validateSafety(value.safety, "$.safety", issues);
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_OUTPUT", issues);
+}
+function validateEvidence(value, path, issues) {
+  if (!Array.isArray(value)) {
+    issue(issues, path, "array_required");
+    return;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  value.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    if (!isRecord(entry)) {
+      issue(issues, entryPath, "object_required");
+      return;
+    }
+    hasExactKeys(entry, ["evidenceId", "kind", "fact"], entryPath, issues);
+    if (!isNonEmptyString(entry.evidenceId))
+      issue(issues, `${entryPath}.evidenceId`, "identifier_invalid");
+    else if (seen.has(entry.evidenceId))
+      issue(issues, `${entryPath}.evidenceId`, "duplicate_value");
+    else seen.add(entry.evidenceId);
+    if (!isOneOf(entry.kind, aiDecisionEvidenceKinds))
+      issue(issues, `${entryPath}.kind`, "controlled_value_invalid");
+    if (!isNonEmptyString(entry.fact, 500)) issue(issues, `${entryPath}.fact`, "fact_invalid");
+  });
+}
+function validateAuthoritativeDecision(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return;
+  }
+  hasExactKeys(
+    value,
+    ["kind", "decisionId", "action", "reasonCodes", "evidence", "version", "decidedAt"],
+    path,
+    issues
+  );
+  if (typeof value.decisionId !== "string" || !isUuid(value.decisionId))
+    issue(issues, `${path}.decisionId`, "id_invalid");
+  validateEngineVersion(value.version, `${path}.version`, issues);
+  if (!isIsoTimestamp(value.decidedAt)) issue(issues, `${path}.decidedAt`, "timestamp_invalid");
+  validateEvidence(value.evidence, `${path}.evidence`, issues);
+  if (value.kind === "workout") {
+    if (!isRecord(value.action)) issue(issues, `${path}.action`, "object_required");
+    else {
+      hasExactKeys(value.action, ["kind", "origin"], `${path}.action`, issues);
+      if (value.action.kind !== "generated_workout")
+        issue(issues, `${path}.action.kind`, "controlled_value_invalid");
+      if (!isOneOf(value.action.origin, workoutOrigins))
+        issue(issues, `${path}.action.origin`, "controlled_value_invalid");
+    }
+    validateUniqueStringArray(value.reasonCodes, `${path}.reasonCodes`, issues);
+  } else if (value.kind === "progression") {
+    if (!isOneOf(value.action, progressionRecommendationActions))
+      issue(issues, `${path}.action`, "controlled_value_invalid");
+    validateUniqueStringArray(value.reasonCodes, `${path}.reasonCodes`, issues, {
+      allowed: progressionRecommendationReasonCodes
+    });
+  } else if (value.kind === "pain_safety") {
+    if (!isOneOf(value.action, [...painSafetyClassifications, "information_required"]))
+      issue(issues, `${path}.action`, "controlled_value_invalid");
+    validateUniqueStringArray(value.reasonCodes, `${path}.reasonCodes`, issues, {
+      allowed: [
+        ...painSafetyClassificationReasonCodes,
+        ...painSafetyInformationRequiredReasonCodes
+      ]
+    });
+  } else {
+    issue(issues, `${path}.kind`, "decision_kind_invalid");
+  }
+}
+function validateGroundedDecisionExplanationInput(value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_INPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    ["task", "contractVersion", "decision", "locale", "maximumCharacters"],
+    "$",
+    issues
+  );
+  if (value.task !== "grounded_decision_explanation") issue(issues, "$.task", "task_invalid");
+  validateVersion(value.contractVersion, "$.contractVersion", issues);
+  validateAuthoritativeDecision(value.decision, "$.decision", issues);
+  if (typeof value.locale !== "string" || !localePattern.test(value.locale))
+    issue(issues, "$.locale", "locale_invalid");
+  if (!isPositiveInteger3(value.maximumCharacters) || value.maximumCharacters > maximumExplanationCharacters) {
+    issue(issues, "$.maximumCharacters", "explanation_bound_invalid");
+  }
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_INPUT", issues);
+}
+function validateGroundedDecisionExplanationOutput(input, value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_OUTPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(
+    value,
+    ["task", "contractVersion", "explanationText", "reasonCodeReferences", "evidenceIdReferences"],
+    "$",
+    issues
+  );
+  if (value.task !== input.task) issue(issues, "$.task", "task_mismatch");
+  if (value.contractVersion !== input.contractVersion)
+    issue(issues, "$.contractVersion", "version_mismatch");
+  if (!isNonEmptyString(value.explanationText, input.maximumCharacters))
+    issue(issues, "$.explanationText", "explanation_invalid");
+  validateUniqueStringArray(value.reasonCodeReferences, "$.reasonCodeReferences", issues, {
+    allowed: input.decision.reasonCodes
+  });
+  validateUniqueStringArray(value.evidenceIdReferences, "$.evidenceIdReferences", issues, {
+    allowed: input.decision.evidence.map((entry) => entry.evidenceId)
+  });
+  return issues.length === 0 ? success2(value) : failure2("INVALID_TASK_OUTPUT", issues);
+}
+function validateAITaskInput(value) {
+  if (!isRecord(value) || !isOneOf(value.task, aiTaskKinds)) {
+    return failure2("UNSUPPORTED_TASK", [{ path: "$.task", reasonCode: "unsupported_task" }]);
+  }
+  if (value.task === "workout_intent_extraction")
+    return validateWorkoutIntentExtractionInput(value);
+  if (value.task === "discomfort_observation_extraction")
+    return validateDiscomfortObservationExtractionInput(value);
+  return validateGroundedDecisionExplanationInput(value);
+}
+function validateAITaskOutput(input, value) {
+  if (input.task === "workout_intent_extraction")
+    return validateWorkoutIntentExtractionOutput(input, value);
+  if (input.task === "discomfort_observation_extraction")
+    return validateDiscomfortObservationExtractionOutput(input, value);
+  return validateGroundedDecisionExplanationOutput(input, value);
+}
+function validateAIUsageMetadata(value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_USAGE_METADATA", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(value, ["inputTokens", "outputTokens", "totalTokens"], "$", issues);
+  for (const field of ["inputTokens", "outputTokens", "totalTokens"]) {
+    if (value[field] !== null && !isNonNegativeInteger3(value[field]))
+      issue(issues, `$.${field}`, "token_count_invalid");
+  }
+  if (typeof value.inputTokens === "number" && typeof value.outputTokens === "number" && typeof value.totalTokens === "number" && value.inputTokens + value.outputTokens !== value.totalTokens) {
+    issue(issues, "$.totalTokens", "token_total_mismatch");
+  }
+  return issues.length === 0 ? success2(value) : failure2("INVALID_USAGE_METADATA", issues);
+}
+function validateResponseMetadata(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return;
+  }
+  hasExactKeys(
+    value,
+    ["providerId", "modelId", "providerRequestId", "receivedAt", "latencyMilliseconds"],
+    path,
+    issues
+  );
+  if (!isNonEmptyString(value.providerId))
+    issue(issues, `${path}.providerId`, "identifier_invalid");
+  if (!isNonEmptyString(value.modelId)) issue(issues, `${path}.modelId`, "identifier_invalid");
+  if (value.providerRequestId !== null && !isNonEmptyString(value.providerRequestId))
+    issue(issues, `${path}.providerRequestId`, "identifier_invalid");
+  if (!isIsoTimestamp(value.receivedAt)) issue(issues, `${path}.receivedAt`, "timestamp_invalid");
+  if (!isNonNegativeInteger3(value.latencyMilliseconds))
+    issue(issues, `${path}.latencyMilliseconds`, "latency_invalid");
+}
+function validateProviderFailure(value, path, issues) {
+  if (!isRecord(value)) {
+    issue(issues, path, "object_required");
+    return;
+  }
+  hasExactKeys(value, ["code", "message", "retryable", "reasonCodes"], path, issues);
+  if (!isOneOf(value.code, aiProviderFailureCodes))
+    issue(issues, `${path}.code`, "failure_code_invalid");
+  if (!isNonEmptyString(value.message, 500)) issue(issues, `${path}.message`, "message_invalid");
+  if (typeof value.retryable !== "boolean") issue(issues, `${path}.retryable`, "boolean_required");
+  validateUniqueStringArray(value.reasonCodes, `${path}.reasonCodes`, issues);
+}
+function validateAIProviderRequest(value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_TASK_INPUT", [{ path: "$", reasonCode: "object_required" }]);
+  hasExactKeys(value, ["task", "input", "metadata"], "$", issues);
+  const inputResult = validateAITaskInput(value.input);
+  if (!inputResult.ok) issues.push(...inputResult.failure.issues);
+  if (isRecord(value.input) && value.task !== value.input.task)
+    issue(issues, "$.task", "task_mismatch");
+  if (!isRecord(value.metadata)) issue(issues, "$.metadata", "object_required");
+  else {
+    hasExactKeys(
+      value.metadata,
+      ["requestId", "requestedAt", "timeoutMilliseconds"],
+      "$.metadata",
+      issues
+    );
+    if (typeof value.metadata.requestId !== "string" || !isUuid(value.metadata.requestId))
+      issue(issues, "$.metadata.requestId", "id_invalid");
+    if (!isIsoTimestamp(value.metadata.requestedAt))
+      issue(issues, "$.metadata.requestedAt", "timestamp_invalid");
+    if (!isPositiveInteger3(value.metadata.timeoutMilliseconds) || value.metadata.timeoutMilliseconds > maximumTimeoutMilliseconds) {
+      issue(issues, "$.metadata.timeoutMilliseconds", "timeout_invalid");
+    }
+  }
+  return issues.length === 0 ? success2(value) : failure2(inputResult.ok ? "INVALID_TASK_INPUT" : inputResult.failure.code, issues);
+}
+function validateAIProviderResult(request, value) {
+  const issues = [];
+  if (!isRecord(value))
+    return failure2("INVALID_PROVIDER_RESULT", [{ path: "$", reasonCode: "object_required" }]);
+  if (value.status === "success") {
+    hasExactKeys(value, ["status", "task", "output", "responseMetadata", "usage"], "$", issues);
+    if (value.task !== request.task) issue(issues, "$.task", "task_mismatch");
+    validateResponseMetadata(value.responseMetadata, "$.responseMetadata", issues);
+    if (value.usage !== null) {
+      const usage = validateAIUsageMetadata(value.usage);
+      if (!usage.ok) issues.push(...usage.failure.issues);
+    }
+    const output = validateAITaskOutput(request.input, value.output);
+    if (!output.ok) issues.push(...output.failure.issues);
+  } else if (value.status === "failure") {
+    hasExactKeys(value, ["status", "task", "failure", "responseMetadata", "usage"], "$", issues);
+    if (value.task !== request.task) issue(issues, "$.task", "task_mismatch");
+    validateProviderFailure(value.failure, "$.failure", issues);
+    if (value.responseMetadata !== null)
+      validateResponseMetadata(value.responseMetadata, "$.responseMetadata", issues);
+    if (value.usage !== null) {
+      const usage = validateAIUsageMetadata(value.usage);
+      if (!usage.ok) issues.push(...usage.failure.issues);
+    }
+  } else {
+    issue(issues, "$.status", "result_status_invalid");
+  }
+  return issues.length === 0 ? success2(value) : failure2("INVALID_PROVIDER_RESULT", issues);
+}
+
+// packages/ai-deepseek-provider/src/contracts.ts
+var deepseekProviderId = "deepseek";
+var deepseekDefaultModelId = "deepseek-v4-flash";
+var deepseekDefaultBaseUrl = "https://api.deepseek.com";
+var unsupportedDeepSeekModelIds = ["deepseek-chat", "deepseek-reasoner"];
+var deepseekRequestErrorReasons = {
+  unsupportedTask: "deepseek.unsupported_task",
+  transportException: "deepseek.transport_exception",
+  timeout: "deepseek.timeout",
+  authenticationFailed: "deepseek.authentication_failed",
+  paymentRequired: "deepseek.payment_required",
+  invalidRequest: "deepseek.invalid_request",
+  rateLimited: "deepseek.rate_limited",
+  unavailable: "deepseek.unavailable",
+  malformedResponse: "deepseek.malformed_response",
+  structuredOutputInvalid: "deepseek.structured_output_invalid",
+  truncatedOutput: "deepseek.truncated_output",
+  unsupportedModel: "deepseek.unsupported_model"
+};
+
+// packages/ai-deepseek-provider/src/provider.ts
+var supportedDeepSeekTasks = [
+  "workout_intent_extraction",
+  "discomfort_observation_extraction",
+  "grounded_decision_explanation"
+];
+var deepseekProviderDefinition = Object.freeze({
+  providerId: deepseekProviderId,
+  modelId: deepseekDefaultModelId,
+  supportedTasks: supportedDeepSeekTasks
+});
+function defineDeepSeekProviderDefinition(modelId) {
+  if (isUnsupportedDeepSeekModel(modelId)) {
+    throw new Error(`DeepSeek model "${modelId}" is not allowed for production use.`);
+  }
+  return Object.freeze({
+    providerId: deepseekProviderId,
+    modelId,
+    supportedTasks: supportedDeepSeekTasks
+  });
+}
+var DeepSeekAiProvider = class {
+  definition;
+  transport;
+  clock;
+  constructor(options) {
+    this.transport = options.transport;
+    this.clock = options.clock ?? defaultIsoClock;
+    this.definition = defineDeepSeekProviderDefinition(options.modelId ?? deepseekDefaultModelId);
+  }
+  async execute(request) {
+    if (!this.definition.supportedTasks.includes(request.task)) {
+      return unsupportedTaskFailure(request.task);
+    }
+    const handler = resolveDeepSeekTaskHandler(request.task);
+    if (handler === null) {
+      return unsupportedTaskFailure(request.task);
+    }
+    const payload = {
+      ...handler.buildRequestPayload(request),
+      model: this.definition.modelId,
+      responseFormat: { type: "json_object" },
+      thinking: { type: "disabled" }
+    };
+    const startedAt = Date.now();
+    const abortController = new AbortController();
+    const timeout = createTimeout(
+      request.metadata.timeoutMilliseconds,
+      () => abortController.abort()
+    );
+    let transportOutcome;
+    try {
+      transportOutcome = await this.transport.call({
+        payload,
+        abortSignal: abortController.signal
+      });
+    } catch (error) {
+      timeout.clear();
+      return transportExceptionFailure(request.task, error);
+    }
+    timeout.clear();
+    if (transportOutcome.status === "failure") {
+      return transportFailureResult(
+        request.task,
+        transportOutcome.failure,
+        startedAt,
+        this.definition.modelId,
+        this.clock
+      );
+    }
+    const { responseMetadata, payload: responsePayload, usage } = transportOutcome.value;
+    const parsed = handler.parseTaskOutput(request, responsePayload);
+    if (parsed.status === "failure") {
+      return structuredOutputFailure(request.task, responseMetadata, usage, parsed.message);
+    }
+    const result = {
+      status: "success",
+      task: request.task,
+      output: parsed.output,
+      responseMetadata,
+      usage
+    };
+    const validation = validateAIProviderResult(request, result);
+    if (!validation.ok) {
+      return structuredOutputFailure(
+        request.task,
+        responseMetadata,
+        usage,
+        "DeepSeek response failed provider-result validation."
+      );
+    }
+    return result;
+  }
+};
+var deepseekTaskHandlers = /* @__PURE__ */ new Map();
+function registerDeepSeekTaskHandler(task, handler) {
+  deepseekTaskHandlers.set(task, handler);
+}
+function resolveDeepSeekTaskHandler(task) {
+  return deepseekTaskHandlers.get(task) ?? null;
+}
+function createTimeout(timeoutMilliseconds, onTimeout) {
+  const handle = setTimeout(onTimeout, timeoutMilliseconds);
+  return {
+    clear() {
+      clearTimeout(handle);
+    }
+  };
+}
+function defaultIsoClock() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function isUnsupportedDeepSeekModel(modelId) {
+  return unsupportedDeepSeekModelIds.includes(
+    modelId
+  );
+}
+function unsupportedTaskFailure(task) {
+  return failureResult(task, {
+    code: "UNSUPPORTED_TASK",
+    message: `DeepSeek provider does not support task "${task}".`,
+    retryable: false,
+    reasonCodes: [deepseekRequestErrorReasons.unsupportedTask]
+  });
+}
+function transportExceptionFailure(task, error) {
+  const message = error instanceof Error ? error.message : "DeepSeek transport threw unexpectedly.";
+  return failureResult(task, {
+    code: "PROVIDER_UNAVAILABLE",
+    message,
+    retryable: true,
+    reasonCodes: [deepseekRequestErrorReasons.transportException]
+  });
+}
+function structuredOutputFailure(task, responseMetadata, usage, message) {
+  return {
+    status: "failure",
+    task,
+    failure: {
+      code: "STRUCTURED_OUTPUT_VALIDATION_FAILED",
+      message,
+      retryable: false,
+      reasonCodes: [deepseekRequestErrorReasons.structuredOutputInvalid]
+    },
+    responseMetadata,
+    usage
+  };
+}
+function transportFailureResult(task, failure4, startedAt, modelId, clock) {
+  const mapped = mapTransportFailure(failure4);
+  const responseMetadata = {
+    providerId: deepseekProviderId,
+    modelId,
+    providerRequestId: null,
+    receivedAt: clock(),
+    latencyMilliseconds: Date.now() - startedAt
+  };
+  return {
+    status: "failure",
+    task,
+    failure: mapped.failure,
+    responseMetadata,
+    usage: null
+  };
+}
+function mapTransportFailure(failure4) {
+  switch (failure4.kind) {
+    case "timeout":
+      return {
+        failure: {
+          code: "PROVIDER_TIMEOUT",
+          message: "DeepSeek request exceeded the configured timeout.",
+          retryable: true,
+          reasonCodes: [deepseekRequestErrorReasons.timeout]
+        }
+      };
+    case "authentication_failed":
+      return {
+        failure: {
+          code: "PROVIDER_AUTHENTICATION_FAILED",
+          message: "DeepSeek rejected the configured API key.",
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.authenticationFailed]
+        }
+      };
+    case "payment_required":
+      return {
+        failure: {
+          code: "PROVIDER_PAYMENT_REQUIRED",
+          message: "DeepSeek account billing or quota is not available.",
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.paymentRequired]
+        }
+      };
+    case "invalid_request":
+      return {
+        failure: {
+          code: "UNSUPPORTED_PROVIDER_CAPABILITY",
+          message: "DeepSeek rejected the structured request configuration.",
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.invalidRequest]
+        }
+      };
+    case "rate_limited":
+      return {
+        failure: {
+          code: "PROVIDER_RATE_LIMITED",
+          message: "DeepSeek rate-limited the request.",
+          retryable: true,
+          reasonCodes: [deepseekRequestErrorReasons.rateLimited]
+        }
+      };
+    case "unavailable":
+      return {
+        failure: {
+          code: "PROVIDER_UNAVAILABLE",
+          message: "DeepSeek endpoint was unavailable.",
+          retryable: true,
+          reasonCodes: [deepseekRequestErrorReasons.unavailable]
+        }
+      };
+    case "malformed_response":
+      return {
+        failure: {
+          code: "MALFORMED_PROVIDER_RESPONSE",
+          message: failure4.message,
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.malformedResponse]
+        }
+      };
+    case "truncated_output":
+      return {
+        failure: {
+          code: "MALFORMED_PROVIDER_RESPONSE",
+          message: "DeepSeek response was truncated before a complete JSON object was returned.",
+          retryable: true,
+          reasonCodes: [deepseekRequestErrorReasons.truncatedOutput]
+        }
+      };
+  }
+}
+function failureResult(task, failure4) {
+  return {
+    status: "failure",
+    task,
+    failure: failure4,
+    responseMetadata: null,
+    usage: null
+  };
+}
+
+// packages/ai-deepseek-provider/src/http-transport.ts
+var deepseekChatCompletionsPath = "/chat/completions";
+var retryableStatusCodes = /* @__PURE__ */ new Set([429, 500, 503]);
+var defaultMaximumAttempts = 3;
+var defaultBackoffMilliseconds = 250;
+var DeepSeekHttpTransport = class {
+  apiKey;
+  modelId;
+  endpointUrl;
+  fetchImpl;
+  clock;
+  maximumAttempts;
+  backoffMilliseconds;
+  sleep;
+  constructor(options) {
+    this.apiKey = options.apiKey;
+    this.modelId = options.modelId ?? deepseekDefaultModelId;
+    this.endpointUrl = toChatCompletionsUrl(options.baseUrl ?? deepseekDefaultBaseUrl);
+    this.fetchImpl = options.fetch ?? defaultFetch;
+    this.clock = options.clock ?? defaultIsoClock2;
+    this.maximumAttempts = Math.max(
+      1,
+      Math.min(options.maximumAttempts ?? defaultMaximumAttempts, 3)
+    );
+    this.backoffMilliseconds = Math.max(
+      0,
+      options.backoffMilliseconds ?? defaultBackoffMilliseconds
+    );
+    this.sleep = options.sleep ?? defaultSleep;
+  }
+  async call(call) {
+    const body = serializeRequestBody(this.modelId, call.payload);
+    for (let attemptIndex = 0; attemptIndex < this.maximumAttempts; attemptIndex += 1) {
+      let response;
+      try {
+        response = await this.fetchImpl(this.endpointUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.apiKey}`
+          },
+          body,
+          signal: call.abortSignal
+        });
+      } catch (error) {
+        if (isAbortError(error)) {
+          return { status: "failure", failure: { kind: "timeout" } };
+        }
+        return { status: "failure", failure: { kind: "unavailable" } };
+      }
+      if (shouldRetry(response.status, attemptIndex, this.maximumAttempts)) {
+        const waited = await waitForRetry(
+          this.sleep,
+          this.backoffMilliseconds * (attemptIndex + 1),
+          call.abortSignal
+        );
+        if (!waited) return { status: "failure", failure: { kind: "timeout" } };
+        continue;
+      }
+      return mapHttpResponse(response, this.modelId, this.clock);
+    }
+    return { status: "failure", failure: { kind: "unavailable" } };
+  }
+};
+function serializeRequestBody(modelId, payload) {
+  return JSON.stringify({
+    model: modelId,
+    messages: payload.messages,
+    response_format: payload.responseFormat,
+    thinking: payload.thinking,
+    temperature: payload.temperature,
+    request_id: payload.requestId
+  });
+}
+async function mapHttpResponse(response, modelId, clock) {
+  if (response.status === 400 || response.status === 422) {
+    return { status: "failure", failure: { kind: "invalid_request" } };
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { status: "failure", failure: { kind: "authentication_failed" } };
+  }
+  if (response.status === 402) {
+    return { status: "failure", failure: { kind: "payment_required" } };
+  }
+  if (response.status === 429) {
+    return { status: "failure", failure: { kind: "rate_limited" } };
+  }
+  if (response.status === 408 || response.status === 504) {
+    return { status: "failure", failure: { kind: "timeout" } };
+  }
+  if (response.status >= 500) {
+    return { status: "failure", failure: { kind: "unavailable" } };
+  }
+  if (!response.ok) {
+    return { status: "failure", failure: { kind: "unavailable" } };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(await response.text());
+  } catch {
+    return {
+      status: "failure",
+      failure: {
+        kind: "malformed_response",
+        message: "DeepSeek response body was not valid JSON."
+      }
+    };
+  }
+  const extraction = extractDeepSeekResponse(parsed);
+  if (extraction === null) {
+    return {
+      status: "failure",
+      failure: {
+        kind: "malformed_response",
+        message: "DeepSeek response did not contain a choice."
+      }
+    };
+  }
+  if (extraction.payload.finishReason === "length") {
+    return { status: "failure", failure: { kind: "truncated_output" } };
+  }
+  const responseMetadata = {
+    providerId: "deepseek",
+    modelId,
+    providerRequestId: extraction.providerRequestId,
+    receivedAt: clock(),
+    latencyMilliseconds: 0
+  };
+  return {
+    status: "ok",
+    value: {
+      responseMetadata,
+      payload: extraction.payload,
+      usage: extraction.usage
+    }
+  };
+}
+function extractDeepSeekResponse(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const root = value;
+  const choices = root.choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const firstChoice = choices[0];
+  if (typeof firstChoice !== "object" || firstChoice === null) return null;
+  const choice = firstChoice;
+  const finishReason = typeof choice.finish_reason === "string" ? choice.finish_reason : null;
+  if (finishReason === "length") {
+    return {
+      providerRequestId: typeof root.id === "string" ? root.id : null,
+      payload: { id: typeof root.id === "string" ? root.id : null, content: null, finishReason },
+      usage: extractUsage(root.usage)
+    };
+  }
+  const message = choice.message;
+  if (typeof message !== "object" || message === null) return null;
+  const messageRecord = message;
+  const contentRaw = messageRecord.content;
+  const content = parseJsonContent(contentRaw);
+  if (content.status === "failure") return null;
+  const providerRequestId = typeof root.id === "string" ? root.id : null;
+  const usage = extractUsage(root.usage);
+  return {
+    providerRequestId,
+    payload: { id: providerRequestId, content: content.value, finishReason },
+    usage
+  };
+}
+function extractUsage(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const usage = value;
+  const inputTokens = readTokenCount(usage.prompt_tokens);
+  const outputTokens = readTokenCount(usage.completion_tokens);
+  const totalTokens = readTokenCount(usage.total_tokens);
+  if (inputTokens === null && outputTokens === null && totalTokens === null) return null;
+  return { inputTokens, outputTokens, totalTokens };
+}
+function readTokenCount(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null;
+}
+function parseJsonContent(value) {
+  if (typeof value !== "string") return { status: "failure" };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { status: "failure" };
+  try {
+    return { status: "ok", value: JSON.parse(trimmed) };
+  } catch {
+    return { status: "failure" };
+  }
+}
+function shouldRetry(status, attemptIndex, maximumAttempts) {
+  return retryableStatusCodes.has(status) && attemptIndex < maximumAttempts - 1;
+}
+async function waitForRetry(sleep, milliseconds, signal) {
+  try {
+    await sleep(milliseconds, signal);
+    return true;
+  } catch (error) {
+    return !isAbortError(error) ? true : false;
+  }
+}
+function toChatCompletionsUrl(baseUrl) {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  return trimmed.endsWith(deepseekChatCompletionsPath) ? trimmed : `${trimmed}${deepseekChatCompletionsPath}`;
+}
+function isAbortError(error) {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+function defaultIsoClock2() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+async function defaultFetch(url, init) {
+  const response = await fetch(url, init);
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: () => response.text()
+  };
+}
+function defaultSleep(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const handle = setTimeout(resolve, milliseconds);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(handle);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true }
+    );
+  });
+}
+
+// packages/ai-deepseek-provider/src/environment.ts
+function createDeepSeekProviderFromEnvironment(options) {
+  const apiKey = readNonEmpty(options.env, "DEEPSEEK_API_KEY");
+  if (apiKey === null) {
+    return {
+      status: "failure",
+      reason: "missing_api_key",
+      message: "DEEPSEEK_API_KEY is required for the server-side DeepSeek provider."
+    };
+  }
+  const modelId = readNonEmpty(options.env, "DEEPSEEK_MODEL") ?? deepseekDefaultModelId;
+  if (isUnsupportedModel(modelId)) {
+    return {
+      status: "failure",
+      reason: "unsupported_model",
+      message: "DEEPSEEK_MODEL must not be deepseek-chat or deepseek-reasoner."
+    };
+  }
+  const baseUrl = readNonEmpty(options.env, "DEEPSEEK_BASE_URL") ?? deepseekDefaultBaseUrl;
+  const transport = new DeepSeekHttpTransport({
+    apiKey,
+    modelId,
+    baseUrl,
+    fetch: options.fetch,
+    clock: options.clock,
+    maximumAttempts: options.maximumAttempts,
+    backoffMilliseconds: options.backoffMilliseconds,
+    sleep: options.sleep
+  });
+  return {
+    status: "ok",
+    provider: new DeepSeekAiProvider({
+      transport,
+      modelId,
+      clock: options.clock
+    })
+  };
+}
+function readNonEmpty(env, key) {
+  const value = env.get(key);
+  if (value === void 0 || value.trim().length === 0) return null;
+  return value.trim();
+}
+function isUnsupportedModel(modelId) {
+  return unsupportedDeepSeekModelIds.includes(
+    modelId
+  );
+}
+
+// packages/ai-glm-provider/src/contracts.ts
+var glmProviderId = "glm";
+var glmDefaultModelId = "glm-4-plus";
+var glmRequestErrorReasons = {
+  unsupportedTask: "glm.unsupported_task",
+  transportException: "glm.transport_exception",
+  timeout: "glm.timeout",
+  authenticationFailed: "glm.authentication_failed",
+  rateLimited: "glm.rate_limited",
+  unavailable: "glm.unavailable",
+  malformedResponse: "glm.malformed_response",
+  structuredOutputInvalid: "glm.structured_output_invalid"
+};
+
+// packages/ai-glm-provider/src/provider.ts
+var supportedGlmTasks = [
+  "workout_intent_extraction",
+  "discomfort_observation_extraction",
+  "grounded_decision_explanation"
+];
+var glmProviderDefinition = Object.freeze({
+  providerId: glmProviderId,
+  modelId: glmDefaultModelId,
+  supportedTasks: supportedGlmTasks
+});
+function defineGlmProviderDefinition(modelId) {
+  return Object.freeze({
+    providerId: glmProviderId,
+    modelId,
+    supportedTasks: supportedGlmTasks
+  });
+}
+var GlmAiProvider = class {
+  definition;
+  transport;
+  clock;
+  constructor(options) {
+    this.transport = options.transport;
+    this.clock = options.clock ?? defaultIsoClock3;
+    this.definition = defineGlmProviderDefinition(options.modelId ?? glmDefaultModelId);
+  }
+  async execute(request) {
+    if (!this.definition.supportedTasks.includes(request.task)) {
+      return unsupportedTaskFailure2(request.task);
+    }
+    const handler = resolveGlmTaskHandler(request.task);
+    if (handler === null) {
+      return unsupportedTaskFailure2(request.task);
+    }
+    const payload = handler.buildRequestPayload(request);
+    const startedAt = Date.now();
+    const abortController = new AbortController();
+    const timeout = createTimeout2(
+      request.metadata.timeoutMilliseconds,
+      () => abortController.abort()
+    );
+    let transportOutcome;
+    try {
+      transportOutcome = await this.transport.call({
+        payload,
+        abortSignal: abortController.signal
+      });
+    } catch (error) {
+      timeout.clear();
+      return transportExceptionFailure2(request.task, error);
+    }
+    timeout.clear();
+    if (transportOutcome.status === "failure") {
+      return transportFailureResult2(
+        request.task,
+        transportOutcome.failure,
+        startedAt,
+        this.clock
+      );
+    }
+    const { responseMetadata, payload: responsePayload, usage } = transportOutcome.value;
+    const parsed = handler.parseTaskOutput(request, responsePayload);
+    if (parsed.status === "failure") {
+      return structuredOutputFailure2(request.task, responseMetadata, usage, parsed.message);
+    }
+    const result = {
+      status: "success",
+      task: request.task,
+      output: parsed.output,
+      responseMetadata,
+      usage
+    };
+    const validation = validateAIProviderResult(request, result);
+    if (!validation.ok) {
+      return structuredOutputFailure2(
+        request.task,
+        responseMetadata,
+        usage,
+        "GLM response failed provider-result validation."
+      );
+    }
+    return result;
+  }
+};
+var glmTaskHandlers = /* @__PURE__ */ new Map();
+function registerGlmTaskHandler(task, handler) {
+  glmTaskHandlers.set(task, handler);
+}
+function resolveGlmTaskHandler(task) {
+  return glmTaskHandlers.get(task) ?? null;
+}
+function createTimeout2(timeoutMilliseconds, onTimeout) {
+  const handle = setTimeout(onTimeout, timeoutMilliseconds);
+  return {
+    clear() {
+      clearTimeout(handle);
+    }
+  };
+}
+function defaultIsoClock3() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function unsupportedTaskFailure2(task) {
+  return failureResult2(task, {
+    code: "UNSUPPORTED_TASK",
+    message: `GLM provider does not support task "${task}".`,
+    retryable: false,
+    reasonCodes: [glmRequestErrorReasons.unsupportedTask]
+  });
+}
+function transportExceptionFailure2(task, error) {
+  const message = error instanceof Error ? error.message : "GLM transport threw unexpectedly.";
+  return failureResult2(task, {
+    code: "PROVIDER_UNAVAILABLE",
+    message,
+    retryable: true,
+    reasonCodes: [glmRequestErrorReasons.transportException]
+  });
+}
+function structuredOutputFailure2(task, responseMetadata, usage, message) {
+  return {
+    status: "failure",
+    task,
+    failure: {
+      code: "STRUCTURED_OUTPUT_VALIDATION_FAILED",
+      message,
+      retryable: false,
+      reasonCodes: [glmRequestErrorReasons.structuredOutputInvalid]
+    },
+    responseMetadata,
+    usage
+  };
+}
+function transportFailureResult2(task, failure4, startedAt, clock) {
+  const mapped = mapTransportFailure2(failure4);
+  const responseMetadata = {
+    providerId: glmProviderId,
+    modelId: glmDefaultModelId,
+    providerRequestId: null,
+    receivedAt: clock(),
+    latencyMilliseconds: Date.now() - startedAt
+  };
+  return {
+    status: "failure",
+    task,
+    failure: mapped.failure,
+    responseMetadata,
+    usage: null
+  };
+}
+function mapTransportFailure2(failure4) {
+  switch (failure4.kind) {
+    case "timeout":
+      return {
+        failure: {
+          code: "PROVIDER_TIMEOUT",
+          message: "GLM request exceeded the configured timeout.",
+          retryable: true,
+          reasonCodes: [glmRequestErrorReasons.timeout]
+        }
+      };
+    case "authentication_failed":
+      return {
+        failure: {
+          code: "PROVIDER_AUTHENTICATION_FAILED",
+          message: "GLM rejected the configured API key.",
+          retryable: false,
+          reasonCodes: [glmRequestErrorReasons.authenticationFailed]
+        }
+      };
+    case "rate_limited":
+      return {
+        failure: {
+          code: "PROVIDER_RATE_LIMITED",
+          message: "GLM rate-limited the request.",
+          retryable: true,
+          reasonCodes: [glmRequestErrorReasons.rateLimited]
+        }
+      };
+    case "unavailable":
+      return {
+        failure: {
+          code: "PROVIDER_UNAVAILABLE",
+          message: "GLM endpoint was unavailable.",
+          retryable: true,
+          reasonCodes: [glmRequestErrorReasons.unavailable]
+        }
+      };
+    case "malformed_response":
+      return {
+        failure: {
+          code: "MALFORMED_PROVIDER_RESPONSE",
+          message: failure4.message,
+          retryable: false,
+          reasonCodes: [glmRequestErrorReasons.malformedResponse]
+        }
+      };
+  }
+}
+function failureResult2(task, failure4) {
+  return {
+    status: "failure",
+    task,
+    failure: failure4,
+    responseMetadata: null,
+    usage: null
+  };
+}
+
+// packages/ai-glm-provider/src/http-transport.ts
+var glmApiBaseUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+var GlmHttpTransport = class {
+  apiKey;
+  modelId;
+  baseUrl;
+  fetchImpl;
+  clock;
+  constructor(options) {
+    this.apiKey = options.apiKey;
+    this.modelId = options.modelId ?? glmDefaultModelId;
+    this.baseUrl = options.baseUrl ?? glmApiBaseUrl;
+    this.fetchImpl = options.fetch ?? defaultFetch2;
+    this.clock = options.clock ?? defaultIsoClock4;
+  }
+  async call(call) {
+    const body = serializeRequestBody2(this.modelId, call.payload);
+    let response;
+    try {
+      response = await this.fetchImpl(this.baseUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.apiKey}`
+        },
+        body,
+        signal: call.abortSignal
+      });
+    } catch (error) {
+      if (isAbortError2(error)) {
+        return { status: "failure", failure: { kind: "timeout" } };
+      }
+      return { status: "failure", failure: { kind: "unavailable" } };
+    }
+    return mapHttpResponse2(response, this.modelId, this.clock);
+  }
+};
+function serializeRequestBody2(modelId, payload) {
+  return JSON.stringify({
+    model: modelId,
+    messages: payload.messages,
+    response_format: payload.responseFormat,
+    temperature: payload.temperature,
+    request_id: payload.requestId
+  });
+}
+async function mapHttpResponse2(response, modelId, clock) {
+  if (response.status === 401 || response.status === 403) {
+    return { status: "failure", failure: { kind: "authentication_failed" } };
+  }
+  if (response.status === 429) {
+    return { status: "failure", failure: { kind: "rate_limited" } };
+  }
+  if (response.status === 408 || response.status === 504) {
+    return { status: "failure", failure: { kind: "timeout" } };
+  }
+  if (response.status >= 500) {
+    return { status: "failure", failure: { kind: "unavailable" } };
+  }
+  if (!response.ok) {
+    return { status: "failure", failure: { kind: "unavailable" } };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(await response.text());
+  } catch {
+    return {
+      status: "failure",
+      failure: { kind: "malformed_response", message: "GLM response body was not valid JSON." }
+    };
+  }
+  const extraction = extractGlmResponse(parsed);
+  if (extraction === null) {
+    return {
+      status: "failure",
+      failure: { kind: "malformed_response", message: "GLM response did not contain a choice." }
+    };
+  }
+  const responseMetadata = {
+    providerId: "glm",
+    modelId,
+    providerRequestId: extraction.providerRequestId,
+    receivedAt: clock(),
+    latencyMilliseconds: 0
+  };
+  return {
+    status: "ok",
+    value: {
+      responseMetadata,
+      payload: extraction.payload,
+      usage: extraction.usage
+    }
+  };
+}
+function extractGlmResponse(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const root = value;
+  const choices = root.choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const firstChoice = choices[0];
+  if (typeof firstChoice !== "object" || firstChoice === null) return null;
+  const choice = firstChoice;
+  const message = choice.message;
+  if (typeof message !== "object" || message === null) return null;
+  const messageRecord = message;
+  const contentRaw = messageRecord.content;
+  const content = typeof contentRaw === "string" ? safeParseJson(contentRaw) : contentRaw ?? null;
+  const providerRequestId = typeof root.id === "string" ? root.id : null;
+  const usage = extractUsage2(root.usage);
+  const finishReason = typeof choice.finish_reason === "string" ? choice.finish_reason : null;
+  return {
+    providerRequestId,
+    payload: { id: providerRequestId, content, finishReason },
+    usage
+  };
+}
+function extractUsage2(value) {
+  if (typeof value !== "object" || value === null) return null;
+  const usage = value;
+  const inputTokens = readTokenCount2(usage.prompt_tokens);
+  const outputTokens = readTokenCount2(usage.completion_tokens);
+  const totalTokens = readTokenCount2(usage.total_tokens);
+  if (inputTokens === null && outputTokens === null && totalTokens === null) return null;
+  return { inputTokens, outputTokens, totalTokens };
+}
+function readTokenCount2(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null;
+}
+function safeParseJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+function isAbortError2(error) {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+function defaultIsoClock4() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+async function defaultFetch2(url, init) {
+  const response = await fetch(url, init);
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: () => response.text()
+  };
+}
+
+// packages/ai-router/src/contracts.ts
+var defaultFallbackEligibleFailureCodes = [
+  "PROVIDER_UNAVAILABLE",
+  "PROVIDER_TIMEOUT",
+  "PROVIDER_RATE_LIMITED",
+  "MALFORMED_PROVIDER_RESPONSE",
+  "STRUCTURED_OUTPUT_VALIDATION_FAILED"
+];
+var defaultAiRoutingRuleSet = Object.freeze({
+  ruleSetVersion: "ai-routing-1",
+  fallbackEligibleFailureCodes: defaultFallbackEligibleFailureCodes,
+  maximumProviderAttempts: 2
+});
+var aiRouterErrorReasons = {
+  fallbackExhausted: "ai-router.fallback_exhausted",
+  routingTerminal: "ai-router.routing_terminal"
+};
+
+// packages/ai-router/src/router.ts
+var AiRouter = class {
+  definition = primaryRouterDefinition;
+  providers;
+  ruleSet;
+  constructor(options) {
+    this.providers = options.providers;
+    this.ruleSet = options.ruleSet;
+  }
+  async execute(request) {
+    const result = await this.route(request);
+    return result.result;
+  }
+  /**
+   * Routes a request across providers and returns the typed final result plus
+   * the full ordered attempt lineage. The lineage preserves provider/model
+   * metadata, fallback eligibility, and each provider result so the decision is
+   * fully traceable.
+   */
+  async route(request) {
+    const attempts = [];
+    const attemptLimit = Math.min(this.ruleSet.maximumProviderAttempts, this.providers.length);
+    for (let index = 0; index < attemptLimit; index += 1) {
+      const provider = this.providers[index];
+      if (provider === void 0) break;
+      if (!provider.definition.supportedTasks.includes(request.task)) {
+        continue;
+      }
+      const result = await provider.execute(request);
+      const eligible = isFallbackEligible(result, this.ruleSet);
+      attempts.push({
+        providerId: provider.definition.providerId,
+        modelId: provider.definition.modelId,
+        attemptIndex: index,
+        result,
+        fallbackEligible: eligible
+      });
+      if (result.status === "success") {
+        return finalize(attempts, this.ruleSet);
+      }
+      if (!eligible) {
+        return finalize(attempts, this.ruleSet);
+      }
+    }
+    return finalize(fallbackExhausted(request, attempts), this.ruleSet);
+  }
+};
+var primaryRouterDefinition = Object.freeze({
+  providerId: "ai-router",
+  modelId: "router",
+  supportedTasks: [
+    "workout_intent_extraction",
+    "discomfort_observation_extraction",
+    "grounded_decision_explanation"
+  ]
+});
+function validateAiRouterOptions(options, expectedTasks = [
+  "workout_intent_extraction",
+  "discomfort_observation_extraction",
+  "grounded_decision_explanation"
+]) {
+  if (options.providers.length === 0) {
+    return failure3("NO_PROVIDERS_CONFIGURED", "At least one provider is required.");
+  }
+  if (!Number.isInteger(options.ruleSet.maximumProviderAttempts) || options.ruleSet.maximumProviderAttempts < 1) {
+    return failure3(
+      "MAXIMUM_ATTEMPTS_INVALID",
+      "maximumProviderAttempts must be a positive integer."
+    );
+  }
+  if (options.ruleSet.maximumProviderAttempts < options.providers.length && options.ruleSet.maximumProviderAttempts < 2) {
+    return failure3(
+      "MAXIMUM_ATTEMPTS_INVALID",
+      "maximumProviderAttempts must allow at least one primary plus one fallback attempt."
+    );
+  }
+  if (options.ruleSet.fallbackEligibleFailureCodes.length === 0 && options.providers.length > 1) {
+    return failure3(
+      "FALLBACK_CODES_INVALID",
+      "fallbackEligibleFailureCodes must be configured when multiple providers are present."
+    );
+  }
+  for (const code of options.ruleSet.fallbackEligibleFailureCodes) {
+    if (!aiProviderFailureCodes.includes(code)) {
+      return failure3("FALLBACK_CODES_INVALID", `Unknown failure code "${code}".`);
+    }
+  }
+  const seenProviders = /* @__PURE__ */ new Set();
+  for (const provider of options.providers) {
+    if (seenProviders.has(provider.definition.providerId)) {
+      return failure3(
+        "DUPLICATE_PROVIDER",
+        `Duplicate provider "${provider.definition.providerId}".`
+      );
+    }
+    seenProviders.add(provider.definition.providerId);
+    for (const task of expectedTasks) {
+      if (!provider.definition.supportedTasks.includes(task)) {
+        return failure3(
+          "PROVIDER_UNSUPPORTED_TASK",
+          `Provider "${provider.definition.providerId}" does not support task "${task}".`
+        );
+      }
+    }
+  }
+  return { ok: true };
+}
+function isFallbackEligible(result, ruleSet) {
+  if (result.status !== "failure") return false;
+  return ruleSet.fallbackEligibleFailureCodes.includes(result.failure.code);
+}
+function finalize(attempts, ruleSet) {
+  const last = attempts[attempts.length - 1];
+  if (last === void 0) {
+    throw new Error("AiRouter finalized with no attempts; this is a router bug.");
+  }
+  return {
+    result: last.result,
+    attempts,
+    routingRuleSetVersion: ruleSet.ruleSetVersion
+  };
+}
+function fallbackExhausted(request, attempts) {
+  const last = attempts[attempts.length - 1];
+  const exhaustedFailure = {
+    code: "FALLBACK_EXHAUSTED",
+    message: "All configured fallback attempts failed.",
+    retryable: false,
+    reasonCodes: [aiRouterErrorReasons.fallbackExhausted]
+  };
+  const exhaustedResult = {
+    status: "failure",
+    task: request.task,
+    failure: exhaustedFailure,
+    responseMetadata: last?.result.responseMetadata ?? null,
+    usage: last?.result.usage ?? null
+  };
+  return [
+    ...attempts,
+    {
+      providerId: "ai-router",
+      modelId: "router",
+      attemptIndex: attempts.length,
+      result: exhaustedResult,
+      fallbackEligible: false
+    }
+  ];
+}
+function failure3(code, message) {
+  return { ok: false, failure: { code, message } };
+}
+
+// packages/ai-decision-explanation/src/explanation-prompt.ts
+var explanationContractVersion = "ai-contract-1";
+var explanationPromptTemperature = 0;
+function buildExplanationPromptMessages(request) {
+  const input = request.input;
+  const decision = input.decision;
+  const system = [
+    "You explain an already-computed authoritative decision in plain, concise, user-friendly language.",
+    "You do NOT make decisions, choose actions, classify safety, recommend load changes, or generate constraints.",
+    "Use ONLY the reason codes and evidence supplied in the decision. Never invent reasons, evidence, history, symptoms, performance data, or user context.",
+    "reasonCodeReferences and evidenceIdReferences must be subsets of the supplied codes and evidence ids \u2014 never add new ones.",
+    "Keep the explanation within the requested character limit and in the requested locale.",
+    "For pain-safety STOP, the explanation must NOT weaken the outcome into permission to train; describe the authoritative stop and recommend seeking qualified medical care.",
+    "For pain-safety ADAPT or pain, never name a condition, claim tissue damage, promise safety or recovery, or give treatment advice.",
+    "Incomplete information is NOT a STOP; describe it as unresolved required information, not as a safety stop."
+  ].join(" ");
+  const user = [
+    `Locale: ${input.locale}`,
+    `Maximum characters: ${input.maximumCharacters}`,
+    `Authoritative decision: ${serializeDecision(decision)}`,
+    "Return ONLY a single JSON object:",
+    JSON.stringify(schemaDescription, null, 2)
+  ].join("\n");
+  return [
+    { role: "system", content: system },
+    { role: "user", content: user }
+  ];
+}
+var schemaDescription = {
+  task: "grounded_decision_explanation",
+  explanationText: "concise plain-language explanation in the requested locale",
+  reasonCodeReferences: "array of supplied reason codes referenced by the explanation",
+  evidenceIdReferences: "array of supplied evidence ids referenced by the explanation"
+};
+function serializeDecision(decision) {
+  return JSON.stringify({
+    kind: decision.kind,
+    decisionId: decision.decisionId,
+    action: decision.action,
+    reasonCodes: decision.reasonCodes,
+    evidence: decision.evidence,
+    version: decision.version,
+    decidedAt: decision.decidedAt
+  });
+}
+function parseExplanationOutput(request, rawContent) {
+  if (rawContent === null || rawContent === void 0) {
+    return parseFailure("Provider returned no explanation content.");
+  }
+  let candidate = rawContent;
+  if (typeof rawContent === "string") {
+    const trimmed = rawContent.trim();
+    if (trimmed.length === 0) {
+      return parseFailure("Provider returned empty explanation content.");
+    }
+    try {
+      candidate = JSON.parse(trimmed);
+    } catch {
+      return parseFailure("Provider explanation content was not valid JSON.");
+    }
+  }
+  if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
+    return parseFailure("Provider explanation content was not a JSON object.");
+  }
+  const withTask = injectContractFields(request.input, candidate);
+  const validation = validateGroundedDecisionExplanationOutput(request.input, withTask);
+  if (!validation.ok) {
+    return parseFailure(formatValidationIssues(validation.failure.issues));
+  }
+  return { status: "ok", output: validation.value };
+}
+function injectContractFields(input, value) {
+  return {
+    ...value,
+    task: input.task,
+    contractVersion: input.contractVersion
+  };
+}
+function formatValidationIssues(issues) {
+  const summary = issues.slice(0, 5).map((entry) => `${entry.path} (${entry.reasonCode})`).join("; ");
+  return `Explanation structured output failed validation: ${summary}.`;
+}
+function parseFailure(message) {
+  return { status: "failure", message };
+}
+
+// packages/ai-decision-explanation/src/glm-handler.ts
+var glmExplanationHandler = {
+  buildRequestPayload(request) {
+    const messages = buildExplanationPromptMessages(request).map((message) => ({
+      role: message.role,
+      content: message.content
+    }));
+    return {
+      model: "glm-4-plus",
+      messages,
+      responseFormat: { type: "json_object" },
+      temperature: explanationPromptTemperature,
+      requestId: request.metadata.requestId,
+      task: "grounded_decision_explanation",
+      contractVersion: explanationContractVersion
+    };
+  },
+  parseTaskOutput(request, response) {
+    const result = parseExplanationOutput(request, response.content);
+    if (result.status === "failure") {
+      return { status: "failure", message: result.message };
+    }
+    return { status: "ok", output: result.output };
+  }
+};
+
+// packages/ai-decision-explanation/src/deepseek-handler.ts
+var deepseekExplanationHandler = {
+  buildRequestPayload(request) {
+    const messages = buildExplanationPromptMessages(request).map(
+      (message) => ({ role: message.role, content: message.content })
+    );
+    return {
+      model: deepseekDefaultModelId,
+      messages,
+      responseFormat: { type: "json_object" },
+      thinking: { type: "disabled" },
+      temperature: explanationPromptTemperature,
+      requestId: request.metadata.requestId,
+      task: "grounded_decision_explanation",
+      contractVersion: explanationContractVersion
+    };
+  },
+  parseTaskOutput(request, response) {
+    const result = parseExplanationOutput(request, response.content);
+    if (result.status === "failure") {
+      return { status: "failure", message: result.message };
+    }
+    return { status: "ok", output: result.output };
+  }
+};
+
+// supabase/functions/generate-workout/ai-explainer.ts
+function createProductionDecisionExplainer(options) {
+  registerGlmTaskHandler("grounded_decision_explanation", glmExplanationHandler);
+  registerDeepSeekTaskHandler("grounded_decision_explanation", deepseekExplanationHandler);
+  const providers = configuredProviders(options);
+  if (providers.length === 0) {
+    return null;
+  }
+  const provider = providers.length === 1 ? providers[0] : new AiRouter({ providers, ruleSet: defaultAiRoutingRuleSet });
+  if (providers.length > 1) {
+    const validation = validateAiRouterOptions(providerOptions(providers), [
+      "grounded_decision_explanation"
+    ]);
+    if (!validation.ok) {
+      return null;
+    }
+  }
+  return new ProviderBackedDecisionExplainer(provider, options.clock);
+}
+function providerOptions(providers) {
+  return { providers, ruleSet: defaultAiRoutingRuleSet };
+}
+function configuredProviders(options) {
+  const providers = [];
+  const glmKey = readNonEmpty2(options.env, "ZAI_API_KEY");
+  if (glmKey !== null) {
+    providers.push(
+      new GlmAiProvider({
+        transport: new GlmHttpTransport({
+          apiKey: glmKey,
+          fetch: options.fetch,
+          clock: options.clock
+        }),
+        clock: options.clock
+      })
+    );
+  }
+  const deepSeek = createDeepSeekProviderFromEnvironment({
+    env: options.env,
+    fetch: options.fetch,
+    clock: options.clock
+  });
+  if (deepSeek.status === "ok") {
+    providers.push(deepSeek.provider);
+  }
+  return providers;
+}
+var ProviderBackedDecisionExplainer = class {
+  provider;
+  clock;
+  constructor(provider, clock) {
+    this.provider = provider;
+    this.clock = clock ?? defaultIsoClock5;
+  }
+  async explainWorkoutDecision(request) {
+    const providerRequest = toProviderRequest(request, this.clock);
+    const validation = validateAIProviderRequest(providerRequest);
+    if (!validation.ok) {
+      return { status: "failure", code: "invalid_output", retryable: false };
+    }
+    let result;
+    try {
+      result = await this.provider.execute(providerRequest);
+    } catch {
+      return { status: "failure", code: "provider_failure", retryable: true };
+    }
+    if (result.status === "failure") {
+      return {
+        status: "failure",
+        code: mapProviderFailure(result),
+        retryable: result.failure.retryable
+      };
+    }
+    return {
+      status: "success",
+      explanation: { text: result.output.explanationText }
+    };
+  }
+};
+function toProviderRequest(request, clock) {
+  return {
+    task: "grounded_decision_explanation",
+    input: {
+      task: "grounded_decision_explanation",
+      contractVersion: request.contractVersion,
+      decision: {
+        kind: "workout",
+        decisionId: request.decisionId,
+        action: request.action,
+        reasonCodes: request.reasonCodes,
+        evidence: request.evidence,
+        version: request.engineVersion,
+        decidedAt: request.decidedAt
+      },
+      locale: request.locale,
+      maximumCharacters: request.maximumCharacters
+    },
+    metadata: {
+      requestId: request.requestId,
+      requestedAt: clock(),
+      timeoutMilliseconds: request.timeoutMilliseconds
+    }
+  };
+}
+function mapProviderFailure(result) {
+  switch (result.failure.code) {
+    case "PROVIDER_TIMEOUT":
+      return "provider_timeout";
+    case "MALFORMED_PROVIDER_RESPONSE":
+    case "STRUCTURED_OUTPUT_VALIDATION_FAILED":
+    case "INVALID_TASK_INPUT":
+      return "invalid_output";
+    default:
+      return "provider_failure";
+  }
+}
+function readNonEmpty2(env, key) {
+  const value = env.get(key);
+  if (value === void 0 || value.trim().length === 0) return null;
+  return value.trim();
+}
+function defaultIsoClock5() {
+  return (/* @__PURE__ */ new Date()).toISOString();
 }
 
 // supabase/functions/generate-workout/index.ts
@@ -5376,11 +7869,16 @@ serve(async (req) => {
   const catalogLoader = createSupabaseCatalogLoader(supabaseUrl, anonKey, token);
   const profileLoader = createSupabaseProfileLoader(supabaseUrl, anonKey, token);
   const sink = new ConsoleSink();
+  const decisionExplainer = createProductionDecisionExplainer({
+    env: Deno.env,
+    fetch
+  });
   const dependencies = {
     profileLoader,
     catalogLoader,
     equipmentContextMap,
-    muscleIdMap
+    muscleIdMap,
+    ...decisionExplainer ? { decisionExplainer } : {}
   };
   const result = "action" in body && body.action === "replace_exercise" ? await replaceWorkoutExercise(body, userId, dependencies) : await generateWorkout(body, userId, dependencies, sink);
   if (result.status === "error") {

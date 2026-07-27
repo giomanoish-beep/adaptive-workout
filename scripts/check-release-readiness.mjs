@@ -264,6 +264,84 @@ async function assertSupabasePrerequisites() {
   assertIncludes(workflow, 'npx supabase test db', 'CI database job');
 }
 
+async function readDirectoryText(relativeDirectory) {
+  const directory = resolve(root, relativeDirectory);
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  const chunks = [];
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const path = resolve(entry.parentPath, entry.name);
+    if (!/\.(?:css|html|js|json|webmanifest)$/u.test(path)) continue;
+    chunks.push(await readFile(path, 'utf8'));
+  }
+  return chunks.join('\n');
+}
+
+async function assertProductionAiFlowReadiness() {
+  const index = readText('supabase/functions/generate-workout/index.ts');
+  assertIncludes(index, 'createProductionDecisionExplainer', 'generate-workout Edge Function');
+  assertIncludes(index, 'env: Deno.env', 'generate-workout Edge Function');
+  assertIncludes(index, 'decisionExplainer', 'generate-workout Edge Function');
+
+  const explainer = readText('supabase/functions/generate-workout/ai-explainer.ts');
+  assertIncludes(
+    explainer,
+    'createDeepSeekProviderFromEnvironment',
+    'generate-workout AI explainer',
+  );
+  assertIncludes(
+    explainer,
+    "registerDeepSeekTaskHandler('grounded_decision_explanation'",
+    'generate-workout AI explainer',
+  );
+  assertIncludes(
+    explainer,
+    "registerGlmTaskHandler('grounded_decision_explanation'",
+    'generate-workout AI explainer',
+  );
+  assertIncludes(explainer, 'defaultAiRoutingRuleSet', 'generate-workout AI explainer');
+  assertIncludes(explainer, 'ZAI_API_KEY', 'generate-workout AI explainer');
+
+  const bundle = readText('supabase/functions/generate-workout/index.bundle.ts');
+  assertIncludes(bundle, 'createDeepSeekProviderFromEnvironment', 'generate-workout bundle');
+  assertIncludes(bundle, 'grounded_decision_explanation', 'generate-workout bundle');
+  assertIncludes(bundle, 'deepseek-v4-flash', 'generate-workout bundle');
+  assertIncludes(bundle, 'DEEPSEEK_API_KEY', 'generate-workout bundle');
+  assertIncludes(bundle, 'thinking:', 'generate-workout bundle');
+
+  const browserSource = [
+    readText('apps/web/src/workout/workout-review.ts'),
+    readText('apps/web/src/workout/WorkoutReview.tsx'),
+    readText('apps/web/src/workout/workout-generation-gateway.ts'),
+  ].join('\n');
+  for (const forbidden of [
+    '@adaptive-workout/ai-deepseek-provider',
+    '@adaptive-workout/ai-glm-provider',
+    '@adaptive-workout/ai-router',
+    '@adaptive-workout/ai-decision-explanation',
+    'DEEPSEEK_API_KEY',
+    'DEEPSEEK_BASE_URL',
+    'DEEPSEEK_MODEL',
+  ]) {
+    assertNotIncludes(browserSource, forbidden, 'browser workout AI boundary');
+  }
+
+  const browserBundle = await readDirectoryText('apps/web/dist');
+  for (const forbidden of [
+    'DEEPSEEK_API_KEY',
+    'DEEPSEEK_BASE_URL',
+    'DEEPSEEK_MODEL',
+    '@adaptive-workout/ai-deepseek-provider',
+    '@adaptive-workout/ai-glm-provider',
+    '@adaptive-workout/ai-router',
+    '@adaptive-workout/ai-decision-explanation',
+    'createDeepSeekProviderFromEnvironment',
+    'deepseek-v4-flash',
+  ]) {
+    assertNotIncludes(browserBundle, forbidden, 'browser production bundle');
+  }
+}
+
 function assertSecretsAreNotTracked() {
   const envExample = readText('.env.example');
   for (const line of envExample.split(/\r?\n/)) {
@@ -304,6 +382,7 @@ async function main() {
   assertProductionGuardReadiness();
   assertDeepSeekProviderReadiness();
   await assertSupabasePrerequisites();
+  await assertProductionAiFlowReadiness();
   assertSecretsAreNotTracked();
   assertReleaseDocsAndCi();
 
