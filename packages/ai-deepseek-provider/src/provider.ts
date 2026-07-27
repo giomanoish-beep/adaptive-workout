@@ -13,6 +13,7 @@ import {
   deepseekDefaultModelId,
   deepseekProviderId,
   deepseekRequestErrorReasons,
+  unsupportedDeepSeekModelIds,
   type DeepSeekTaskHandler,
   type DeepSeekTransport,
   type DeepSeekTransportCall,
@@ -32,6 +33,9 @@ export const deepseekProviderDefinition: AIProviderDefinition = Object.freeze({
 });
 
 export function defineDeepSeekProviderDefinition(modelId: string): AIProviderDefinition {
+  if (isUnsupportedDeepSeekModel(modelId)) {
+    throw new Error(`DeepSeek model "${modelId}" is not allowed for production use.`);
+  }
   return Object.freeze({
     providerId: deepseekProviderId,
     modelId,
@@ -81,7 +85,12 @@ export class DeepSeekAiProvider implements AIProvider {
       return unsupportedTaskFailure<Task>(request.task);
     }
 
-    const payload = handler.buildRequestPayload(request);
+    const payload = {
+      ...handler.buildRequestPayload(request),
+      model: this.definition.modelId,
+      responseFormat: { type: 'json_object' as const },
+      thinking: { type: 'disabled' as const },
+    };
     const startedAt = Date.now();
     const abortController = new AbortController();
     const timeout = createTimeout(request.metadata.timeoutMilliseconds, () =>
@@ -105,6 +114,7 @@ export class DeepSeekAiProvider implements AIProvider {
         request.task,
         transportOutcome.failure,
         startedAt,
+        this.definition.modelId,
         this.clock,
       );
     }
@@ -177,6 +187,12 @@ function defaultIsoClock(): string {
   return new Date().toISOString();
 }
 
+function isUnsupportedDeepSeekModel(modelId: string): boolean {
+  return unsupportedDeepSeekModelIds.includes(
+    modelId as (typeof unsupportedDeepSeekModelIds)[number],
+  );
+}
+
 function unsupportedTaskFailure<Task extends AITaskKind>(task: Task): AIProviderResult<Task> {
   return failureResult(task, {
     code: 'UNSUPPORTED_TASK',
@@ -223,12 +239,13 @@ function transportFailureResult<Task extends AITaskKind>(
   task: Task,
   failure: DeepSeekTransportFailure,
   startedAt: number,
+  modelId: string,
   clock: () => string,
 ): AIProviderResult<Task> {
   const mapped = mapTransportFailure(failure);
   const responseMetadata: AIProviderResponseMetadata = {
     providerId: deepseekProviderId,
-    modelId: deepseekDefaultModelId,
+    modelId,
     providerRequestId: null,
     receivedAt: clock(),
     latencyMilliseconds: Date.now() - startedAt,
@@ -264,6 +281,24 @@ function mapTransportFailure(failure: DeepSeekTransportFailure): {
           reasonCodes: [deepseekRequestErrorReasons.authenticationFailed],
         },
       };
+    case 'payment_required':
+      return {
+        failure: {
+          code: 'PROVIDER_PAYMENT_REQUIRED',
+          message: 'DeepSeek account billing or quota is not available.',
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.paymentRequired],
+        },
+      };
+    case 'invalid_request':
+      return {
+        failure: {
+          code: 'UNSUPPORTED_PROVIDER_CAPABILITY',
+          message: 'DeepSeek rejected the structured request configuration.',
+          retryable: false,
+          reasonCodes: [deepseekRequestErrorReasons.invalidRequest],
+        },
+      };
     case 'rate_limited':
       return {
         failure: {
@@ -289,6 +324,15 @@ function mapTransportFailure(failure: DeepSeekTransportFailure): {
           message: failure.message,
           retryable: false,
           reasonCodes: [deepseekRequestErrorReasons.malformedResponse],
+        },
+      };
+    case 'truncated_output':
+      return {
+        failure: {
+          code: 'MALFORMED_PROVIDER_RESPONSE',
+          message: 'DeepSeek response was truncated before a complete JSON object was returned.',
+          retryable: true,
+          reasonCodes: [deepseekRequestErrorReasons.truncatedOutput],
         },
       };
   }

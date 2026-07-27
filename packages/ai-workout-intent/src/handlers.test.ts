@@ -20,6 +20,7 @@ import {
 import {
   clearDeepSeekTaskHandlers,
   DeepSeekAiProvider,
+  deepseekDefaultModelId,
   registerDeepSeekTaskHandler,
   type DeepSeekRequestPayload,
   type DeepSeekResponsePayload,
@@ -97,7 +98,7 @@ function okDeepSeekResult(content: unknown): DeepSeekTransportResult {
   return {
     responseMetadata: {
       providerId: 'deepseek',
-      modelId: 'deepseek-chat',
+      modelId: deepseekDefaultModelId,
       providerRequestId: 'deepseek-req-1',
       receivedAt: '2026-07-14T10:00:01.000Z',
       latencyMilliseconds: 1_200,
@@ -184,6 +185,16 @@ describe('GLM workout-intent handler through GlmAiProvider', () => {
 });
 
 describe('DeepSeek workout-intent handler through DeepSeekAiProvider', () => {
+  it('sends JSON Output and disabled thinking mode to the transport', async () => {
+    registerDeepSeekTaskHandler('workout_intent_extraction', deepseekWorkoutIntentHandler);
+    const transport = fakeDeepSeekTransport(okDeepSeekResult(validModelJson));
+    await new DeepSeekAiProvider({ transport }).execute(workoutIntentRequest);
+
+    expect(transport.lastPayload()?.task).toBe('workout_intent_extraction');
+    expect(transport.lastPayload()?.responseFormat).toEqual({ type: 'json_object' });
+    expect(transport.lastPayload()?.thinking).toEqual({ type: 'disabled' });
+  });
+
   it('returns a validated structured output for a successful provider response', async () => {
     registerDeepSeekTaskHandler('workout_intent_extraction', deepseekWorkoutIntentHandler);
     const provider = new DeepSeekAiProvider({

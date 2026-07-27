@@ -8,9 +8,8 @@ import type {
 import type { ContractVersion } from '@adaptive-workout/domain';
 
 /**
- * DeepSeek is the configured fallback AI provider (see docs/AI.md). The API key
- * lives in a server-only secret and is never read by this package's provider
- * code. The primary provider (GLM) is invoked first by the router.
+ * DeepSeek is the configured production AI provider (see docs/AI.md). The API
+ * key lives in a server-only secret and is never read by browser code.
  */
 export const deepseekProviderId = 'deepseek' as const;
 export type DeepSeekProviderId = typeof deepseekProviderId;
@@ -25,7 +24,9 @@ export type DeepSeekApiKeyId = string & { readonly [deepseekApiKeyIdBrand]: neve
 
 export type DeepSeekModelId = string;
 
-export const deepseekDefaultModelId = 'deepseek-chat' as DeepSeekModelId;
+export const deepseekDefaultModelId = 'deepseek-v4-flash' as DeepSeekModelId;
+export const deepseekDefaultBaseUrl = 'https://api.deepseek.com';
+export const unsupportedDeepSeekModelIds = ['deepseek-chat', 'deepseek-reasoner'] as const;
 
 export interface DeepSeekRequestMessage {
   readonly role: 'system' | 'user' | 'assistant';
@@ -42,6 +43,7 @@ export interface DeepSeekRequestPayload {
   readonly model: DeepSeekModelId;
   readonly messages: readonly DeepSeekRequestMessage[];
   readonly responseFormat: { readonly type: 'json_object' };
+  readonly thinking: { readonly type: 'disabled' };
   readonly temperature: number;
   readonly requestId: string;
   readonly task: AITaskKind;
@@ -68,9 +70,12 @@ export interface DeepSeekTransportResult {
 export type DeepSeekTransportFailure =
   | { readonly kind: 'timeout' }
   | { readonly kind: 'authentication_failed' }
+  | { readonly kind: 'payment_required' }
+  | { readonly kind: 'invalid_request' }
   | { readonly kind: 'rate_limited' }
   | { readonly kind: 'unavailable' }
-  | { readonly kind: 'malformed_response'; readonly message: string };
+  | { readonly kind: 'malformed_response'; readonly message: string }
+  | { readonly kind: 'truncated_output' };
 
 export interface DeepSeekTransport {
   /**
@@ -113,10 +118,14 @@ export const deepseekRequestErrorReasons = {
   transportException: 'deepseek.transport_exception',
   timeout: 'deepseek.timeout',
   authenticationFailed: 'deepseek.authentication_failed',
+  paymentRequired: 'deepseek.payment_required',
+  invalidRequest: 'deepseek.invalid_request',
   rateLimited: 'deepseek.rate_limited',
   unavailable: 'deepseek.unavailable',
   malformedResponse: 'deepseek.malformed_response',
   structuredOutputInvalid: 'deepseek.structured_output_invalid',
+  truncatedOutput: 'deepseek.truncated_output',
+  unsupportedModel: 'deepseek.unsupported_model',
 } as const;
 export type DeepSeekRequestErrorReason =
   (typeof deepseekRequestErrorReasons)[keyof typeof deepseekRequestErrorReasons];

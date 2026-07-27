@@ -1,5 +1,7 @@
 * text=auto
 
+.gitattributes text eol=lf
+
 *.css text eol=lf
 *.html text eol=lf
 *.js text eol=lf
@@ -13,5 +15,7 @@
 *.webmanifest text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
+
+.env.example text eol=lf
 
 *.png binary

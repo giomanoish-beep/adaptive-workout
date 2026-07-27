@@ -173,6 +173,50 @@ function assertProductionGuardReadiness() {
   assertIncludes(guard, 'e2e@adaptive-workout.test', 'production guard forbidden markers');
 }
 
+function assertDeepSeekProviderReadiness() {
+  const contracts = readText('packages/ai-deepseek-provider/src/contracts.ts');
+  assertIncludes(
+    contracts,
+    "deepseekDefaultModelId = 'deepseek-v4-flash'",
+    'DeepSeek provider contracts',
+  );
+  assertIncludes(
+    contracts,
+    "deepseekDefaultBaseUrl = 'https://api.deepseek.com'",
+    'DeepSeek provider contracts',
+  );
+  assertIncludes(contracts, "readonly thinking: { readonly type: 'disabled' }", 'DeepSeek payload');
+
+  const environment = readText('packages/ai-deepseek-provider/src/environment.ts');
+  assertIncludes(environment, 'DEEPSEEK_API_KEY', 'DeepSeek environment factory');
+  assertIncludes(environment, 'DEEPSEEK_BASE_URL', 'DeepSeek environment factory');
+  assertIncludes(environment, 'DEEPSEEK_MODEL', 'DeepSeek environment factory');
+  assertIncludes(
+    environment,
+    'createDeepSeekProviderFromEnvironment',
+    'DeepSeek environment factory',
+  );
+
+  const transport = readText('packages/ai-deepseek-provider/src/http-transport.ts');
+  assertIncludes(transport, 'response_format: payload.responseFormat', 'DeepSeek HTTP transport');
+  assertIncludes(transport, 'thinking: payload.thinking', 'DeepSeek HTTP transport');
+  assertIncludes(transport, 'retryableStatusCodes = new Set([429, 500, 503])', 'DeepSeek retries');
+  assertIncludes(transport, 'response.status === 402', 'DeepSeek HTTP status handling');
+  assertIncludes(transport, "finishReason === 'length'", 'DeepSeek truncated-output handling');
+
+  const handlers = [
+    'packages/ai-workout-intent/src/deepseek-handler.ts',
+    'packages/ai-discomfort-extraction/src/deepseek-handler.ts',
+    'packages/ai-decision-explanation/src/deepseek-handler.ts',
+  ];
+  for (const handler of handlers) {
+    const source = readText(handler);
+    assertIncludes(source, 'deepseekDefaultModelId', handler);
+    assertIncludes(source, "responseFormat: { type: 'json_object' }", handler);
+    assertIncludes(source, "thinking: { type: 'disabled' }", handler);
+  }
+}
+
 async function assertSupabasePrerequisites() {
   const config = readText('supabase/config.toml');
   assertIncludes(config, '[functions.generate-workout]', 'supabase/config.toml');
@@ -233,6 +277,10 @@ function assertSecretsAreNotTracked() {
   assertIncludes(gitignore, '.env', '.gitignore');
   assertIncludes(gitignore, '.env.*', '.gitignore');
   assertIncludes(gitignore, '!.env.example', '.gitignore');
+
+  assertIncludes(envExample, 'DEEPSEEK_API_KEY=', '.env.example');
+  assertIncludes(envExample, 'DEEPSEEK_BASE_URL=', '.env.example');
+  assertIncludes(envExample, 'DEEPSEEK_MODEL=', '.env.example');
 }
 
 function assertReleaseDocsAndCi() {
@@ -254,6 +302,7 @@ async function main() {
   assertVercelPrerequisites();
   assertOtpReadiness();
   assertProductionGuardReadiness();
+  assertDeepSeekProviderReadiness();
   await assertSupabasePrerequisites();
   assertSecretsAreNotTracked();
   assertReleaseDocsAndCi();
