@@ -12,6 +12,7 @@ import {
 import {
   clearDeepSeekTaskHandlers,
   DeepSeekAiProvider,
+  deepseekDefaultModelId,
   registerDeepSeekTaskHandler,
   type DeepSeekRequestPayload,
   type DeepSeekResponsePayload,
@@ -111,7 +112,7 @@ function okDeepSeekResult(content: unknown): DeepSeekTransportResult {
   return {
     responseMetadata: {
       providerId: 'deepseek',
-      modelId: 'deepseek-chat',
+      modelId: deepseekDefaultModelId,
       providerRequestId: 'deepseek-req-1',
       receivedAt: '2026-07-14T10:00:01.000Z',
       latencyMilliseconds: 1_200,
@@ -197,6 +198,16 @@ describe('GLM discomfort handler through GlmAiProvider', () => {
 });
 
 describe('DeepSeek discomfort handler through DeepSeekAiProvider', () => {
+  it('sends JSON Output and disabled thinking mode to the transport', async () => {
+    registerDeepSeekTaskHandler('discomfort_observation_extraction', deepseekDiscomfortHandler);
+    const transport = fakeDeepSeekTransport(okDeepSeekResult(validModelJson));
+    await new DeepSeekAiProvider({ transport }).execute(discomfortRequest);
+
+    expect(transport.lastPayload()?.task).toBe('discomfort_observation_extraction');
+    expect(transport.lastPayload()?.responseFormat).toEqual({ type: 'json_object' });
+    expect(transport.lastPayload()?.thinking).toEqual({ type: 'disabled' });
+  });
+
   it('returns the same canonical output contract as GLM', async () => {
     registerDeepSeekTaskHandler('discomfort_observation_extraction', deepseekDiscomfortHandler);
     const provider = new DeepSeekAiProvider({

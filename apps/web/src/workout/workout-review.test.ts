@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { formatRepRange, totalReviewWorkingSets, workoutReviewFixture } from './workout-review';
+import {
+  formatLoadPrescription,
+  formatRepRange,
+  totalReviewWorkingSets,
+  workoutReviewFixture,
+} from './workout-review';
+
+const loadPrescription = {
+  kind: 'external_numeric',
+  suggestedLoadKg: 20,
+  unit: 'kg',
+  label: 'Estimated — confirm after first set',
+  incrementKg: 2.5,
+} as const;
 
 describe('workout review fixture', () => {
   it('has the documented title, duration, and total working sets', () => {
@@ -40,6 +53,21 @@ describe('review helpers', () => {
     expect(formatRepRange({ minimum: 8, maximum: 10 })).toBe('8\u201310');
   });
 
+  it('formats numeric and non-numeric load prescriptions for display', () => {
+    expect(formatLoadPrescription(loadPrescription)).toBe(
+      '20 kg · Estimated — confirm after first set',
+    );
+    expect(
+      formatLoadPrescription({
+        kind: 'bodyweight',
+        suggestedLoadKg: null,
+        unit: 'kg',
+        label: 'Bodyweight',
+        incrementKg: 0,
+      }),
+    ).toBe('Bodyweight');
+  });
+
   it('totals sets for an arbitrary review', () => {
     expect(
       totalReviewWorkingSets({
@@ -47,8 +75,22 @@ describe('review helpers', () => {
         estimatedDurationMinutes: 1,
         totalWorkingSets: 0,
         exercises: [
-          { position: 1, name: 'a', sets: 3, reps: { minimum: 1, maximum: 2 }, rir: 1 },
-          { position: 2, name: 'b', sets: 5, reps: { minimum: 1, maximum: 2 }, rir: 1 },
+          {
+            position: 1,
+            name: 'a',
+            sets: 3,
+            reps: { minimum: 1, maximum: 2 },
+            rir: 1,
+            loadPrescription,
+          },
+          {
+            position: 2,
+            name: 'b',
+            sets: 5,
+            reps: { minimum: 1, maximum: 2 },
+            rir: 1,
+            loadPrescription,
+          },
         ],
         muscleVolume: [],
       }),

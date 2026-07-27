@@ -42,6 +42,7 @@ export interface ReplaceWorkoutExerciseSuccess {
     readonly exerciseId: string;
     readonly exerciseVersion: number;
     readonly name: string;
+    readonly loadPrescription: LoadPrescription;
   };
 }
 
@@ -64,6 +65,26 @@ export type ReplaceWorkoutExerciseResponse =
 /*  Server → Browser response (review DTO)                             */
 /* ------------------------------------------------------------------ */
 
+export type LoadPrescriptionKind =
+  'external_numeric' | 'bodyweight' | 'unloaded_bar' | 'calibration_required';
+
+/**
+ * Browser-safe load prescription for a single exercise.
+ *
+ * Distinguishes external numeric loads, bodyweight exercises, unloaded bars,
+ * and calibration-required states explicitly — never uses an ambiguous 0.
+ */
+export interface LoadPrescription {
+  readonly kind: LoadPrescriptionKind;
+  /** Suggested external load in kg when kind is 'external_numeric'; null otherwise. */
+  readonly suggestedLoadKg: number | null;
+  readonly unit: 'kg';
+  /** Human-readable label for the UI (e.g. "Estimated — confirm after first set"). */
+  readonly label: string;
+  /** Realistic adjustment increment in kg (e.g. 2.5 for barbells, 2 for dumbbells). */
+  readonly incrementKg: number;
+}
+
 export interface WorkoutReviewRepRange {
   readonly minimum: number;
   readonly maximum: number;
@@ -81,17 +102,23 @@ export interface WorkoutReviewExercise {
   readonly rir: number;
   /** Planned rest in seconds, or null if not prescribed. */
   readonly restSeconds: number | null;
-  /** Conservative initial load estimate in kg (V1.4). 0 = bodyweight/unloaded. */
-  readonly initialLoadKg: number;
-  /** Source of the load estimate. */
-  readonly loadEstimateSource: string;
-  /** Human-readable label for the load estimate. */
-  readonly loadEstimateLabel: string;
+  /** Complete load prescription (never ambiguous). */
+  readonly loadPrescription: LoadPrescription;
 }
 
 export interface WorkoutReviewMuscleVolume {
   readonly muscle: string;
   readonly volume: number;
+}
+
+export interface WorkoutDecisionExplanation {
+  /**
+   * User-facing explanation generated from deterministic decision evidence.
+   *
+   * This field is browser-safe: it never carries provider identifiers, prompts,
+   * raw model responses, credentials, or routing metadata.
+   */
+  readonly text: string;
 }
 
 export interface WorkoutReviewSuccess {
@@ -109,6 +136,8 @@ export interface WorkoutReviewSuccess {
   readonly ruleSetVersion: string;
   /** Controlled trace summary for UI debugging only. */
   readonly traceSummary: string | null;
+  /** Optional AI explanation of the deterministic workout decision. */
+  readonly decisionExplanation: WorkoutDecisionExplanation | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,6 +180,8 @@ export interface ServerTrainingProfile {
   readonly environment: string;
   readonly programPreference: string;
   readonly hasCurrentDiscomfort: boolean;
+  /** User body weight in kg. May be null when not yet provided. */
+  readonly bodyWeightKg: number | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -230,6 +261,51 @@ export interface ProfileLoader {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Server-side AI explanation port                                    */
+/* ------------------------------------------------------------------ */
+
+export interface WorkoutDecisionExplanationEvidence {
+  readonly evidenceId: string;
+  readonly kind: 'constraint' | 'exercise' | 'exposure' | 'set' | 'observation' | 'rule';
+  readonly fact: string;
+}
+
+export interface WorkoutDecisionExplanationRequest {
+  readonly requestId: string;
+  readonly decisionId: string;
+  readonly decidedAt: string;
+  readonly contractVersion: string;
+  readonly engineVersion: {
+    readonly engineName: string;
+    readonly engineVersion: string;
+    readonly ruleSetVersion: string;
+  };
+  readonly action: { readonly kind: 'generated_workout'; readonly origin: 'generated' };
+  readonly reasonCodes: readonly string[];
+  readonly evidence: readonly WorkoutDecisionExplanationEvidence[];
+  readonly locale: string;
+  readonly maximumCharacters: number;
+  readonly timeoutMilliseconds: number;
+}
+
+export type WorkoutDecisionExplanationFailureCode =
+  'not_configured' | 'provider_failure' | 'provider_timeout' | 'invalid_output';
+
+export type WorkoutDecisionExplanationResult =
+  | { readonly status: 'success'; readonly explanation: WorkoutDecisionExplanation }
+  | {
+      readonly status: 'failure';
+      readonly code: WorkoutDecisionExplanationFailureCode;
+      readonly retryable: boolean;
+    };
+
+export interface WorkoutDecisionExplainer {
+  explainWorkoutDecision(
+    request: WorkoutDecisionExplanationRequest,
+  ): Promise<WorkoutDecisionExplanationResult>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Orchestrator dependencies                                          */
 /* ------------------------------------------------------------------ */
 
@@ -240,4 +316,10 @@ export interface WorkoutGenerationDependencies {
   readonly muscleIdMap: MuscleIdMap;
   /** Correlation ID for observability. */
   readonly correlationId?: string;
+  /** Optional server-only AI explanation dependency. */
+  readonly decisionExplainer?: WorkoutDecisionExplainer;
+  /** Injectable IDs/time keep tests deterministic. */
+  readonly aiRequestIdFactory?: () => string;
+  readonly aiDecisionIdFactory?: () => string;
+  readonly clock?: () => string;
 }

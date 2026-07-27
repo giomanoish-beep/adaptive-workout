@@ -22,6 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.110.5';
 import { generateWorkout } from '../../../packages/workout-gen-orchestrator/src/orchestrator.ts';
 import { replaceWorkoutExercise } from '../../../packages/workout-gen-orchestrator/src/replacement.ts';
 import { ConsoleSink } from '../../../packages/observability/src/sinks.ts';
+import { createProductionDecisionExplainer } from './ai-explainer.ts';
 import type {
   GenerateWorkoutRequest,
   ReplaceWorkoutExerciseRequest,
@@ -226,6 +227,7 @@ function createSupabaseProfileLoader(
         environment: (row['training_environment'] as string) ?? '',
         programPreference: (row['program_preference'] as string) ?? '',
         hasCurrentDiscomfort: (row['has_current_discomfort'] as boolean) ?? false,
+        bodyWeightKg: (row['body_weight_kg'] as number) ?? null,
       };
     },
   };
@@ -317,12 +319,17 @@ serve(async (req: Request) => {
   const profileLoader = createSupabaseProfileLoader(supabaseUrl, anonKey, token);
 
   const sink = new ConsoleSink();
+  const decisionExplainer = createProductionDecisionExplainer({
+    env: Deno.env,
+    fetch,
+  });
 
   const dependencies = {
     profileLoader,
     catalogLoader,
     equipmentContextMap,
     muscleIdMap,
+    ...(decisionExplainer ? { decisionExplainer } : {}),
   };
 
   const result =

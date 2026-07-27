@@ -4,6 +4,7 @@ import type {
   DeepSeekTaskHandler,
 } from '@adaptive-workout/ai-deepseek-provider';
 import type { AIProviderRequest } from '@adaptive-workout/ai';
+import { deepseekDefaultModelId } from '@adaptive-workout/ai-deepseek-provider';
 import {
   buildExplanationPromptMessages,
   explanationContractVersion,
@@ -24,9 +25,10 @@ export const deepseekExplanationHandler: DeepSeekTaskHandler<'grounded_decision_
       (message) => ({ role: message.role, content: message.content }),
     );
     return {
-      model: 'deepseek-chat',
+      model: deepseekDefaultModelId,
       messages,
       responseFormat: { type: 'json_object' },
+      thinking: { type: 'disabled' },
       temperature: explanationPromptTemperature,
       requestId: request.metadata.requestId,
       task: 'grounded_decision_explanation',

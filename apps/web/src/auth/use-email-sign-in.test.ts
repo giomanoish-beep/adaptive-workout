@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { requestEmailSignIn } from './use-email-sign-in';
+import { requestEmailSignIn, translateEmailSignInError } from './use-email-sign-in';
 
 /**
  * Minimal Supabase auth mock. Only the surface the sign-in action touches.
@@ -33,10 +33,10 @@ describe('requestEmailSignIn', () => {
     });
   });
 
-  it('returns the provider error message when Supabase fails', async () => {
-    const { client } = mockClient({ message: 'Rate limit exceeded.' });
+  it('returns a sanitized provider error message when Supabase fails', async () => {
+    const { client } = mockClient({ message: 'Provider internal detail.' });
     await expect(requestEmailSignIn(client, 'athlete@example.com')).resolves.toEqual({
-      error: 'Rate limit exceeded.',
+      error: 'Unable to send verification code. Please try again.',
     });
   });
 
@@ -47,7 +47,27 @@ describe('requestEmailSignIn', () => {
       },
     } as unknown as SupabaseClient;
     await expect(requestEmailSignIn(client, 'athlete@example.com')).resolves.toEqual({
-      error: 'Unable to send verification code.',
+      error: 'Unable to send verification code. Please try again.',
     });
+  });
+});
+
+describe('translateEmailSignInError', () => {
+  it('shows a resend rate-limit message without raw provider details', () => {
+    expect(translateEmailSignInError({ status: 429, message: 'rate limit exceeded' })).toBe(
+      'Too many attempts. Please wait before requesting another code.',
+    );
+  });
+
+  it('shows a network failure message', () => {
+    expect(translateEmailSignInError({ message: 'Failed to fetch' })).toBe(
+      'Network problem. Check your connection and try again.',
+    );
+  });
+
+  it('uses a generic unknown error message', () => {
+    expect(translateEmailSignInError({ message: 'database internals' })).toBe(
+      'Unable to send verification code. Please try again.',
+    );
   });
 });

@@ -129,16 +129,20 @@ export function completeExerciseReplacement(
   position: number,
   replacement: Pick<
     WorkoutReviewExercise,
-    'exerciseId' | 'exerciseVersion' | 'name' | 'progression'
+    'exerciseId' | 'exerciseVersion' | 'name' | 'progression' | 'loadPrescription'
   >,
 ): WorkoutFlowState {
   if (state.stage !== 'review') return state;
-  const previousId = state.review.exercises.find(
+  const existingExercise = state.review.exercises.find(
     (exercise) => exercise.position === position,
-  )?.exerciseId;
+  );
+  const previousId = existingExercise?.exerciseId;
+  const review = existingExercise
+    ? replaceReviewExercise(state.review, position, replacement)
+    : state.review;
   return {
     ...state,
-    review: replaceReviewExercise(state.review, position, replacement),
+    review,
     replacingPosition: null,
     replacementError: null,
     replacementHistory: {

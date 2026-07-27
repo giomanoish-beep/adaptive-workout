@@ -9,7 +9,11 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { WorkoutReview, WorkoutReviewExercise } from '../workout/workout-review';
+import type {
+  LoadPrescriptionKind,
+  WorkoutReview,
+  WorkoutReviewExercise,
+} from '../workout/workout-review';
 import type { LoggedSetValue } from '../active-workout/active-workout-validation';
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +45,10 @@ export interface SessionExerciseRow {
   readonly plannedRepsMax: number | null;
   readonly plannedRir: number | null;
   readonly plannedRestSeconds: number | null;
+  readonly plannedLoadKind: LoadPrescriptionKind | null;
+  readonly plannedLoadKg: number | null;
+  readonly plannedLoadLabel: string | null;
+  readonly plannedLoadIncrementKg: number | null;
 }
 
 export interface SetLogRow {
@@ -118,6 +126,10 @@ function mapExerciseRow(row: Record<string, unknown>): SessionExerciseRow {
     plannedRepsMax: (row['planned_reps_max'] as number | null) ?? null,
     plannedRir: (row['planned_rir'] as number | null) ?? null,
     plannedRestSeconds: (row['planned_rest_seconds'] as number | null) ?? null,
+    plannedLoadKind: (row['planned_load_kind'] as LoadPrescriptionKind | null) ?? null,
+    plannedLoadKg: (row['planned_load_kg'] as number | null) ?? null,
+    plannedLoadLabel: (row['planned_load_label'] as string | null) ?? null,
+    plannedLoadIncrementKg: (row['planned_load_increment'] as number | null) ?? null,
   };
 }
 
@@ -424,5 +436,9 @@ function toExerciseInsert(
     planned_reps_max: exercise.reps.maximum,
     planned_rir: exercise.rir,
     planned_rest_seconds: exercise.restSeconds ?? null,
+    planned_load_kind: exercise.loadPrescription.kind,
+    planned_load_kg: exercise.loadPrescription.suggestedLoadKg,
+    planned_load_label: exercise.loadPrescription.label,
+    planned_load_increment: exercise.loadPrescription.incrementKg,
   };
 }

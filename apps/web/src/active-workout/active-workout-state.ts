@@ -24,6 +24,9 @@ export interface PlannedSet {
   readonly setNumber: number;
   readonly targetReps: Readonly<{ readonly minimum: number; readonly maximum: number }>;
   readonly targetRir: number;
+  readonly suggestedLoadKg: number | null;
+  readonly loadKind: WorkoutReviewExercise['loadPrescription']['kind'];
+  readonly loadLabel: string;
 }
 
 /** An exercise as it appears in the active workout. */
@@ -171,6 +174,9 @@ function toActiveExercise(exercise: WorkoutReviewExercise): ActiveExercise {
       setNumber,
       targetReps: { minimum: exercise.reps.minimum, maximum: exercise.reps.maximum },
       targetRir: exercise.rir,
+      suggestedLoadKg: exercise.loadPrescription.suggestedLoadKg,
+      loadKind: exercise.loadPrescription.kind,
+      loadLabel: exercise.loadPrescription.label,
     });
   }
   return {

@@ -14,6 +14,7 @@ import {
   generateWorkoutViaGateway,
   mapGatewayToWorkoutReview,
   replaceExerciseViaGateway,
+  toLoadPrescriptionKind,
   type GatewayGenerateRequest,
 } from '../workout/workout-generation-gateway';
 import { createWorkoutSessionRepository } from '../workout-session/workout-session-repository';
@@ -125,9 +126,17 @@ export function AppNav({
         throw new Error(result.message ?? 'No valid substitute is available.');
       }
       const progression = await loadProgressionSafely(client);
+      const lp = result.replacement.loadPrescription;
       return {
         ...current,
         ...result.replacement,
+        loadPrescription: {
+          kind: toLoadPrescriptionKind(lp.kind),
+          suggestedLoadKg: lp.suggestedLoadKg,
+          unit: lp.unit,
+          label: lp.label,
+          incrementKg: lp.incrementKg,
+        },
         progression: toProgressionSummary(
           progression.find((item) => item.exerciseId === result.replacement?.exerciseId),
         ),

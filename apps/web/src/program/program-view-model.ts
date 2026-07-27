@@ -61,6 +61,22 @@ export function scheduledWorkoutReview(
       reps: { minimum: item.repsMin, maximum: item.repsMax },
       rir: item.targetRir,
       restSeconds: item.restSeconds,
+      loadPrescription:
+        item.initialLoadKg === null
+          ? {
+              kind: 'calibration_required' as const,
+              suggestedLoadKg: null,
+              unit: 'kg' as const,
+              label: item.recommendationReason,
+              incrementKg: 2.5,
+            }
+          : {
+              kind: 'external_numeric' as const,
+              suggestedLoadKg: item.initialLoadKg,
+              unit: 'kg' as const,
+              label: item.recommendationReason,
+              incrementKg: 2.5,
+            },
     }));
   return {
     title: template.name,

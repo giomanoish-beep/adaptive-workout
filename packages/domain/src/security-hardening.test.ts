@@ -168,6 +168,8 @@ describe('HARDENING-004 — secret management', () => {
       'SUPABASE_SERVICE_ROLE_KEY',
       'ZAI_API_KEY',
       'DEEPSEEK_API_KEY',
+      'DEEPSEEK_BASE_URL',
+      'DEEPSEEK_MODEL',
     ];
     const lines = content.split('\n');
     for (const line of lines) {

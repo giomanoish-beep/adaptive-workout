@@ -187,6 +187,13 @@ export async function installE2ERouteMocks(
             exerciseId: 'e2e-replacement-1',
             exerciseVersion: 1,
             name: 'Incline Dumbbell Bench Press',
+            loadPrescription: {
+              kind: 'external_numeric',
+              suggestedLoadKg: 10,
+              unit: 'kg',
+              label: 'Estimated per dumbbell — confirm after first set',
+              incrementKg: 2,
+            },
           },
         }),
       });
@@ -222,6 +229,7 @@ export async function installE2ERouteMocks(
         reps: { minimum: ex.reps.minimum, maximum: ex.reps.maximum },
         rir: ex.rir,
         restSeconds: 120,
+        loadPrescription: ex.loadPrescription,
       })),
       muscleVolume: workoutReviewFixture.muscleVolume.map((mv) => ({
         muscle: mv.muscle,
@@ -231,6 +239,7 @@ export async function installE2ERouteMocks(
       engineVersion: 'e2e-test-1.0.0',
       ruleSetVersion: 'e2e-test-1.0.0',
       traceSummary: null,
+      decisionExplanation: null,
     };
 
     await route.fulfill({

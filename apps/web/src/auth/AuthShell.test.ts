@@ -5,6 +5,7 @@ import authShellSource from './AuthShell.tsx?raw';
 import signInSource from './SignIn.tsx?raw';
 import useEmailSignInSource from './use-email-sign-in.ts?raw';
 import emailSource from './email.ts?raw';
+import useAuthSource from './use-auth.ts?raw';
 
 /**
  * WEB_APP-001 fix guard: the unauthenticated AuthShell must render a real
@@ -51,6 +52,7 @@ describe('sign-in action wiring', () => {
   it('calls Supabase email OTP with the normalized email', () => {
     expect(useEmailSignInSource).toMatch(/signInWithOtp\(\{/);
     expect(useEmailSignInSource).toMatch(/email: result\.normalized/);
+    expect(useEmailSignInSource).toMatch(/options:\s*\{\s*shouldCreateUser: true/);
   });
 
   it('imports only the client type, never server-only session internals', () => {
@@ -59,6 +61,46 @@ describe('sign-in action wiring', () => {
     expect(useEmailSignInSource).toMatch(/from '@supabase\/supabase-js'/);
     expect(useEmailSignInSource).not.toMatch(/onAuthStateChange\(/);
     expect(useEmailSignInSource).not.toMatch(/\.getSession\(/);
+  });
+});
+
+describe('OTP shell wiring (STAB-001)', () => {
+  it('renders the OTP screen only for the awaitingOtp state', () => {
+    expect(authShellSource).toMatch(/status === 'awaitingOtp'/);
+    expect(authShellSource).toMatch(/<VerifyOtp/);
+  });
+
+  it('passes resend in-flight and error state to the OTP screen', () => {
+    expect(authShellSource).toMatch(
+      /resendSubmitting=\{emailSignIn\?\.state\.stage\s+=== 'submitting'\}/,
+    );
+    expect(authShellSource).toMatch(/resendErrorMessage=/);
+  });
+
+  it('guards duplicate resend requests while submitting or cooling down', () => {
+    expect(authShellSource).toMatch(/emailSignIn\.state\.stage !== 'submitting'/);
+    expect(authShellSource).toMatch(/cooldownSeconds <= 0/);
+  });
+
+  it('changes email by resetting local sign-in state without sending a new email', () => {
+    const handleBack = authShellSource.slice(
+      authShellSource.indexOf('const handleBack = useCallback'),
+      authShellSource.indexOf("if (state.status === 'loading')"),
+    );
+    expect(handleBack).toMatch(/emailSignIn\?\.reset\(\)/);
+    expect(handleBack).toMatch(/onOtpBack\?\.\(\)/);
+    expect(handleBack).not.toMatch(/signIn\(/);
+  });
+
+  it('bypasses the OTP screen when the auth state is authenticated', () => {
+    expect(authShellSource).toMatch(/auth-shell--authenticated/);
+    expect(authShellSource).toMatch(/\{children\}/);
+  });
+
+  it('restores sessions through Supabase auth state rather than a new email request', () => {
+    expect(useAuthSource).toMatch(/client\.auth\.getSession\(\)/);
+    expect(useAuthSource).toMatch(/client\.auth\.onAuthStateChange/);
+    expect(useAuthSource).not.toMatch(/signInWithOtp/);
   });
 });
 

@@ -4,6 +4,7 @@ import type {
   DeepSeekTaskHandler,
 } from '@adaptive-workout/ai-deepseek-provider';
 import type { AIProviderRequest } from '@adaptive-workout/ai';
+import { deepseekDefaultModelId } from '@adaptive-workout/ai-deepseek-provider';
 import {
   buildDiscomfortPromptMessages,
   discomfortContractVersion,
@@ -24,9 +25,10 @@ export const deepseekDiscomfortHandler: DeepSeekTaskHandler<'discomfort_observat
       (message) => ({ role: message.role, content: message.content }),
     );
     return {
-      model: 'deepseek-chat',
+      model: deepseekDefaultModelId,
       messages,
       responseFormat: { type: 'json_object' },
+      thinking: { type: 'disabled' },
       temperature: discomfortPromptTemperature,
       requestId: request.metadata.requestId,
       task: 'discomfort_observation_extraction',

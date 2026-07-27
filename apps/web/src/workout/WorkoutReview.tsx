@@ -1,4 +1,8 @@
-import { formatRepRange, type WorkoutReview as WorkoutReviewModel } from './workout-review';
+import {
+  formatLoadPrescription,
+  formatRepRange,
+  type WorkoutReview as WorkoutReviewModel,
+} from './workout-review';
 
 export interface WorkoutReviewProps {
   readonly review: WorkoutReviewModel;
@@ -51,6 +55,9 @@ export function WorkoutReview({
                 <span>{formatRepRange(exercise.reps)} reps</span>
                 <span>RIR {exercise.rir}</span>
               </div>
+              <p className="workout-card__load">
+                Load: {formatLoadPrescription(exercise.loadPrescription)}
+              </p>
               <ExerciseProgressionSummary exercise={exercise} />
               <button
                 type="button"
@@ -70,6 +77,13 @@ export function WorkoutReview({
         <p className="workout-review__replacement-error" role="alert">
           {replacementError}
         </p>
+      )}
+
+      {review.decisionExplanation && (
+        <section className="workout-review__explanation" aria-label="Workout decision explanation">
+          <h3 className="workout-review__explanation-title">Why this workout</h3>
+          <p>{review.decisionExplanation.text}</p>
+        </section>
       )}
 
       <section className="workout-review__volume">

@@ -68,6 +68,9 @@ test.describe('V1.1 workout UX', () => {
     const firstCard = page.locator('.workout-card').first();
     await firstCard.getByRole('button', { name: 'Replace for this workout' }).click();
     await expect(firstCard).toContainText('Incline Dumbbell Bench Press');
+    await expect(firstCard).toContainText(
+      'Load: 10 kg · Estimated per dumbbell — confirm after first set',
+    );
     await page.getByRole('button', { name: 'Start workout' }).click();
     await expect(page.getByRole('heading', { name: 'Incline Dumbbell Bench Press' })).toBeVisible();
 

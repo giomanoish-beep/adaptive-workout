@@ -111,7 +111,15 @@ describe('workout-only exercise replacement', () => {
     expect(clearReplaceExercise(idle)).toBe(idle);
   });
 
-  it('updates the review while preserving the prescription and tracks the previous exercise', () => {
+  const replacementLoadPrescription = {
+    kind: 'external_numeric' as const,
+    suggestedLoadKg: 8,
+    unit: 'kg' as const,
+    label: 'Estimated - confirm after first set',
+    incrementKg: 2,
+  };
+
+  it('updates the review with the replacement prescription and tracks the previous exercise', () => {
     let state = completeWorkoutGeneration(
       beginWorkoutGeneration({ stage: 'idle', draft: requestedDraft() }),
       workoutReviewFixture,
@@ -122,6 +130,7 @@ describe('workout-only exercise replacement', () => {
       exerciseVersion: 2,
       name: 'Incline Dumbbell Bench Press',
       progression: undefined,
+      loadPrescription: replacementLoadPrescription,
     });
     expect(state.stage).toBe('review');
     if (state.stage === 'review') {
@@ -130,6 +139,7 @@ describe('workout-only exercise replacement', () => {
         sets: 4,
         reps: { minimum: 8, maximum: 10 },
         rir: 2,
+        loadPrescription: replacementLoadPrescription,
       });
       expect(state.replacementHistory[1]).toEqual([]);
       expect(state.replacingPosition).toBeNull();

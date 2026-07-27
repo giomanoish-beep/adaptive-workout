@@ -15,6 +15,7 @@ import {
   registerDeepSeekTaskHandler,
 } from './provider';
 import {
+  deepseekDefaultModelId,
   packageName,
   type DeepSeekRequestPayload,
   type DeepSeekResponsePayload,
@@ -83,7 +84,7 @@ function okResponseMetadata(
 ): AIProviderResponseMetadata {
   return {
     providerId: 'deepseek',
-    modelId: 'deepseek-chat',
+    modelId: deepseekDefaultModelId,
     providerRequestId: 'provider-request-1',
     receivedAt: fixedTimestamp,
     latencyMilliseconds: 1_000,
@@ -139,9 +140,10 @@ function registerEchoHandler(
   registerDeepSeekTaskHandler('grounded_decision_explanation', {
     buildRequestPayload(request): DeepSeekRequestPayload {
       return {
-        model: 'deepseek-chat',
+        model: deepseekDefaultModelId,
         messages: [{ role: 'user', content: 'explain this decision' }],
         responseFormat: { type: 'json_object' },
+        thinking: { type: 'disabled' },
         temperature: 0,
         requestId: request.metadata.requestId,
         task: 'grounded_decision_explanation',
@@ -190,6 +192,8 @@ describe('DeepSeekAiProvider execute', () => {
     const call = transport.calls[0];
     expect(call?.payload.task).toBe('grounded_decision_explanation');
     expect(call?.payload.requestId).toBe(fakeProviderRequest.metadata.requestId);
+    expect(call?.payload.model).toBe(deepseekDefaultModelId);
+    expect(call?.payload.thinking).toEqual({ type: 'disabled' });
     expect(call?.abortSignal).toBeInstanceOf(AbortSignal);
   });
 
@@ -248,6 +252,32 @@ describe('DeepSeekAiProvider execute', () => {
     });
   });
 
+  it('maps a payment failure to PROVIDER_PAYMENT_REQUIRED without retry eligibility', async () => {
+    const transport = fakeTransport({ kind: 'failure', failure: { kind: 'payment_required' } });
+    registerEchoHandler(validExplanationOutput);
+    const provider = new DeepSeekAiProvider({ transport, clock: fixedClock });
+
+    const result = await provider.execute(fakeProviderRequest);
+
+    expect(result).toMatchObject({
+      status: 'failure',
+      failure: { code: 'PROVIDER_PAYMENT_REQUIRED', retryable: false },
+    });
+  });
+
+  it('maps invalid structured request rejection to unsupported provider capability', async () => {
+    const transport = fakeTransport({ kind: 'failure', failure: { kind: 'invalid_request' } });
+    registerEchoHandler(validExplanationOutput);
+    const provider = new DeepSeekAiProvider({ transport, clock: fixedClock });
+
+    const result = await provider.execute(fakeProviderRequest);
+
+    expect(result).toMatchObject({
+      status: 'failure',
+      failure: { code: 'UNSUPPORTED_PROVIDER_CAPABILITY', retryable: false },
+    });
+  });
+
   it('maps an unavailable failure to PROVIDER_UNAVAILABLE', async () => {
     const transport = fakeTransport({ kind: 'failure', failure: { kind: 'unavailable' } });
     registerEchoHandler(validExplanationOutput);
@@ -278,6 +308,19 @@ describe('DeepSeekAiProvider execute', () => {
         message: 'choices array missing',
         retryable: false,
       },
+    });
+  });
+
+  it('maps truncated output to a malformed provider response', async () => {
+    const transport = fakeTransport({ kind: 'failure', failure: { kind: 'truncated_output' } });
+    registerEchoHandler(validExplanationOutput);
+    const provider = new DeepSeekAiProvider({ transport, clock: fixedClock });
+
+    const result = await provider.execute(fakeProviderRequest);
+
+    expect(result).toMatchObject({
+      status: 'failure',
+      failure: { code: 'MALFORMED_PROVIDER_RESPONSE', retryable: true },
     });
   });
 
@@ -347,7 +390,7 @@ describe('DeepSeekAiProvider definition', () => {
   it('exposes the default model and advertises all structured tasks', () => {
     const transport = fakeTransport({ kind: 'ok', result: okTransportResult({ valid: true }) });
     const provider = new DeepSeekAiProvider({ transport, clock: fixedClock });
-    expect(provider.definition.modelId).toBe('deepseek-chat');
+    expect(provider.definition.modelId).toBe(deepseekDefaultModelId);
     expect(provider.definition.supportedTasks).toHaveLength(3);
   });
 
@@ -355,10 +398,20 @@ describe('DeepSeekAiProvider definition', () => {
     const transport = fakeTransport({ kind: 'ok', result: okTransportResult({ valid: true }) });
     const provider = new DeepSeekAiProvider({
       transport,
-      modelId: 'deepseek-reasoner',
+      modelId: 'deepseek-v4-pro',
       clock: fixedClock,
     });
     expect(provider.definition.providerId).toBe('deepseek');
-    expect(provider.definition.modelId).toBe('deepseek-reasoner');
+    expect(provider.definition.modelId).toBe('deepseek-v4-pro');
+  });
+
+  it('rejects legacy and thinking model identifiers', () => {
+    const transport = fakeTransport({ kind: 'ok', result: okTransportResult({ valid: true }) });
+    expect(() => new DeepSeekAiProvider({ transport, modelId: 'deepseek-chat' })).toThrow(
+      /not allowed/,
+    );
+    expect(() => new DeepSeekAiProvider({ transport, modelId: 'deepseek-reasoner' })).toThrow(
+      /not allowed/,
+    );
   });
 });

@@ -141,7 +141,7 @@ function failureResult(
 }
 
 const glm = defineProvider('glm', 'glm-4-plus');
-const deepseek = defineProvider('deepseek', 'deepseek-chat');
+const deepseek = defineProvider('deepseek', 'deepseek-v4-flash');
 
 describe('ai-router package', () => {
   it('exports the documented package name', () => {
@@ -152,7 +152,7 @@ describe('ai-router package', () => {
 describe('AiRouter routing', () => {
   it('returns GLM success without calling DeepSeek', async () => {
     const primary = stubProvider(glm, successResult('glm', 'glm-4-plus'));
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const result = await router.execute(explanationRequest);
@@ -167,7 +167,7 @@ describe('AiRouter routing', () => {
 
   it('triggers DeepSeek fallback on GLM timeout', async () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -183,7 +183,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('PROVIDER_UNAVAILABLE', 'glm', 'glm-4-plus', true),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -197,7 +197,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('MALFORMED_PROVIDER_RESPONSE', 'glm', 'glm-4-plus', false),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -211,7 +211,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('STRUCTURED_OUTPUT_VALIDATION_FAILED', 'glm', 'glm-4-plus', false),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -225,7 +225,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('INVALID_TASK_INPUT', 'glm', 'glm-4-plus', false),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -242,7 +242,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('UNSUPPORTED_TASK', 'glm', 'glm-4-plus', false),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -258,7 +258,7 @@ describe('AiRouter routing', () => {
       glm,
       failureResult('PROVIDER_AUTHENTICATION_FAILED', 'glm', 'glm-4-plus', false),
     );
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -271,7 +271,7 @@ describe('AiRouter routing', () => {
 
   it('returns DeepSeek success with correct provider metadata after GLM failure', async () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const result = await router.execute(explanationRequest);
@@ -279,7 +279,7 @@ describe('AiRouter routing', () => {
     expect(result.status).toBe('success');
     if (result.status === 'success') {
       expect(result.responseMetadata.providerId).toBe('deepseek');
-      expect(result.responseMetadata.modelId).toBe('deepseek-chat');
+      expect(result.responseMetadata.modelId).toBe('deepseek-v4-flash');
     }
   });
 
@@ -287,7 +287,7 @@ describe('AiRouter routing', () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
     const fallback = stubProvider(
       deepseek,
-      failureResult('PROVIDER_UNAVAILABLE', 'deepseek', 'deepseek-chat', true),
+      failureResult('PROVIDER_UNAVAILABLE', 'deepseek', 'deepseek-v4-flash', true),
     );
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
@@ -303,7 +303,7 @@ describe('AiRouter routing', () => {
 
   it('preserves provider attempt order in the lineage', async () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed = await router.route(explanationRequest);
@@ -320,7 +320,7 @@ describe('AiRouter routing', () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
     const fallback = stubProvider(
       deepseek,
-      failureResult('PROVIDER_TIMEOUT', 'deepseek', 'deepseek-chat', true),
+      failureResult('PROVIDER_TIMEOUT', 'deepseek', 'deepseek-v4-flash', true),
     );
     const unused = stubProvider(third, successResult('openai-like', 'unused'));
     const boundedRuleSet: AiRoutingRuleSet = {
@@ -350,7 +350,7 @@ describe('AiRouter routing', () => {
       new AiRouter({
         providers: [
           stubProvider(glm, outcome),
-          stubProvider(deepseek, successResult('deepseek', 'deepseek-chat')),
+          stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash')),
         ],
         ruleSet: routerRuleSet,
       });
@@ -369,7 +369,7 @@ describe('AiRouter routing', () => {
 describe('AiRouter lineage metadata', () => {
   it('marks fallback-eligible failures and records the terminal result', async () => {
     const primary = stubProvider(glm, failureResult('PROVIDER_TIMEOUT', 'glm', 'glm-4-plus', true));
-    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'));
+    const fallback = stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'));
     const router = new AiRouter({ providers: [primary, fallback], ruleSet: routerRuleSet });
 
     const routed: AiRouterResult<'grounded_decision_explanation'> =
@@ -382,7 +382,7 @@ describe('AiRouter lineage metadata', () => {
   it('preserves the routing rule-set version on the result', async () => {
     const primary = stubProvider(glm, successResult('glm', 'glm-4-plus'));
     const router = new AiRouter({
-      providers: [primary, stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'))],
+      providers: [primary, stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash'))],
       ruleSet: routerRuleSet,
     });
 
@@ -421,7 +421,10 @@ describe('validateAiRouterOptions', () => {
 
   it('rejects an unknown fallback-eligible failure code', () => {
     const result = validateAiRouterOptions({
-      providers: [okProvider, stubProvider(deepseek, successResult('deepseek', 'deepseek-chat'))],
+      providers: [
+        okProvider,
+        stubProvider(deepseek, successResult('deepseek', 'deepseek-v4-flash')),
+      ],
       ruleSet: {
         ...routerRuleSet,
         fallbackEligibleFailureCodes: ['NOT_A_REAL_CODE' as AIProviderFailure['code']],

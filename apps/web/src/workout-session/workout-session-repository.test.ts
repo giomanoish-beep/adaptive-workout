@@ -3,6 +3,14 @@ import { createWorkoutSessionRepository, WorkoutSessionError } from './workout-s
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { WorkoutReview } from '../workout/workout-review';
 
+const loadPrescription = {
+  kind: 'external_numeric',
+  suggestedLoadKg: 20,
+  unit: 'kg',
+  label: 'Estimated — confirm after first set',
+  incrementKg: 2.5,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -85,6 +93,7 @@ function buildReview(overrides?: Partial<WorkoutReview>): WorkoutReview {
         sets: 3,
         reps: { minimum: 8, maximum: 12 },
         rir: 2,
+        loadPrescription,
       },
       {
         position: 2,
@@ -92,6 +101,7 @@ function buildReview(overrides?: Partial<WorkoutReview>): WorkoutReview {
         sets: 3,
         reps: { minimum: 8, maximum: 10 },
         rir: 2,
+        loadPrescription,
       },
     ],
     muscleVolume: [],
@@ -223,6 +233,21 @@ describe('createWorkoutSessionRepository', () => {
       expect(exerciseCall[0]).toHaveProperty('planned_exercise_name');
     });
 
+    it('persists the complete load prescription snapshot', async () => {
+      const { client, insert } = buildMockClient();
+      const repo = createWorkoutSessionRepository(client);
+
+      await repo.createSession(buildReview());
+
+      const exerciseCall = insert.mock.calls[1] as [Record<string, unknown>];
+      expect(exerciseCall[0]).toMatchObject({
+        planned_load_kind: 'external_numeric',
+        planned_load_kg: 20,
+        planned_load_label: 'Estimated — confirm after first set',
+        planned_load_increment: 2.5,
+      });
+    });
+
     it('pairs the deployed planned exercise ID and catalog version', async () => {
       const { client, insert } = buildMockClient();
       const repo = createWorkoutSessionRepository(client);
@@ -236,6 +261,7 @@ describe('createWorkoutSessionRepository', () => {
             sets: 3,
             reps: { minimum: 8, maximum: 12 },
             rir: 2,
+            loadPrescription,
           },
         ],
       });
@@ -261,6 +287,7 @@ describe('createWorkoutSessionRepository', () => {
             sets: 3,
             reps: { minimum: 8, maximum: 12 },
             rir: 2,
+            loadPrescription,
           },
         ],
       });

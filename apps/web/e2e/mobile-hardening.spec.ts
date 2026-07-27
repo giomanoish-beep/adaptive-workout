@@ -12,8 +12,8 @@
  *  - Timer interval cleanup behavior confirmed structurally
  */
 
-import { test, expect } from '@playwright/test';
-import { completeOnboarding, setupActiveWorkout } from './helpers';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+import { completeOnboarding, setupActiveWorkout, setupE2ETest, setupWorkoutFlow } from './helpers';
 
 async function assertNoHorizontalOverflow(page: import('@playwright/test').Page) {
   const overflow = await page.evaluate(() => {
@@ -29,6 +29,7 @@ async function assertNoHorizontalOverflow(page: import('@playwright/test').Page)
 
 /** Complete onboarding and navigate to the workout tab. */
 async function setupWithOnboarding(page: import('@playwright/test').Page) {
+  await setupE2ETest(page);
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   await completeOnboarding(page);
@@ -44,6 +45,339 @@ async function goToSignInScreen(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
+}
+
+const SHORT_PAGE_TOLERANCE_PX = 4;
+
+const stab004Viewports = [
+  { name: 'iPhone SE', width: 375, height: 667 },
+  { name: 'iPhone 14', width: 390, height: 844 },
+  { name: 'compact Android', width: 360, height: 800 },
+  { name: 'large mobile', width: 430, height: 932 },
+] as const;
+
+const desktopReferenceViewport = { name: 'desktop reference', width: 1280, height: 900 } as const;
+
+type GeometryClassification = 'short' | 'long';
+
+interface RouteGeometrySpec {
+  readonly name: string;
+  readonly classification: GeometryClassification;
+  readonly hasBottomNav: boolean;
+  readonly setup: (page: Page) => Promise<void>;
+  readonly finalControl: (page: Page) => Locator;
+}
+
+async function goToOtpScreen(page: Page) {
+  await goToSignInScreen(page);
+  await page.getByLabel('Email').fill('layout@example.com');
+  await page.getByRole('button', { name: 'Continue with email' }).click();
+  await expect(page.getByText('Enter verification code')).toBeVisible();
+}
+
+async function createProgram(page: Page) {
+  await page.getByRole('button', { name: 'Create my program' }).click();
+  await expect(page.getByRole('heading', { name: 'Create my program' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: '8 weeks' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Create program' }).click();
+  await expect(page.getByRole('heading', { name: 'Upper A' })).toBeVisible({ timeout: 15_000 });
+}
+
+async function setupOnboardingQuestion(page: Page) {
+  await setupE2ETest(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: "What's your main goal?" })).toBeVisible();
+}
+
+async function setupWorkoutRequest(page: Page) {
+  await setupWithOnboarding(page);
+  await page.getByRole('button', { name: 'Workout', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Build your session' })).toBeVisible();
+}
+
+async function setupWorkoutReview(page: Page) {
+  await setupWorkoutFlow(page);
+  await page.getByRole('button', { name: 'Generate workout' }).click();
+  await expect(page.getByRole('heading', { name: 'Chest + Back' })).toBeVisible({
+    timeout: 10_000,
+  });
+}
+
+async function setupProgramOverview(page: Page) {
+  await setupWithOnboarding(page);
+  await createProgram(page);
+  await page.getByRole('button', { name: 'Program', exact: true }).click();
+  await expect(page.getByTestId('program-week-detail')).toContainText('Dumbbell Bench Press');
+}
+
+async function setupWeekDetail(page: Page) {
+  await setupProgramOverview(page);
+  await page.getByLabel('Reschedule Upper A').first().scrollIntoViewIfNeeded();
+}
+
+async function setupProgress(page: Page) {
+  await setupWithOnboarding(page);
+  await page.getByRole('button', { name: 'Progress', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'History', pressed: true })).toBeVisible();
+}
+
+async function setupSettings(page: Page) {
+  await setupWithOnboarding(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Training preferences' })).toBeVisible();
+}
+
+const routeGeometrySpecs: readonly RouteGeometrySpec[] = [
+  {
+    name: 'email entry',
+    classification: 'short',
+    hasBottomNav: false,
+    setup: goToSignInScreen,
+    finalControl: (page) => page.getByRole('button', { name: 'Continue with email' }),
+  },
+  {
+    name: 'OTP verification',
+    classification: 'short',
+    hasBottomNav: false,
+    setup: goToOtpScreen,
+    finalControl: (page) => page.getByRole('button', { name: 'Verify code' }),
+  },
+  {
+    name: 'short onboarding step',
+    classification: 'short',
+    hasBottomNav: false,
+    setup: setupOnboardingQuestion,
+    finalControl: (page) => page.getByRole('button', { name: 'Continue' }),
+  },
+  {
+    name: 'Today empty',
+    classification: 'short',
+    hasBottomNav: true,
+    setup: setupWithOnboarding,
+    finalControl: (page) => page.getByRole('button', { name: 'Generate one session' }),
+  },
+  {
+    name: 'workout request',
+    classification: 'long',
+    hasBottomNav: true,
+    setup: setupWorkoutRequest,
+    finalControl: (page) => page.getByRole('button', { name: 'Generate workout' }),
+  },
+  {
+    name: 'workout review',
+    classification: 'long',
+    hasBottomNav: true,
+    setup: setupWorkoutReview,
+    finalControl: (page) => page.getByRole('button', { name: 'Start workout' }),
+  },
+  {
+    name: 'active workout',
+    classification: 'short',
+    hasBottomNav: false,
+    setup: setupActiveWorkout,
+    finalControl: (page) => page.getByRole('button', { name: 'Finish workout' }),
+  },
+  {
+    name: 'program overview',
+    classification: 'long',
+    hasBottomNav: true,
+    setup: setupProgramOverview,
+    finalControl: (page) => page.getByRole('button', { name: 'Edit future program' }),
+  },
+  {
+    name: 'week detail',
+    classification: 'long',
+    hasBottomNav: true,
+    setup: setupWeekDetail,
+    finalControl: (page) => page.getByLabel('Reschedule Upper A').first(),
+  },
+  {
+    name: 'progress',
+    classification: 'short',
+    hasBottomNav: true,
+    setup: setupProgress,
+    finalControl: (page) => page.getByRole('button', { name: 'Progression' }),
+  },
+  {
+    name: 'settings',
+    classification: 'long',
+    hasBottomNav: true,
+    setup: setupSettings,
+    finalControl: (page) => page.getByRole('button', { name: 'Sign out' }),
+  },
+] as const;
+
+async function measureGeometry(page: Page) {
+  await page.waitForTimeout(100);
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    const nav = document.querySelector('.bottom-nav');
+    const navRect = nav?.getBoundingClientRect();
+    const navStyle = nav ? getComputedStyle(nav) : null;
+    const rootStyle = getComputedStyle(root);
+    const visibleInteractiveCount = Array.from(
+      document.querySelectorAll('button, input, select, textarea, a[href], [role="button"]'),
+    ).filter((item) => {
+      const style = getComputedStyle(item);
+      const rect = item.getBoundingClientRect();
+      return (
+        style.visibility !== 'hidden' &&
+        style.display !== 'none' &&
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom > 0 &&
+        rect.top < window.innerHeight
+      );
+    }).length;
+    return {
+      clientHeight: root.clientHeight,
+      scrollHeight: root.scrollHeight,
+      clientWidth: root.clientWidth,
+      scrollWidth: root.scrollWidth,
+      windowInnerHeight: window.innerHeight,
+      bodyMinHeight: getComputedStyle(document.body).minHeight,
+      rootOverflowY: rootStyle.overflowY,
+      bottomNav: navRect
+        ? {
+            top: navRect.top,
+            bottom: navRect.bottom,
+            height: navRect.height,
+            paddingTop: Number.parseFloat(navStyle?.paddingTop ?? '0'),
+            paddingBottom: Number.parseFloat(navStyle?.paddingBottom ?? '0'),
+          }
+        : null,
+      visibleInteractiveCount,
+    };
+  });
+}
+
+async function assertShortPageFits(page: Page, spec: RouteGeometrySpec, viewportName: string) {
+  const geometry = await measureGeometry(page);
+  const overflow = geometry.scrollHeight - geometry.clientHeight;
+  expect(
+    geometry.scrollHeight,
+    `${spec.name} at ${viewportName} overflowed by ${overflow}px`,
+  ).toBeLessThanOrEqual(geometry.clientHeight + SHORT_PAGE_TOLERANCE_PX);
+  await assertFinalControlReachable(page, spec, viewportName);
+}
+
+async function assertLongPageScrollable(page: Page, spec: RouteGeometrySpec, viewportName: string) {
+  const geometry = await measureGeometry(page);
+  expect(
+    geometry.scrollHeight,
+    `${spec.name} at ${viewportName} should remain scrollable when content is long`,
+  ).toBeGreaterThan(geometry.clientHeight + SHORT_PAGE_TOLERANCE_PX);
+  await assertFinalControlReachable(page, spec, viewportName);
+}
+
+async function assertFinalControlReachable(
+  page: Page,
+  spec: RouteGeometrySpec,
+  viewportName: string,
+) {
+  const control = spec.finalControl(page);
+  await control.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', inline: 'nearest' }),
+  );
+  await expect(control).toBeVisible();
+  const result = await control.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const fixedRects = Array.from(document.querySelectorAll<HTMLElement>('*'))
+      .filter((item) => {
+        if (item === element || item.contains(element)) return false;
+        const style = getComputedStyle(item);
+        const box = item.getBoundingClientRect();
+        return (
+          (style.position === 'fixed' || style.position === 'sticky') &&
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          box.width > 0 &&
+          box.height > 0
+        );
+      })
+      .map((item) => {
+        const box = item.getBoundingClientRect();
+        return { top: box.top, right: box.right, bottom: box.bottom, left: box.left };
+      });
+    const overlaps = fixedRects.filter((fixed) => {
+      const horizontal = rect.left < fixed.right && rect.right > fixed.left;
+      const vertical = rect.top < fixed.bottom && rect.bottom > fixed.top;
+      return horizontal && vertical;
+    });
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportHeight: window.innerHeight,
+      overlaps,
+    };
+  });
+  expect(
+    result.top,
+    `${spec.name} final control is clipped above viewport at ${viewportName}`,
+  ).toBeGreaterThanOrEqual(-SHORT_PAGE_TOLERANCE_PX);
+  expect(
+    result.bottom,
+    `${spec.name} final control is clipped below viewport at ${viewportName}`,
+  ).toBeLessThanOrEqual(result.viewportHeight + SHORT_PAGE_TOLERANCE_PX);
+  expect(
+    result.overlaps,
+    `${spec.name} final control is covered by fixed/sticky UI at ${viewportName}`,
+  ).toEqual([]);
+}
+
+async function assertBottomNavigationGeometry(
+  page: Page,
+  spec: RouteGeometrySpec,
+  viewportName: string,
+) {
+  const nav = page.locator('.bottom-nav');
+  if (!spec.hasBottomNav) {
+    await expect(nav).not.toBeVisible();
+    return;
+  }
+  await expect(nav).toBeVisible();
+  const geometry = await measureGeometry(page);
+  expect(
+    geometry.bottomNav,
+    `${spec.name} should have bottom nav at ${viewportName}`,
+  ).not.toBeNull();
+  expect(geometry.bottomNav?.bottom).toBeLessThanOrEqual(geometry.windowInnerHeight + 1);
+  expect(geometry.bottomNav?.top).toBeGreaterThan(0);
+  expect(geometry.bottomNav?.paddingBottom).toBeGreaterThanOrEqual(
+    geometry.bottomNav?.paddingTop ?? 0,
+  );
+}
+
+function logGeometry(
+  phase: 'before-or-current' | 'after',
+  viewportName: string,
+  spec: RouteGeometrySpec,
+  classification: GeometryClassification,
+  geometry: Awaited<ReturnType<typeof measureGeometry>>,
+) {
+  console.log(
+    `STAB004 ${JSON.stringify({
+      phase,
+      viewport: viewportName,
+      route: spec.name,
+      classification,
+      clientHeight: geometry.clientHeight,
+      scrollHeight: geometry.scrollHeight,
+      overflow: geometry.scrollHeight - geometry.clientHeight,
+      hasBottomNav: geometry.bottomNav !== null,
+      finalControlVisibility: 'checked',
+    })}`,
+  );
+}
+
+function classificationFor(spec: RouteGeometrySpec, viewportName: string): GeometryClassification {
+  if (spec.name === 'workout request' && viewportName === 'large mobile') {
+    return 'short';
+  }
+  return spec.classification;
 }
 
 /** Shared setup: generate Chest+Back active workout.
@@ -344,5 +678,41 @@ test.describe('HARDENING-003 — keyboard accessibility', () => {
 
     await genBtn.focus();
     await expect(genBtn).toBeFocused();
+  });
+});
+
+test.describe('STAB-004 — mobile route geometry', () => {
+  for (const viewport of stab004Viewports) {
+    for (const spec of routeGeometrySpecs) {
+      test(`${spec.name} geometry at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await spec.setup(page);
+        await assertNoHorizontalOverflow(page);
+        await assertBottomNavigationGeometry(page, spec, viewport.name);
+        const geometry = await measureGeometry(page);
+        const classification = classificationFor(spec, viewport.name);
+        logGeometry('after', viewport.name, spec, classification, geometry);
+        if (classification === 'short') {
+          await assertShortPageFits(page, spec, viewport.name);
+        } else {
+          await assertLongPageScrollable(page, spec, viewport.name);
+        }
+      });
+    }
+  }
+
+  test('desktop reference keeps primary route controls reachable', async ({ page }) => {
+    await page.setViewportSize({
+      width: desktopReferenceViewport.width,
+      height: desktopReferenceViewport.height,
+    });
+    for (const spec of routeGeometrySpecs) {
+      await spec.setup(page);
+      await assertNoHorizontalOverflow(page);
+      await assertBottomNavigationGeometry(page, spec, desktopReferenceViewport.name);
+      await assertFinalControlReachable(page, spec, desktopReferenceViewport.name);
+    }
   });
 });

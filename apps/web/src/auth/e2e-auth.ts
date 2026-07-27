@@ -103,6 +103,14 @@ export function createE2ESupabaseClient(): SupabaseClient {
         },
       };
     },
+    signInWithOtp() {
+      return Promise.resolve({ data: {}, error: null });
+    },
+    verifyOtp() {
+      authenticated = true;
+      notify('SIGNED_IN');
+      return Promise.resolve({ data: { session, user: session.user }, error: null });
+    },
     signOut() {
       authenticated = false;
       notify('SIGNED_OUT');

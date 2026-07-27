@@ -34,13 +34,15 @@ Set these in Vercel project settings (Environment Variables), not in `vercel.jso
 
 ### Server/Function Secrets
 
-| Variable                    | Required | Consuming Function(s)            | Notes                                               |
-| --------------------------- | -------- | -------------------------------- | --------------------------------------------------- |
-| `SUPABASE_URL`              | Yes      | Both Edge Functions              | Supabase project URL (function-side)                |
-| `SUPABASE_ANON_KEY`         | Yes      | Both Edge Functions              | Auth verification and user-scoped reads             |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | `refresh-progression` only       | Derived-state writes scoped to the verified user ID |
-| `ZAI_API_KEY`               | No       | Only if AI generation is enabled | NOT currently consumed                              |
-| `DEEPSEEK_API_KEY`          | No       | Only if AI generation is enabled | NOT currently consumed                              |
+| Variable                    | Required | Consuming Function(s)          | Notes                                               |
+| --------------------------- | -------- | ------------------------------ | --------------------------------------------------- |
+| `SUPABASE_URL`              | Yes      | Both Edge Functions            | Supabase project URL (function-side)                |
+| `SUPABASE_ANON_KEY`         | Yes      | Both Edge Functions            | Auth verification and user-scoped reads             |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | `refresh-progression` only     | Derived-state writes scoped to the verified user ID |
+| `ZAI_API_KEY`               | No       | Only if GLM routing is enabled | Server-only provider secret                         |
+| `DEEPSEEK_API_KEY`          | Yes      | DeepSeek AI provider           | Server-only, required before enabling AI calls      |
+| `DEEPSEEK_BASE_URL`         | No       | DeepSeek AI provider           | Defaults to `https://api.deepseek.com`              |
+| `DEEPSEEK_MODEL`            | No       | DeepSeek AI provider           | Defaults to `deepseek-v4-flash`                     |
 
 Set function secrets via Supabase Dashboard or CLI:
 
@@ -166,11 +168,11 @@ npx supabase migration up
 
 ### Function Inventory
 
-| Function              | Directory                                 | Auth         | Purpose                                           |
-| --------------------- | ----------------------------------------- | ------------ | ------------------------------------------------- |
-| `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation                  |
-| `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state |
-| `generate-program`    | `supabase/functions/generate-program/`    | JWT-verified | Deterministic multi-week program generation       |
+| Function              | Directory                                 | Auth         | Purpose                                                                            |
+| --------------------- | ----------------------------------------- | ------------ | ---------------------------------------------------------------------------------- |
+| `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation plus optional server-side grounded AI explanation |
+| `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state                                  |
+| `generate-program`    | `supabase/functions/generate-program/`    | JWT-verified | Deterministic multi-week program generation                                        |
 
 ### Deployment Prerequisite: Bundling
 
@@ -215,6 +217,23 @@ npx supabase functions list
 
 The deploy output should report `Uploading asset (generate-workout): supabase/functions/generate-workout/index.bundle.ts`, confirming the bundled entrypoint (not the raw `index.ts`) was uploaded.
 
+### AI-004 generate-workout redeployment
+
+AI-004 changes only the `generate-workout` Edge Function bundle. After the
+release branch is merged and deployment is explicitly approved, redeploy that
+function from the approved commit:
+
+```bash
+npm run edge-fn:build:all
+npx supabase functions deploy generate-workout --project-ref bgslpmenvlcgstczzfyg --no-verify-jwt
+npx supabase functions list --project-ref bgslpmenvlcgstczzfyg
+```
+
+Do not deploy `refresh-progression` or `generate-program` for AI-004 unless a
+later diff changes those functions. Do not run `supabase db push` for AI-004;
+the body-weight/load-prescription migration was already applied before this
+task.
+
 ## Function Secrets
 
 After deployment, set required secrets via Supabase CLI:
@@ -223,11 +242,17 @@ After deployment, set required secrets via Supabase CLI:
 npx supabase secrets set \
   SUPABASE_URL=<your-project-url> \
   SUPABASE_ANON_KEY=<your-anon-key> \
-  SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+  SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key> \
+  DEEPSEEK_API_KEY=<your-deepseek-api-key>
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is consumed only by `refresh-progression`. It must
 never be configured in Vercel or exposed through a `VITE_` variable.
+
+`DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` are Supabase Edge
+Function secrets only. `DEEPSEEK_BASE_URL` and `DEEPSEEK_MODEL` may be omitted
+to use the production defaults. Do not configure any DeepSeek variable with a
+`VITE_` prefix.
 
 Secrets can also be managed via Supabase Dashboard > Functions > manage secrets.
 
@@ -280,6 +305,12 @@ After deploying both Vercel and Supabase:
 - [ ] Onboarding can be completed
 - [ ] Onboarding survives page reload (auth session restored)
 - [ ] Workout generation calls the deployed Edge Function (check Network tab)
+- [ ] When DeepSeek function secrets are present, the generated workout review
+      may show a concise "Why this workout" explanation
+- [ ] If the provider fails or is unavailable, generation still succeeds safely
+      without the explanation
+- [ ] No prompt, raw provider response, provider internals, or secret appears
+      in browser output, network payloads, or logs
 - [ ] Generated workout starts and creates a persisted session
 - [ ] One set can be logged and survives reload
 - [ ] Finishing a partial workout persists correctly
@@ -384,7 +415,7 @@ jobs:
 ## Known Limitations
 
 1. **Edge Function Monorepo Imports**: Workspace packages must be bundled before deployment. The raw `index.ts` files cannot be deployed directly. `npm run edge-fn:build:all` produces each function's `index.bundle.ts`, which `supabase/config.toml` declares as the deploy entrypoint. See the bundling section above.
-2. **No AI Provider Connection**: The `ZAI_API_KEY` and `DEEPSEEK_API_KEY` secrets are not consumed by any deployed function. AI features will require additional Edge Functions.
+2. **AI Provider Activation**: DeepSeek is implemented as a server-side `AIProvider` using `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`. The deterministic workout/program/progression Edge Functions still do not let AI bypass the engines; user-facing AI task endpoints must be enabled deliberately and deployed only after secret configuration approval.
 3. **No Account Deletion UI**: Implemented only as a Supabase Auth action, not as an in-app feature.
 4. **No Data Export**: Not implemented.
 5. **AI Interaction Retention**: The recommended 30-day cleanup is not enforced — see `docs/SECURITY_AND_RETENTION.md`.

@@ -1,6 +1,6 @@
 # AI
 
-AI is an optional interpretation and explanation layer behind trusted server-side boundaries. GLM is primary and DeepSeek is fallback. No provider SDK or secret is included in browser code.
+AI is an optional interpretation and explanation layer behind trusted server-side boundaries. DeepSeek is the production provider integration behind the `AIProvider` abstraction; GLM remains an interchangeable provider implementation for router configurations where it is explicitly configured. No provider SDK or secret is included in browser code.
 
 ## Provider abstraction
 
@@ -15,9 +15,28 @@ interface AIProvider {
 
 `AIProviderRequest` carries a versioned task input and deterministic request metadata. `AIProviderResult` returns validated task output or a typed failure; provider/model, timing, and usage metadata remain outside the task output. Provider identity is data rather than a closed vendor union, so providers remain replaceable without changing task contracts.
 
+## DeepSeek production provider
+
+The server-side DeepSeek provider is created only from server environment:
+
+- `DEEPSEEK_API_KEY` is required and is used only by the HTTP transport.
+- `DEEPSEEK_BASE_URL` is optional and defaults to `https://api.deepseek.com`.
+- `DEEPSEEK_MODEL` is optional and defaults to `deepseek-v4-flash`.
+
+DeepSeek requests explicitly disable thinking mode and use JSON Output for structured tasks:
+
+```json
+{
+  "thinking": { "type": "disabled" },
+  "response_format": { "type": "json_object" }
+}
+```
+
+The legacy `deepseek-chat` and thinking `deepseek-reasoner` model IDs are rejected before any request is made. Provider responses are parsed as JSON and validated against the existing task output contracts before use. Empty content, malformed JSON, schema-invalid JSON, terminal provider errors, rate limits, unavailable provider responses, timeouts, request cancellation, and truncated output all become typed `AIProviderResult` failures rather than raw provider details.
+
 ## Routing
 
-A server-side router calls GLM first. It may call DeepSeek only for configured transient failures, timeout, or invalid structured output, with bounded attempts and idempotent trace metadata. Authentication, rate limits, redaction, timeouts, and logging live outside providers. Fallback never weakens schema validation or safety boundaries.
+A server-side router may compose providers with bounded attempts and idempotent trace metadata. Authentication, rate limits, redaction, timeouts, and logging live outside browser code. Fallback never weakens schema validation or safety boundaries.
 
 ## Structured tasks
 
@@ -26,6 +45,30 @@ A server-side router calls GLM first. It may call DeepSeek only for configured t
 - `grounded_decision_explanation`: explains an authoritative workout, progression, or pain-safety decision using only supplied reason codes and evidence references. It cannot replace the action, classification, constraints, or recommendation.
 
 All outputs are parsed against versioned schemas. Invalid, unsupported, or uncertain values are rejected or represented explicitly; they are never silently guessed.
+
+## Production wiring
+
+The production `generate-workout` Edge Function creates AI providers from
+server-only environment variables and injects an optional
+`grounded_decision_explanation` explainer into the workout-generation
+orchestrator. The explainer runs only after deterministic workout generation
+succeeds and receives bounded evidence from the trusted engine result: workout
+summary, selected exercises, volume summary, duration stopping reason, and
+engine decision codes.
+
+The browser receives only an optional safe explanation string on the existing
+workout review screen. It never receives provider names, prompts, raw provider
+responses, model metadata, secrets, or API keys.
+
+`discomfort_observation_extraction` is not wired into production yet because the
+current shipped discomfort input is a structured boolean flag, not a
+natural-language discomfort report. That task should only be connected when an
+existing user flow supplies natural-language discomfort text.
+
+If no AI provider is configured, or if the provider times out, returns invalid
+output, or otherwise fails, deterministic workout generation still succeeds
+without an explanation. Provider failure cannot select exercises, loads, sets,
+progression, or safety decisions.
 
 AI parses and explains. Deterministic workout, progression, and pain-safety engines decide. Provider implementations must remain server-side and interchangeable behind `AIProvider`.
 

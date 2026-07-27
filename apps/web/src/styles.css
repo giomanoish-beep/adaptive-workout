@@ -58,6 +58,16 @@ main > p:last-child {
   flex-direction: column;
 }
 
+@media (max-width: 699px) {
+  .auth-shell--authenticated {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
 .app-nav__content {
   flex: 1 1 auto;
   width: min(100% - 2rem, var(--content-max));
@@ -823,6 +833,30 @@ main > p:last-child {
   font-size: 0.95rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.workout-review__explanation {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  border-radius: 0.85rem;
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.workout-review__explanation-title {
+  margin: 0 0 0.45rem;
+  color: #99f6e4;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workout-review__explanation p {
+  margin: 0;
+  color: #dbeafe;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .workout-review__actions {

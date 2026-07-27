@@ -17,6 +17,7 @@ import {
 import {
   clearDeepSeekTaskHandlers,
   DeepSeekAiProvider,
+  deepseekDefaultModelId,
   registerDeepSeekTaskHandler,
   type DeepSeekRequestPayload,
   type DeepSeekResponsePayload,
@@ -97,7 +98,7 @@ function okDeepSeekResult(content: unknown): DeepSeekTransportResult {
   return {
     responseMetadata: {
       providerId: 'deepseek',
-      modelId: 'deepseek-chat',
+      modelId: deepseekDefaultModelId,
       providerRequestId: 'deepseek-req-1',
       receivedAt: '2026-07-14T10:00:01.000Z',
       latencyMilliseconds: 1_100,
@@ -188,6 +189,16 @@ describe('GLM explanation handler through GlmAiProvider', () => {
 });
 
 describe('DeepSeek explanation handler through DeepSeekAiProvider', () => {
+  it('sends JSON Output and disabled thinking mode to the transport', async () => {
+    registerDeepSeekTaskHandler('grounded_decision_explanation', deepseekExplanationHandler);
+    const transport = fakeDeepSeekTransport(okDeepSeekResult(validModelJson));
+    await new DeepSeekAiProvider({ transport }).execute(explanationRequest);
+
+    expect(transport.lastPayload()?.task).toBe('grounded_decision_explanation');
+    expect(transport.lastPayload()?.responseFormat).toEqual({ type: 'json_object' });
+    expect(transport.lastPayload()?.thinking).toEqual({ type: 'disabled' });
+  });
+
   it('returns the same canonical contract as GLM', async () => {
     registerDeepSeekTaskHandler('grounded_decision_explanation', deepseekExplanationHandler);
     const provider = new DeepSeekAiProvider({

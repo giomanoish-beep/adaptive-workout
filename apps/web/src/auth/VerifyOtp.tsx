@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  createOtpVerificationGate,
+  isCompleteOtpToken,
+  normalizeOtpToken,
+  OTP_LENGTH,
+  requestVerifyEmailOtp,
+  translateVerifyError,
+} from './verify-otp-utils';
 
 /**
  * 6-digit numeric OTP verification screen (V1.4).
@@ -20,17 +28,19 @@ export interface VerifyOtpProps {
   readonly email: string;
   /** Seconds remaining on the resend cooldown (0 = can resend). */
   readonly cooldownSeconds: number;
+  readonly resendErrorMessage?: string | null;
+  readonly resendSubmitting?: boolean;
   readonly onVerified: () => void;
   readonly onResend: () => void;
   readonly onBack: () => void;
 }
 
-const OTP_LENGTH = 6;
-
 export function VerifyOtp({
   client,
   email,
   cooldownSeconds,
+  resendErrorMessage = null,
+  resendSubmitting = false,
   onVerified,
   onResend,
   onBack,
@@ -38,9 +48,14 @@ export function VerifyOtp({
   const [digits, setDigits] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const inFlightRef = useRef(false);
+  const verificationGateRef = useRef<ReturnType<typeof createOtpVerificationGate> | null>(null);
+  const resendInFlightRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const verifyOtpRef = useRef<(token: string) => Promise<void>>();
+  const verifyOtpRef = useRef<((token: string) => Promise<void>) | null>(null);
+
+  if (verificationGateRef.current === null) {
+    verificationGateRef.current = createOtpVerificationGate();
+  }
 
   // Auto-focus the input when the component mounts.
   useEffect(() => {
@@ -49,17 +64,13 @@ export function VerifyOtp({
 
   const verifyOtp = useCallback(
     async (token: string) => {
-      if (inFlightRef.current || token.length !== OTP_LENGTH) return;
-      inFlightRef.current = true;
+      const verificationGate = verificationGateRef.current;
+      if (verificationGate === null || !verificationGate.start(token)) return;
       setSubmitting(true);
       setErrorMessage(null);
 
       try {
-        const { error } = await client.auth.verifyOtp({
-          email,
-          token,
-          type: 'email',
-        });
+        const { error } = await requestVerifyEmailOtp(client, email, token);
 
         if (error !== null) {
           const message = translateVerifyError(error);
@@ -70,7 +81,7 @@ export function VerifyOtp({
           onVerified();
         }
       } finally {
-        inFlightRef.current = false;
+        verificationGate.finish();
         setSubmitting(false);
       }
     },
@@ -85,8 +96,9 @@ export function VerifyOtp({
   const handleChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       // Only accept digits; ignore non-numeric input.
-      const value = event.target.value.replace(/\D/g, '').slice(0, OTP_LENGTH);
+      const value = normalizeOtpToken(event.target.value);
       setDigits(value);
+      verificationGateRef.current?.reset();
       if (errorMessage) {
         setErrorMessage(null);
       }
@@ -109,7 +121,23 @@ export function VerifyOtp({
     [digits, submitting, verifyOtp],
   );
 
-  const canResend = cooldownSeconds <= 0 && !submitting;
+  const handleResend = useCallback(() => {
+    if (resendInFlightRef.current || cooldownSeconds > 0 || submitting || resendSubmitting) {
+      return;
+    }
+    resendInFlightRef.current = true;
+    try {
+      onResend();
+    } finally {
+      queueMicrotask(() => {
+        resendInFlightRef.current = false;
+      });
+    }
+  }, [cooldownSeconds, onResend, resendSubmitting, submitting]);
+
+  const canResend = cooldownSeconds <= 0 && !submitting && !resendSubmitting;
+  const disabled = submitting || resendSubmitting;
+  const visibleErrorMessage = errorMessage ?? resendErrorMessage;
 
   return (
     <div className="verify-otp">
@@ -133,47 +161,44 @@ export function VerifyOtp({
             onChange={handleChange}
             disabled={submitting}
             aria-label="6-digit verification code"
-            aria-invalid={errorMessage !== null}
+            aria-invalid={visibleErrorMessage !== null}
+            aria-describedby={visibleErrorMessage ? 'verify-otp-message' : undefined}
           />
         </label>
 
-        {errorMessage && (
-          <p className="verify-otp__error" role="alert">
-            {errorMessage}
+        {visibleErrorMessage && (
+          <p id="verify-otp-message" className="verify-otp__error" role="alert">
+            {visibleErrorMessage}
           </p>
         )}
 
+        <button
+          type="submit"
+          className="verify-otp__primary"
+          disabled={disabled || !isCompleteOtpToken(digits)}
+        >
+          {submitting ? 'Verifying code...' : 'Verify code'}
+        </button>
+
         <div className="verify-otp__actions">
-          <button type="button" className="verify-otp__back" onClick={onBack} disabled={submitting}>
+          <button type="button" className="verify-otp__back" onClick={onBack} disabled={disabled}>
             Different email
           </button>
           <button
             type="button"
             className="verify-otp__resend"
-            onClick={onResend}
+            onClick={handleResend}
             disabled={!canResend}
+            aria-live="polite"
           >
-            {cooldownSeconds > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend code'}
+            {resendSubmitting
+              ? 'Sending code...'
+              : cooldownSeconds > 0
+                ? `Resend in ${cooldownSeconds}s`
+                : 'Resend code'}
           </button>
         </div>
       </form>
     </div>
   );
-}
-
-function translateVerifyError(error: {
-  readonly message?: string;
-  readonly status?: number;
-}): string {
-  if (error.status === 429) {
-    return 'Too many attempts. Please wait before trying again.';
-  }
-  const message = error.message ?? '';
-  if (/expired/i.test(message)) {
-    return 'This code has expired. Please request a new one.';
-  }
-  if (/invalid/i.test(message) || /token/i.test(message)) {
-    return 'Invalid code. Please check and try again.';
-  }
-  return message || 'Unable to verify code. Please try again.';
 }

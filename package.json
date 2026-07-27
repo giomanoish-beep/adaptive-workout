@@ -21,6 +21,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
+    "release:check": "node scripts/check-release-readiness.mjs",
     "test": "vitest run",
     "test:e2e": "npm exec --workspace @adaptive-workout/web -- playwright test",
     "test:e2e-production-guard": "node scripts/test-e2e-production-guard.mjs",

@@ -58,6 +58,7 @@ export function mapEngineResultToReview(
     engineVersion: `${ORCHESTRATOR_ENGINE_NAME}@${String(ORCHESTRATOR_RULE_SET_VERSION)}`,
     ruleSetVersion: String(ORCHESTRATOR_RULE_SET_VERSION),
     traceSummary: null,
+    decisionExplanation: null,
   };
 }
 
@@ -84,17 +85,11 @@ function mapExercise(
     familySlug,
     equipmentCategory,
     isUnilateral,
-    bodyWeightKg: undefined, // profile body weight not yet stored in ServerTrainingProfile
+    bodyWeightKg: profile?.bodyWeightKg ?? null,
     experienceLevel: normalizeExperienceLevel(profile?.experience ?? 'intermediate'),
   });
 
-  const prescription = prescribeExercise(
-    goalProfile,
-    familySlug,
-    loadEstimate.loadKg,
-    loadEstimate.source,
-    loadEstimate.label,
-  );
+  const prescription = prescribeExercise(goalProfile, familySlug, loadEstimate);
 
   return {
     position: index + 1,
@@ -105,9 +100,7 @@ function mapExercise(
     reps: { minimum: prescription.repMin, maximum: prescription.repMax },
     rir: prescription.targetRir,
     restSeconds: prescription.restSeconds,
-    initialLoadKg: prescription.initialLoadKg,
-    loadEstimateSource: prescription.loadEstimateSource,
-    loadEstimateLabel: prescription.loadEstimateLabel,
+    loadPrescription: prescription.loadPrescription,
   };
 }
 
@@ -123,7 +116,10 @@ function mapExercise(
  *   - selectorized-machine, plate-loaded-machine, leg-press, hack-squat → 'machine'
  *   - bench → accessory, falls through to 'machine' as default
  */
-function inferEquipmentCategory(exerciseId: string, catalogResult: CatalogMappingResult): string {
+export function inferEquipmentCategory(
+  exerciseId: string,
+  catalogResult: CatalogMappingResult,
+): string {
   const slugs = catalogResult.exerciseIdToEquipmentSlugs.get(exerciseId);
   if (!slugs || slugs.length === 0) return 'machine';
 
@@ -159,7 +155,7 @@ function inferEquipmentCategory(exerciseId: string, catalogResult: CatalogMappin
  * Uses common naming patterns rather than catalog metadata since
  * the current catalog doesn't store body_side per exercise.
  */
-function inferIsUnilateral(exerciseName: string): boolean {
+export function inferIsUnilateral(exerciseName: string): boolean {
   const lower = exerciseName.toLowerCase();
   const unilateralPatterns = [
     'single-arm',
@@ -173,7 +169,7 @@ function inferIsUnilateral(exerciseName: string): boolean {
   return unilateralPatterns.some((pattern) => lower.includes(pattern));
 }
 
-function normalizeExperienceLevel(exp: string): 'beginner' | 'intermediate' | 'advanced' {
+export function normalizeExperienceLevel(exp: string): 'beginner' | 'intermediate' | 'advanced' {
   const lower = exp.toLowerCase();
   if (lower === 'beginner' || lower === 'novice') return 'beginner';
   if (lower === 'advanced' || lower === 'expert') return 'advanced';

@@ -63,3 +63,52 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | V1.2                   | Multi-week program engine, program UI, and E2E tests                | DONE    | V1.1                                                         |
 | V1.3                   | Personal beta: deployable with real Supabase persistence            | DONE    | V1.2                                                         |
 | V1.4                   | Mobile UX (100dvh), email OTP auth, duration tuning, load estimator | DONE    | V1.3                                                         |
+| STAB-002               | Add explicit load prescriptions and body-weight calibration         | DONE    | V1.4                                                         |
+| STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
+| STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
+| AI-004-PROD            | Wire supported AI tasks into the production server flow             | DONE    | AI-003, AI-006, STAB-005                                     |
+
+## AI-001 evidence
+
+- Integrated DeepSeek as the production server-side provider behind the
+  existing `AIProvider` abstraction.
+- Added server environment wiring for `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`,
+  and `DEEPSEEK_MODEL` without requiring a real key in tests.
+- Defaulted DeepSeek to `deepseek-v4-flash`, disabled thinking mode, and kept
+  JSON Output for structured tasks.
+- Preserved contract validation before model output can be used; malformed,
+  empty, schema-invalid, terminal-error, retryable-error, timeout, cancellation,
+  unavailable-provider, and truncated-output cases are typed failures.
+- Rebuilt Edge Function bundles after provider/package changes. Remote secret
+  configuration, Edge Function deployment, production deployment, and PR merge
+  remain manual gates.
+
+## AI-004-PROD evidence
+
+- Wired `grounded_decision_explanation` into the authenticated production
+  `generate-workout` Edge Function flow through the existing `AIProvider`
+  abstraction.
+- The AI call runs only after deterministic workout generation succeeds and is
+  grounded in server-side engine evidence. It may add a safe explanation string
+  to the existing workout review response, but it cannot choose exercises,
+  loads, sets, progression, or safety decisions.
+- `discomfort_observation_extraction` remains unwired because the current
+  shipped discomfort flow does not provide natural-language discomfort text.
+- DeepSeek can run with only `DEEPSEEK_API_KEY`; if both DeepSeek and GLM are
+  configured, the documented bounded router policy remains in use.
+- Provider timeout, unavailable-provider, invalid-output, and provider-failure
+  cases fail safely by omitting the explanation while preserving deterministic
+  generation.
+- Rebuilt `supabase/functions/generate-workout/index.bundle.ts`. A later manual
+  Supabase deployment is required for production to receive the AI-004 function
+  change; no remote deployment was performed during implementation.
+
+## STAB-005 evidence
+
+- Added `npm run release:check`, a deterministic static release-readiness guard
+  that does not read secrets or modify remote resources.
+- Added `docs/RELEASE_CHECKLIST.md` to separate automated release-candidate
+  checks from manual production, Supabase, OTP, deployment, and iPhone gates.
+- Wired the release-readiness guard into the GitHub Actions quality job.
+- Production deployment, remote Supabase changes, Edge Function deployment, and
+  iPhone installation verification remain manual human gates.

@@ -4,6 +4,7 @@ import type {
   DeepSeekTaskHandler,
 } from '@adaptive-workout/ai-deepseek-provider';
 import type { AIProviderRequest } from '@adaptive-workout/ai';
+import { deepseekDefaultModelId } from '@adaptive-workout/ai-deepseek-provider';
 import {
   buildWorkoutIntentPromptMessages,
   parseWorkoutIntentOutput,
@@ -24,9 +25,10 @@ export const deepseekWorkoutIntentHandler: DeepSeekTaskHandler<'workout_intent_e
       (message) => ({ role: message.role, content: message.content }),
     );
     return {
-      model: 'deepseek-chat',
+      model: deepseekDefaultModelId,
       messages,
       responseFormat: { type: 'json_object' },
+      thinking: { type: 'disabled' },
       temperature: workoutIntentPromptTemperature,
       requestId: request.metadata.requestId,
       task: 'workout_intent_extraction',
