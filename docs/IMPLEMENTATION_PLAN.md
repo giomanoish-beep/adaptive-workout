@@ -67,6 +67,26 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
 | STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
 | AI-004-PROD            | Wire supported AI tasks into the production server flow             | DONE    | AI-003, AI-006, STAB-005                                     |
+| HOTFIX-001             | Align numeric OTP template guidance and custom duration fitting     | DONE    | V1.4, AI-004-PROD                                            |
+
+## HOTFIX-001 evidence
+
+- Confirmed the application-side auth flow remains numeric six-digit email OTP:
+  sign-in requests Supabase email OTP and verification uses `type: 'email'`.
+- Documented the required Supabase email-template gate: render `{{ .Token }}`
+  and do not rely on `{{ .ConfirmationURL }}` for this app's production
+  sign-in email. No remote Supabase template was changed.
+- Updated custom generated workout duration fitting to use the simple model:
+  4 minutes setup, 45 seconds per working set, prescribed rest only between
+  sets, and 60 seconds between exercises.
+- Custom generated workouts now fit toward the requested duration with a
+  five-minute tolerance while preserving safety, useful-volume hard caps,
+  movement-pattern usefulness, and deterministic engine validation. Scheduled
+  workout allocation remains on the existing scheduled/programmed path.
+- Added focused regression tests for the numeric OTP expectation, duration
+  formula details, 30/45/60/75/90 custom targets, useful-work monotonicity,
+  hard-cap saturation, deterministic generation, and scheduled-path
+  non-regression.
 
 ## AI-001 evidence
 

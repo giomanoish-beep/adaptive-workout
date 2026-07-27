@@ -26,6 +26,16 @@ describe('requestEmailSignIn', () => {
     });
   });
 
+  it('requests an email OTP token instead of a magic-link redirect', async () => {
+    const { client, signInWithOtp } = mockClient(null);
+    await requestEmailSignIn(client, 'athlete@example.com');
+
+    expect(signInWithOtp).toHaveBeenCalledWith({
+      email: 'athlete@example.com',
+      options: { shouldCreateUser: true },
+    });
+  });
+
   it('returns null error when Supabase succeeds', async () => {
     const { client } = mockClient(null);
     await expect(requestEmailSignIn(client, 'athlete@example.com')).resolves.toEqual({

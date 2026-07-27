@@ -155,6 +155,7 @@ Automated checks verify app-side requirements:
 
 - sign-in calls Supabase `signInWithOtp` with `shouldCreateUser: true`;
 - the app does not forward arbitrary redirect parameters with `emailRedirectTo`;
+- the app expects a six-digit numeric email OTP token, not a magic link;
 - verification calls `verifyOtp` with `type: 'email'`;
 - the browser client enables Supabase session persistence, auto refresh, and
   URL-session detection;
@@ -165,6 +166,10 @@ Manual OTP gate:
 - configure Supabase Auth Site URL to the final production URL;
 - configure exact production redirect URLs and any approved preview redirect
   pattern;
+- configure the relevant Supabase email template to render `{{ .Token }}` and
+  not rely on `{{ .ConfirmationURL }}` for this app's production sign-in email;
+- verify the production email contains a numeric six-digit code rather than a
+  magic link;
 - verify an email OTP can be requested and redeemed against the production
   origin;
 - verify resend/rate-limit behavior with the provider's production policy.

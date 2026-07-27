@@ -8,7 +8,7 @@
 | ----------------------- | -------------------------- | -------------------------- |
 | Frontend (Vite + React) | Vercel                     | Static SPA hosting         |
 | Database (PostgreSQL)   | Supabase                   | Authoritative data + RLS   |
-| Authentication          | Supabase Auth              | Email magic-link OTP       |
+| Authentication          | Supabase Auth              | Numeric email OTP          |
 | Serverless functions    | Supabase Edge Functions    | Trusted compute, AI calls  |
 | Secrets                 | Supabase + Vercel env vars | Server-only, never browser |
 
@@ -84,7 +84,7 @@ Asset files (`/assets/*`) receive `Cache-Control: public, max-age=31536000, immu
 
 ### CSP
 
-A Content-Security-Policy is **not** set in `vercel.json` headers due to the dynamic nature of Supabase Auth magic links (which redirect through Supabase domains). To add CSP, test with a report-only header first and ensure:
+A Content-Security-Policy is **not** set in `vercel.json` headers yet. To add CSP, test with a report-only header first and ensure:
 
 - `connect-src`: Supabase project URL + `https://*.supabase.co`
 - `script-src 'self'`
@@ -270,15 +270,17 @@ After the Vercel production URL is known, configure Supabase Auth:
    - `http://localhost:5173/**` (local development)
    - `https://*-<team>.vercel.app` (preview deployments, optional)
 
-### Magic-Link Redirect Design
+### Numeric Email OTP Template
 
-The app calls `client.auth.signInWithOtp({ email })` without an explicit `emailRedirectTo` parameter. Supabase Auth uses the configured **Site URL** as the default redirect destination. This is sufficient because:
+The app intentionally uses Supabase numeric email OTPs:
 
-1. The production Site URL is the single correct destination
-2. The app has no concept of deep-linking to specific pages from magic links
-3. The session is restored via `onAuthStateChange` + `detectSessionInUrl: true`
+- sign-in calls `client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })`;
+- verification calls `client.auth.verifyOtp({ email, token, type: 'email' })`;
+- the UI expects a six-digit numeric token and does not use a magic-link redirect.
 
-No arbitrary redirect query parameter is trusted or forwarded.
+Configure the Supabase Auth email template to send the numeric token with `{{ .Token }}`. Do **not** use `{{ .ConfirmationURL }}` for the production email used by this app, because that sends a magic link instead of the code the UI asks the user to enter. The coding workflow must not modify this remote template; it is a manual production configuration gate.
+
+The app does not pass `emailRedirectTo`, and no arbitrary redirect query parameter is trusted or forwarded.
 
 ## Production Smoke Checklist
 
@@ -292,12 +294,13 @@ After deploying both Vercel and Supabase:
 - [ ] No `VITE_E2E_AUTH` or service-role keys in browser network/source
 - [ ] Security headers present: nosniff, Referrer-Policy, X-Frame-Options
 
-### Magic-Link Auth (Manual)
+### Numeric Email OTP Auth (Manual)
 
 - [ ] Enter email, click "Continue with email"
-- [ ] "Check your email" message appears
-- [ ] Magic-link email received (check inbox)
-- [ ] Clicking the link opens the production URL (not localhost)
+- [ ] OTP screen appears and asks for a 6-digit verification code
+- [ ] Email contains the numeric token rendered from `{{ .Token }}`
+- [ ] Email does not contain a magic-link-only `{{ .ConfirmationURL }}` flow
+- [ ] Entering the six-digit code authenticates the session
 - [ ] Authenticated session established (onboarding appears)
 
 ### Core Flow
