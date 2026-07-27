@@ -67,6 +67,21 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
 | STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
 
+## AI-001 evidence
+
+- Integrated DeepSeek as the production server-side provider behind the
+  existing `AIProvider` abstraction.
+- Added server environment wiring for `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`,
+  and `DEEPSEEK_MODEL` without requiring a real key in tests.
+- Defaulted DeepSeek to `deepseek-v4-flash`, disabled thinking mode, and kept
+  JSON Output for structured tasks.
+- Preserved contract validation before model output can be used; malformed,
+  empty, schema-invalid, terminal-error, retryable-error, timeout, cancellation,
+  unavailable-provider, and truncated-output cases are typed failures.
+- Rebuilt Edge Function bundles after provider/package changes. Remote secret
+  configuration, Edge Function deployment, production deployment, and PR merge
+  remain manual gates.
+
 ## STAB-005 evidence
 
 - Added `npm run release:check`, a deterministic static release-readiness guard

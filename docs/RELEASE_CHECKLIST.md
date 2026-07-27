@@ -44,6 +44,7 @@ approval and are listed in detail below:
 - Edge Function deployment;
 - production secret or environment-variable changes;
 - production OTP provider/Auth URL configuration;
+- production DeepSeek secret verification;
 - physical iPhone PWA installation verification;
 - PR merge.
 
@@ -69,6 +70,9 @@ secrets. It verifies:
 - the migration count matches CI's database validation expectation;
 - `.env.example` contains only empty placeholders and no other `.env` file is
   tracked;
+- the server-only DeepSeek provider defaults to `deepseek-v4-flash`, rejects
+  legacy/thinking model IDs, sends JSON Output with disabled thinking mode, and
+  handles terminal and retryable provider errors deterministically;
 - this checklist and the implementation-plan STAB-005 row exist.
 
 ## PWA and iPhone readiness
@@ -133,6 +137,9 @@ Manual Supabase gate:
 - verify production Auth Site URL and Redirect URLs after the final production
   URL is known;
 - verify Edge Function secrets exist without printing values;
+- verify `DEEPSEEK_API_KEY` exists before enabling AI calls;
+- optionally verify `DEEPSEEK_BASE_URL` and `DEEPSEEK_MODEL`; if absent, the
+  provider uses `https://api.deepseek.com` and `deepseek-v4-flash`;
 - verify `SUPABASE_SERVICE_ROLE_KEY` is configured only for server-side function
   use;
 - do not run `supabase db push`, mutate remote data, or deploy Edge Functions
@@ -172,6 +179,28 @@ Manual deployment gate:
 - deploy Edge Functions only after explicit approval;
 - apply remote migrations only after explicit approval and migration review;
 - never reset production data.
+
+## DeepSeek AI provider readiness
+
+Automated checks verify repository-owned provider behavior only:
+
+- DeepSeek is implemented behind `AIProvider` and remains server-side.
+- `DEEPSEEK_API_KEY` is required by the server factory and is never read by
+  browser code.
+- `DEEPSEEK_BASE_URL` defaults to `https://api.deepseek.com`.
+- `DEEPSEEK_MODEL` defaults to `deepseek-v4-flash`.
+- DeepSeek requests include `thinking: { type: "disabled" }`.
+- Structured tasks use JSON Output and prompts explicitly request a JSON object
+  with the required schema shape.
+- Provider JSON is validated against the existing task contracts before use.
+- Tests cover success, timeout, empty response, invalid JSON, schema-invalid
+  JSON, 401, 402, 429, 5xx, truncated output, and unavailable provider cases.
+
+Manual AI provider gate:
+
+- configure `DEEPSEEK_API_KEY` only as a Supabase Edge Function secret;
+- do not print or paste the secret into logs, docs, or browser variables;
+- do not deploy Edge Functions until explicitly approved.
 
 ## Release-candidate decision
 

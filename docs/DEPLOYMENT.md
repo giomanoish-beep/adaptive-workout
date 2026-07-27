@@ -34,13 +34,15 @@ Set these in Vercel project settings (Environment Variables), not in `vercel.jso
 
 ### Server/Function Secrets
 
-| Variable                    | Required | Consuming Function(s)            | Notes                                               |
-| --------------------------- | -------- | -------------------------------- | --------------------------------------------------- |
-| `SUPABASE_URL`              | Yes      | Both Edge Functions              | Supabase project URL (function-side)                |
-| `SUPABASE_ANON_KEY`         | Yes      | Both Edge Functions              | Auth verification and user-scoped reads             |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | `refresh-progression` only       | Derived-state writes scoped to the verified user ID |
-| `ZAI_API_KEY`               | No       | Only if AI generation is enabled | NOT currently consumed                              |
-| `DEEPSEEK_API_KEY`          | No       | Only if AI generation is enabled | NOT currently consumed                              |
+| Variable                    | Required | Consuming Function(s)          | Notes                                               |
+| --------------------------- | -------- | ------------------------------ | --------------------------------------------------- |
+| `SUPABASE_URL`              | Yes      | Both Edge Functions            | Supabase project URL (function-side)                |
+| `SUPABASE_ANON_KEY`         | Yes      | Both Edge Functions            | Auth verification and user-scoped reads             |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes      | `refresh-progression` only     | Derived-state writes scoped to the verified user ID |
+| `ZAI_API_KEY`               | No       | Only if GLM routing is enabled | Server-only provider secret                         |
+| `DEEPSEEK_API_KEY`          | Yes      | DeepSeek AI provider           | Server-only, required before enabling AI calls      |
+| `DEEPSEEK_BASE_URL`         | No       | DeepSeek AI provider           | Defaults to `https://api.deepseek.com`              |
+| `DEEPSEEK_MODEL`            | No       | DeepSeek AI provider           | Defaults to `deepseek-v4-flash`                     |
 
 Set function secrets via Supabase Dashboard or CLI:
 
@@ -223,11 +225,17 @@ After deployment, set required secrets via Supabase CLI:
 npx supabase secrets set \
   SUPABASE_URL=<your-project-url> \
   SUPABASE_ANON_KEY=<your-anon-key> \
-  SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+  SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key> \
+  DEEPSEEK_API_KEY=<your-deepseek-api-key>
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is consumed only by `refresh-progression`. It must
 never be configured in Vercel or exposed through a `VITE_` variable.
+
+`DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` are Supabase Edge
+Function secrets only. `DEEPSEEK_BASE_URL` and `DEEPSEEK_MODEL` may be omitted
+to use the production defaults. Do not configure any DeepSeek variable with a
+`VITE_` prefix.
 
 Secrets can also be managed via Supabase Dashboard > Functions > manage secrets.
 
@@ -384,7 +392,7 @@ jobs:
 ## Known Limitations
 
 1. **Edge Function Monorepo Imports**: Workspace packages must be bundled before deployment. The raw `index.ts` files cannot be deployed directly. `npm run edge-fn:build:all` produces each function's `index.bundle.ts`, which `supabase/config.toml` declares as the deploy entrypoint. See the bundling section above.
-2. **No AI Provider Connection**: The `ZAI_API_KEY` and `DEEPSEEK_API_KEY` secrets are not consumed by any deployed function. AI features will require additional Edge Functions.
+2. **AI Provider Activation**: DeepSeek is implemented as a server-side `AIProvider` using `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`. The deterministic workout/program/progression Edge Functions still do not let AI bypass the engines; user-facing AI task endpoints must be enabled deliberately and deployed only after secret configuration approval.
 3. **No Account Deletion UI**: Implemented only as a Supabase Auth action, not as an in-app feature.
 4. **No Data Export**: Not implemented.
 5. **AI Interaction Retention**: The recommended 30-day cleanup is not enforced — see `docs/SECURITY_AND_RETENTION.md`.

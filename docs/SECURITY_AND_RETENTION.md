@@ -14,7 +14,7 @@ This document is an engineering inventory. It is **not** a legal compliance cert
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Browser ↔ Supabase                     | HTTPS via Supabase JS client using anon key only. No service-role or AI keys in browser code.                                           |
 | Browser ↔ Vite dev server              | Development only. Environment variables injected at build time via `VITE_` prefix.                                                      |
-| Supabase Edge Functions ↔ AI Providers | Service-role and AI provider keys exist only in Edge Function secrets (not implemented yet in this prototype).                          |
+| Supabase Edge Functions ↔ AI Providers | Service-role and AI provider keys exist only in Edge Function secrets. DeepSeek provider integration is server-side only.               |
 | Supabase PostgreSQL ↔ Browser          | Mediated by PostgREST with RLS on every table. Anonymous role has no table access.                                                      |
 | Browser localStorage                   | Supabase Auth session token only (via `persistSession: true`). No workout, profile, pain, or history data is stored in browser storage. |
 
@@ -405,17 +405,17 @@ Security headers are configured in `vercel.json` for production deployment. See 
 
 ## 13. Known Gaps Before Production
 
-| Gap                                                         | Severity | Status                                                |
-| ----------------------------------------------------------- | -------- | ----------------------------------------------------- |
-| No user-facing data export                                  | High     | Documented, not implemented                           |
-| No account deletion UI                                      | High     | Documented, not implemented                           |
-| No AI interaction cleanup enforcement                       | Medium   | SQL defined, not implemented                          |
-| No automated RLS runtime tests (pgTAP)                      | Medium   | Docker unavailable for review                         |
-| No deployment security headers                              | Medium   | Recommendations documented                            |
-| No pain-event deletion UI                                   | Low      | Documented                                            |
-| No selective workout deletion UI                            | Low      | Documented                                            |
-| Profile data not persisted (in-memory only)                 | High     | Pre-existing architecture limitation (ONBOARDING-001) |
-| AI providers not connected (Edge Functions not implemented) | Info     | Pre-existing architecture limitation                  |
+| Gap                                         | Severity | Status                                                            |
+| ------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| No user-facing data export                  | High     | Documented, not implemented                                       |
+| No account deletion UI                      | High     | Documented, not implemented                                       |
+| No AI interaction cleanup enforcement       | Medium   | SQL defined, not implemented                                      |
+| No automated RLS runtime tests (pgTAP)      | Medium   | Docker unavailable for review                                     |
+| No deployment security headers              | Medium   | Recommendations documented                                        |
+| No pain-event deletion UI                   | Low      | Documented                                                        |
+| No selective workout deletion UI            | Low      | Documented                                                        |
+| Profile data not persisted (in-memory only) | High     | Pre-existing architecture limitation (ONBOARDING-001)             |
+| User-facing AI endpoints not deployed       | Info     | DeepSeek provider exists server-side; deployment is a manual gate |
 
 ---
 
