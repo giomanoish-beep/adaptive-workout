@@ -46,6 +46,30 @@ A server-side router may compose providers with bounded attempts and idempotent 
 
 All outputs are parsed against versioned schemas. Invalid, unsupported, or uncertain values are rejected or represented explicitly; they are never silently guessed.
 
+## Production wiring
+
+The production `generate-workout` Edge Function creates AI providers from
+server-only environment variables and injects an optional
+`grounded_decision_explanation` explainer into the workout-generation
+orchestrator. The explainer runs only after deterministic workout generation
+succeeds and receives bounded evidence from the trusted engine result: workout
+summary, selected exercises, volume summary, duration stopping reason, and
+engine decision codes.
+
+The browser receives only an optional safe explanation string on the existing
+workout review screen. It never receives provider names, prompts, raw provider
+responses, model metadata, secrets, or API keys.
+
+`discomfort_observation_extraction` is not wired into production yet because the
+current shipped discomfort input is a structured boolean flag, not a
+natural-language discomfort report. That task should only be connected when an
+existing user flow supplies natural-language discomfort text.
+
+If no AI provider is configured, or if the provider times out, returns invalid
+output, or otherwise fails, deterministic workout generation still succeeds
+without an explanation. Provider failure cannot select exercises, loads, sets,
+progression, or safety decisions.
+
 AI parses and explains. Deterministic workout, progression, and pain-safety engines decide. Provider implementations must remain server-side and interchangeable behind `AIProvider`.
 
 ## Allowed responsibilities

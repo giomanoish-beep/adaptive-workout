@@ -66,6 +66,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | STAB-002               | Add explicit load prescriptions and body-weight calibration         | DONE    | V1.4                                                         |
 | STAB-004               | Harden mobile route geometry and deterministic visual baselines     | DONE    | V1.4                                                         |
 | STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
+| AI-004-PROD            | Wire supported AI tasks into the production server flow             | DONE    | AI-003, AI-006, STAB-005                                     |
 
 ## AI-001 evidence
 
@@ -81,6 +82,26 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 - Rebuilt Edge Function bundles after provider/package changes. Remote secret
   configuration, Edge Function deployment, production deployment, and PR merge
   remain manual gates.
+
+## AI-004-PROD evidence
+
+- Wired `grounded_decision_explanation` into the authenticated production
+  `generate-workout` Edge Function flow through the existing `AIProvider`
+  abstraction.
+- The AI call runs only after deterministic workout generation succeeds and is
+  grounded in server-side engine evidence. It may add a safe explanation string
+  to the existing workout review response, but it cannot choose exercises,
+  loads, sets, progression, or safety decisions.
+- `discomfort_observation_extraction` remains unwired because the current
+  shipped discomfort flow does not provide natural-language discomfort text.
+- DeepSeek can run with only `DEEPSEEK_API_KEY`; if both DeepSeek and GLM are
+  configured, the documented bounded router policy remains in use.
+- Provider timeout, unavailable-provider, invalid-output, and provider-failure
+  cases fail safely by omitting the explanation while preserving deterministic
+  generation.
+- Rebuilt `supabase/functions/generate-workout/index.bundle.ts`. A later manual
+  Supabase deployment is required for production to receive the AI-004 function
+  change; no remote deployment was performed during implementation.
 
 ## STAB-005 evidence
 

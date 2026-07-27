@@ -73,6 +73,10 @@ secrets. It verifies:
 - the server-only DeepSeek provider defaults to `deepseek-v4-flash`, rejects
   legacy/thinking model IDs, sends JSON Output with disabled thinking mode, and
   handles terminal and retryable provider errors deterministically;
+- the production `generate-workout` bundle contains the server-only DeepSeek
+  wiring for `grounded_decision_explanation`;
+- the browser build contains no DeepSeek key names, server-only provider
+  implementation, or raw AI package wiring;
 - this checklist and the implementation-plan STAB-005 row exist.
 
 ## PWA and iPhone readiness
@@ -195,12 +199,23 @@ Automated checks verify repository-owned provider behavior only:
 - Provider JSON is validated against the existing task contracts before use.
 - Tests cover success, timeout, empty response, invalid JSON, schema-invalid
   JSON, 401, 402, 429, 5xx, truncated output, and unavailable provider cases.
+- `generate-workout` invokes only the supported grounded decision explanation
+  task after deterministic generation succeeds.
+- Ordinary deterministic generation still works when no AI provider is
+  configured.
+- Provider failures and invalid provider output return no explanation and do not
+  bypass deterministic safety rules.
+- The browser bundle receives only a safe optional explanation string and no
+  key names, prompts, raw provider responses, or provider internals.
 
 Manual AI provider gate:
 
 - configure `DEEPSEEK_API_KEY` only as a Supabase Edge Function secret;
 - do not print or paste the secret into logs, docs, or browser variables;
-- do not deploy Edge Functions until explicitly approved.
+- deploy the updated `generate-workout` function only after explicit approval:
+  `npx supabase functions deploy generate-workout --project-ref bgslpmenvlcgstczzfyg --no-verify-jwt`;
+- after deployment, smoke-test authenticated generation, explanation fallback,
+  persistence, and log/output redaction.
 
 ## Release-candidate decision
 

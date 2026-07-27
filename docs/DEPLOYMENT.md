@@ -168,11 +168,11 @@ npx supabase migration up
 
 ### Function Inventory
 
-| Function              | Directory                                 | Auth         | Purpose                                           |
-| --------------------- | ----------------------------------------- | ------------ | ------------------------------------------------- |
-| `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation                  |
-| `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state |
-| `generate-program`    | `supabase/functions/generate-program/`    | JWT-verified | Deterministic multi-week program generation       |
+| Function              | Directory                                 | Auth         | Purpose                                                                            |
+| --------------------- | ----------------------------------------- | ------------ | ---------------------------------------------------------------------------------- |
+| `generate-workout`    | `supabase/functions/generate-workout/`    | JWT-verified | Deterministic workout generation plus optional server-side grounded AI explanation |
+| `refresh-progression` | `supabase/functions/refresh-progression/` | JWT-verified | Recalculate and persist derived progression state                                  |
+| `generate-program`    | `supabase/functions/generate-program/`    | JWT-verified | Deterministic multi-week program generation                                        |
 
 ### Deployment Prerequisite: Bundling
 
@@ -216,6 +216,23 @@ npx supabase functions list
 ```
 
 The deploy output should report `Uploading asset (generate-workout): supabase/functions/generate-workout/index.bundle.ts`, confirming the bundled entrypoint (not the raw `index.ts`) was uploaded.
+
+### AI-004 generate-workout redeployment
+
+AI-004 changes only the `generate-workout` Edge Function bundle. After the
+release branch is merged and deployment is explicitly approved, redeploy that
+function from the approved commit:
+
+```bash
+npm run edge-fn:build:all
+npx supabase functions deploy generate-workout --project-ref bgslpmenvlcgstczzfyg --no-verify-jwt
+npx supabase functions list --project-ref bgslpmenvlcgstczzfyg
+```
+
+Do not deploy `refresh-progression` or `generate-program` for AI-004 unless a
+later diff changes those functions. Do not run `supabase db push` for AI-004;
+the body-weight/load-prescription migration was already applied before this
+task.
 
 ## Function Secrets
 
@@ -288,6 +305,12 @@ After deploying both Vercel and Supabase:
 - [ ] Onboarding can be completed
 - [ ] Onboarding survives page reload (auth session restored)
 - [ ] Workout generation calls the deployed Edge Function (check Network tab)
+- [ ] When DeepSeek function secrets are present, the generated workout review
+      may show a concise "Why this workout" explanation
+- [ ] If the provider fails or is unavailable, generation still succeeds safely
+      without the explanation
+- [ ] No prompt, raw provider response, provider internals, or secret appears
+      in browser output, network payloads, or logs
 - [ ] Generated workout starts and creates a persisted session
 - [ ] One set can be logged and survives reload
 - [ ] Finishing a partial workout persists correctly
