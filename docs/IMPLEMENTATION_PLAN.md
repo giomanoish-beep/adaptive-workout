@@ -68,6 +68,7 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
 | STAB-005               | Prepare V1 release candidate without production deployment          | DONE    | STAB-004                                                     |
 | AI-004-PROD            | Wire supported AI tasks into the production server flow             | DONE    | AI-003, AI-006, STAB-005                                     |
 | HOTFIX-001             | Align numeric OTP template guidance and custom duration fitting     | DONE    | V1.4, AI-004-PROD                                            |
+| ANDROID-001            | Package and validate the standalone Android application             | DONE    | HOTFIX-001, STAB-005                                         |
 
 ## HOTFIX-001 evidence
 
@@ -87,6 +88,22 @@ Statuses: `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Update this file when a task
   formula details, 30/45/60/75/90 custom targets, useful-work monotonicity,
   hard-cap saturation, deterministic generation, and scheduled-path
   non-regression.
+
+## ANDROID-001 evidence
+
+- Added a Capacitor Android application with package ID
+  `com.adaptiveworkout.app`, minimum SDK 24, and target/compile SDK 36.
+- Kept production Supabase access in the existing browser client and server
+  boundaries; no service-role or AI provider secret is packaged in the APK.
+- Added Android back-button and foreground/background Supabase token-refresh
+  lifecycle handling with focused unit coverage.
+- Added reproducible debug, release, and connected-device commands. Release
+  signing reads only an external local properties file and never stores signing
+  material in Git.
+- Android lint, Gradle unit tasks, signed release assembly, signature
+  verification, installation, launch, and an Android 15 instrumented test were
+  completed locally. Physical Galaxy A14 production smoke testing remains the
+  documented human gate.
 
 ## AI-001 evidence
 

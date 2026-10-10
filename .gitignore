@@ -11,3 +11,14 @@ node-runtime.zip
 .DS_Store
 
 .vercel/
+
+# Android builds and private signing material
+**/.gradle/
+**/android/**/build/
+**/android/local.properties
+**/android/.idea/
+*.jks
+*.keystore
+*.apk
+*.aab
+artifacts/

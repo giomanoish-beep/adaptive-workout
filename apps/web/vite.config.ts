@@ -5,5 +5,21 @@ export default defineConfig(({ mode }) => {
   if (mode === 'production' && process.env.VITE_E2E_AUTH === 'true') {
     throw new Error('E2E auth seam must not be active in a production build.');
   }
-  return { plugins: [react()] };
+  return {
+    plugins: [react()],
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'supabase',
+                test: /node_modules[\\/]@supabase[\\/]/,
+              },
+            ],
+          },
+        },
+      },
+    },
+  };
 });

@@ -21,6 +21,7 @@ import { createWorkoutSessionRepository } from '../workout-session/workout-sessi
 import { createProgressRepository } from '../progress/progress-repository';
 import type { ExerciseProgression } from '../progress/progress-types';
 import { useProgram } from '../program/use-program';
+import { useAndroidBack } from '../native/use-android-back';
 import { TodayScreen } from '../program/TodayScreen';
 import { ProgramScreen } from '../program/ProgramScreen';
 import type { ScheduledWorkoutState } from '../program/program-types';
@@ -62,6 +63,16 @@ export function AppNav({
   const program = useProgram(client);
   const loadedProgram = program.state.status === 'loaded' ? program.state.program : null;
   const [sessionOptions, setSessionOptions] = useState<SessionCreateOptions | undefined>();
+
+  useAndroidBack(
+    true,
+    useCallback(() => {
+      // Background an active session without finishing it or losing draft input.
+      if (route === 'active_workout' || route === defaultRoute) return false;
+      setRoute(defaultRoute);
+      return true;
+    }, [route]),
+  );
 
   useEffect(() => {
     let cancelled = false;

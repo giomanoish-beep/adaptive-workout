@@ -3,6 +3,7 @@ dist
 coverage
 apps/web/playwright-report
 apps/web/test-results
+apps/web/android/app/src/main/assets/
 package-lock.json
 supabase/functions/generate-workout/index.bundle.ts
 supabase/functions/refresh-progression/index.bundle.ts

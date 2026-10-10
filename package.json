@@ -9,6 +9,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "android:build": "node scripts/build-android.mjs release",
+    "android:build:debug": "node scripts/build-android.mjs debug",
+    "android:test:device": "node scripts/build-android.mjs device",
     "catalog:generate": "npm run build --workspace @adaptive-workout/domain && node scripts/generate-exercise-catalog.mjs",
     "catalog:check": "npm run build --workspace @adaptive-workout/domain && node scripts/generate-exercise-catalog.mjs --check",
     "db:lint": "supabase db lint --local --level warning",

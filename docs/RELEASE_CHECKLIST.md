@@ -234,3 +234,20 @@ V1 is ready for the manual deployment step only when:
 - the remaining work is only the documented manual production/iPhone gates.
 
 V1 is not deployed by STAB-005.
+
+## Android APK release gate
+
+The standalone Android package is documented in `docs/ANDROID_APK.md`. Before
+sharing an APK, run:
+
+1. `npm run android:build:debug`
+2. Start an Android 15 or newer emulator, then run `npm run android:test:device`.
+3. `npm run android:build`
+4. Verify the release APK with Android SDK `apksigner verify --verbose`.
+5. Confirm the package is `com.adaptiveworkout.app`, the minimum SDK is 24, and
+   the target SDK is 36.
+
+The release signing key and signing properties must stay outside Git and must
+be backed up securely. Physical Galaxy A14 installation, production OTP,
+background/resume, network interruption, and workout persistence remain manual
+device gates.
