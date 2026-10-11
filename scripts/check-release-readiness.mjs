@@ -30,17 +30,6 @@ function assertNotIncludes(haystack, needle, context) {
   );
 }
 
-async function assertPngDimensions(relativePath, expectedWidth, expectedHeight) {
-  const buffer = await readFile(resolve(root, relativePath));
-  assert.deepEqual(
-    [...buffer.subarray(0, 8)],
-    [137, 80, 78, 71, 13, 10, 26, 10],
-    `${relativePath} must be a PNG file.`,
-  );
-  assert.equal(buffer.readUInt32BE(16), expectedWidth, `${relativePath} width mismatch.`);
-  assert.equal(buffer.readUInt32BE(20), expectedHeight, `${relativePath} height mismatch.`);
-}
-
 function assertPackageScripts() {
   const pkg = readJson('package.json');
   const expectedScripts = [
@@ -55,90 +44,13 @@ function assertPackageScripts() {
     'release:check',
     'db:reset',
     'db:lint',
+    'android:build',
+    'android:test:device',
   ];
 
   for (const script of expectedScripts) {
     assert.equal(typeof pkg.scripts?.[script], 'string', `package.json must define ${script}.`);
   }
-}
-
-async function assertPwaInstallability() {
-  const manifest = readJson('apps/web/public/manifest.webmanifest');
-  assert.equal(manifest.name, 'Adaptive Workout');
-  assert.equal(manifest.short_name, 'Workout');
-  assert.equal(manifest.start_url, '/');
-  assert.equal(manifest.scope, '/');
-  assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.background_color, '#0b1120');
-  assert.equal(manifest.theme_color, '#0b1120');
-
-  const expectedIcons = [
-    ['/icons/icon-192.png', '192x192', 'any', 192],
-    ['/icons/icon-512.png', '512x512', 'any', 512],
-    ['/icons/icon-maskable-192.png', '192x192', 'maskable', 192],
-    ['/icons/icon-maskable-512.png', '512x512', 'maskable', 512],
-  ];
-  assert.equal(manifest.icons.length, expectedIcons.length);
-  for (const [src, sizes, purpose, pixelSize] of expectedIcons) {
-    assert(
-      manifest.icons.some(
-        (icon) =>
-          icon.src === src &&
-          icon.sizes === sizes &&
-          icon.type === 'image/png' &&
-          icon.purpose === purpose,
-      ),
-      `manifest must declare ${src} as ${sizes} ${purpose}.`,
-    );
-    await assertPngDimensions(`apps/web/public${src}`, pixelSize, pixelSize);
-  }
-
-  const indexHtml = readText('apps/web/index.html');
-  assertIncludes(indexHtml, 'viewport-fit=cover', 'apps/web/index.html');
-  assertIncludes(indexHtml, '<meta name="theme-color" content="#0b1120" />', 'apps/web/index.html');
-  assertIncludes(
-    indexHtml,
-    '<meta name="mobile-web-app-capable" content="yes" />',
-    'apps/web/index.html',
-  );
-  assertIncludes(
-    indexHtml,
-    '<meta name="apple-mobile-web-app-capable" content="yes" />',
-    'apps/web/index.html',
-  );
-  assertIncludes(
-    indexHtml,
-    '<link rel="manifest" href="/manifest.webmanifest" />',
-    'apps/web/index.html',
-  );
-  assertIncludes(
-    indexHtml,
-    '<link rel="apple-touch-icon" href="/icons/icon-192.png" />',
-    'apps/web/index.html',
-  );
-}
-
-function assertVercelPrerequisites() {
-  const vercel = readJson('vercel.json');
-  assert.equal(vercel.installCommand, 'npm ci');
-  assert.equal(vercel.buildCommand, 'npm run build --workspace @adaptive-workout/web');
-  assert.equal(vercel.outputDirectory, 'apps/web/dist');
-  assert.equal(vercel.framework, null);
-
-  const allHeaders = vercel.headers.flatMap((entry) => entry.headers);
-  const header = (name) => allHeaders.find((item) => item.key === name)?.value;
-  assert.equal(header('X-Content-Type-Options'), 'nosniff');
-  assert.equal(header('Referrer-Policy'), 'strict-origin-when-cross-origin');
-  assert.equal(header('X-Frame-Options'), 'DENY');
-  assert.equal(header('Strict-Transport-Security'), 'max-age=63072000; includeSubDomains; preload');
-  assertIncludes(header('Permissions-Policy') ?? '', 'camera=()', 'vercel.json Permissions-Policy');
-
-  assert(
-    vercel.redirects.some(
-      (redirect) => redirect.destination === '/index.html' && redirect.statusCode === 200,
-    ),
-    'vercel.json must preserve SPA fallback to /index.html.',
-  );
 }
 
 function assertOtpReadiness() {
@@ -376,8 +288,6 @@ function assertReleaseDocsAndCi() {
 
 async function main() {
   assertPackageScripts();
-  await assertPwaInstallability();
-  assertVercelPrerequisites();
   assertOtpReadiness();
   assertProductionGuardReadiness();
   assertDeepSeekProviderReadiness();

@@ -1,7 +1,7 @@
 /**
  * HARDENING-003: Mobile viewport and accessibility semantics checks.
  *
- * Tests at 320px and 430px viewport widths:
+ * Tests at compact Android, Galaxy A14, 320px and large-mobile viewports:
  *  - No horizontal document overflow on key screens
  *  - Bottom navigation visibility / hidden states
  *  - Selected states exposed on segmented controls, chips, options
@@ -49,10 +49,9 @@ async function goToSignInScreen(page: import('@playwright/test').Page) {
 
 const SHORT_PAGE_TOLERANCE_PX = 4;
 
-const stab004Viewports = [
-  { name: 'iPhone SE', width: 375, height: 667 },
-  { name: 'iPhone 14', width: 390, height: 844 },
-  { name: 'compact Android', width: 360, height: 800 },
+const androidViewports = [
+  { name: 'Android compact', width: 360, height: 800 },
+  { name: 'Galaxy A14', width: 412, height: 915 },
   { name: 'large mobile', width: 430, height: 932 },
 ] as const;
 
@@ -682,7 +681,7 @@ test.describe('HARDENING-003 — keyboard accessibility', () => {
 });
 
 test.describe('STAB-004 — mobile route geometry', () => {
-  for (const viewport of stab004Viewports) {
+  for (const viewport of androidViewports) {
     for (const spec of routeGeometrySpecs) {
       test(`${spec.name} geometry at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({
         page,

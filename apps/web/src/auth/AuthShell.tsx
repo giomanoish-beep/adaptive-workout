@@ -4,6 +4,7 @@ import type { AuthState } from './auth-state';
 import { SignIn } from './SignIn';
 import { VerifyOtp } from './VerifyOtp';
 import { useEmailSignIn } from './use-email-sign-in';
+import { useAndroidBack } from '../native/use-android-back';
 
 /**
  * Renders one of five authentication states. Children render only when
@@ -95,6 +96,15 @@ export function AuthShell({
     emailSignIn?.reset();
     onOtpBack?.();
   }, [emailSignIn, onOtpBack]);
+
+  useAndroidBack(
+    state.status !== 'authenticated',
+    useCallback(() => {
+      if (state.status !== 'awaitingOtp') return false;
+      handleBack();
+      return true;
+    }, [handleBack, state.status]),
+  );
 
   if (state.status === 'loading') {
     return (

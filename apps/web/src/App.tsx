@@ -125,6 +125,22 @@ function ProfileRenderer({
 }
 
 function AuthedApp({ client }: { readonly client: SupabaseClient }) {
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    void import('./native/android-runtime')
+      .then(({ subscribeAndroidAuthIfAvailable }) => {
+        if (cancelled) return;
+        unsubscribe = subscribeAndroidAuthIfAvailable(client.auth);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [client]);
   const auth = useAuth(client);
   const { profileState, completeOnboarding, updateProfile, retryLoad } = useTrainingProfile(client);
 

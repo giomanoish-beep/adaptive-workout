@@ -4,7 +4,7 @@ import { NavIcon } from './NavIcon';
 /**
  * Fixed bottom navigation bar for authenticated mobile use. The active
  * destination is visually obvious (filled icon + accent color). Reachable with
- * one thumb; safe-area aware for installed iPhone web-app use. Purely
+ * one thumb; safe-area aware for the installed Android app. Purely
  * presentational — route state is owned by the parent.
  */
 export interface BottomNavProps {

@@ -1,5 +1,9 @@
 # Post-HARDENING-004 Implementation Audit
 
+> Historical browser/PWA deployment audit. The current product is distributed
+> as an Android APK; the Vercel findings below are retained for provenance and
+> are not active release requirements.
+
 **Audit date:** 2026-07-16
 **Scope:** CLOUD-001, CLOUD-002, SERVER-001, CLOUD-003, DEPLOY-001
 **Method:** Targeted inspection of production code + wiring + tests + static bundle checks + remote deployment evidence.

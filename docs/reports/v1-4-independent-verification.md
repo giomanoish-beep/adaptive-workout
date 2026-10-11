@@ -1,5 +1,9 @@
 # V1.4 Independent Verification Report
 
+> Historical report. The current release target is the Android APK; iPhone and
+> browser-installation findings below are retained as prior verification data,
+> not as current product gates.
+
 **Branch:** `feat/v1-4`
 **Base:** `origin/main` (tag v1.3.0)
 **HEAD:** `77521a7` (before fixes) → `[after fixes]`

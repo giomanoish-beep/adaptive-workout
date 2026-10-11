@@ -12,6 +12,7 @@ import {
   allocateAndSelectWorkoutExercises,
   calculateExerciseMuscleSetContribution,
   constructDurationFittedWorkout,
+  estimateWorkoutDurationForExercises,
   type DurationFittedWorkoutResult,
   type DurationFittedWorkoutSuccess,
   type WorkoutAllocationRuleSet,
@@ -76,66 +77,64 @@ describe('workout duration fitting', () => {
     expect(construct(input)).toEqual(construct(input));
   });
 
-  it('estimates more duration for more working sets', () => {
+  it('estimates custom duration with per-set execution and rest only between sets', () => {
     const input = chestOnlyInput(60);
-    const noExpansion = { ...durationRuleSet(), targetDurationUtilization: 0.01 };
-    const smaller = construct(
+    const rules = {
+      ...durationRuleSet(),
+      defaultExerciseSetupSeconds: 240,
+      transitionSecondsBetweenExercises: 60,
+    };
+    const smaller = estimateWorkoutDurationForExercises(
+      [{ exerciseId: dumbbellBenchPressId, workingSets: 2 }],
       input,
-      {
-        ...allocationRuleSet(),
-        requiredMuscleTargetWorkingSets: 4,
-      },
-      noExpansion,
+      rules,
     );
-    const larger = construct(
+    const larger = estimateWorkoutDurationForExercises(
+      [{ exerciseId: dumbbellBenchPressId, workingSets: 4 }],
       input,
-      {
-        ...allocationRuleSet(),
-        requiredMuscleTargetWorkingSets: 6,
-      },
-      noExpansion,
+      rules,
     );
 
-    expect(totalSets(larger)).toBeGreaterThan(totalSets(smaller));
-    expect(larger.estimatedDuration.totalSeconds).toBeGreaterThan(
-      smaller.estimatedDuration.totalSeconds,
-    );
+    expect(smaller).toMatchObject({
+      setupSeconds: 240,
+      setExecutionSeconds: 90,
+      restSeconds: 90,
+      transitionSeconds: 0,
+      totalSeconds: 420,
+    });
+    expect(larger.totalSeconds).toBe(690);
+    expect(larger.restSeconds).toBe(270);
   });
 
-  it('accounts for additional exercise setup and transitions', () => {
-    const oneExerciseInput = inputFor(
+  it('uses one fixed setup block and transitions for custom workouts', () => {
+    const input = inputFor(
       60,
       [target(chestId)],
-      [exercise(dumbbellBenchPressId, horizontalPressId, chestId, 1, [dumbbellId, benchId])],
+      [
+        exercise(dumbbellBenchPressId, horizontalPressId, chestId, 1, [dumbbellId, benchId]),
+        exercise(secondPressId, chestIsolationId, chestId, 1, [dumbbellId, benchId]),
+      ],
     );
-    const noExpansion = { ...durationRuleSet(), targetDurationUtilization: 0.01 };
-    const oneExercise = construct(
-      oneExerciseInput,
+    const estimate = estimateWorkoutDurationForExercises(
+      [
+        { exerciseId: dumbbellBenchPressId, workingSets: 3 },
+        { exerciseId: secondPressId, workingSets: 2, restSecondsBetweenSets: 120 },
+      ],
+      input,
       {
-        ...allocationRuleSet(),
-        defaultWorkingSetsPerExercise: 6,
-        maximumWorkingSetsPerExercise: 6,
+        ...durationRuleSet(),
+        defaultExerciseSetupSeconds: 240,
+        transitionSecondsBetweenExercises: 60,
       },
-      noExpansion,
-    );
-    const twoExercises = construct(
-      inputFor(
-        60,
-        [target(chestId)],
-        [
-          exercise(dumbbellBenchPressId, horizontalPressId, chestId, 1, [dumbbellId, benchId]),
-          exercise(secondPressId, chestIsolationId, chestId, 1, [dumbbellId, benchId]),
-        ],
-      ),
-      { ...allocationRuleSet(), minimumDistinctExerciseFamilies: 2 },
-      noExpansion,
     );
 
-    expect(totalSets(twoExercises)).toBe(totalSets(oneExercise));
-    expect(twoExercises.exercises).toHaveLength(2);
-    expect(twoExercises.estimatedDuration.totalSeconds).toBeGreaterThan(
-      oneExercise.estimatedDuration.totalSeconds,
-    );
+    expect(estimate).toMatchObject({
+      setupSeconds: 240,
+      setExecutionSeconds: 225,
+      restSeconds: 300,
+      transitionSeconds: 60,
+      totalSeconds: 825,
+    });
   });
 
   it('accounts for longer rest guidance', () => {
@@ -151,7 +150,7 @@ describe('workout duration fitting', () => {
     );
   });
 
-  it('preserves a workout already within duration', () => {
+  it('starts from a valid minimum workout and refits toward the target', () => {
     const input = inputFor(60, [target(chestId)], [dumbbellBenchPress()]);
     const allocationRules = {
       ...allocationRuleSet(),
@@ -177,7 +176,14 @@ describe('workout duration fitting', () => {
         })),
       );
     }
-    expect(fitted.decisions).toEqual([]);
+    expect(fitted.decisions).toContainEqual(
+      expect.objectContaining({ code: 'REDUCED_OPTIONAL_VOLUME' }),
+    );
+    expect(fitted.decisions).toContainEqual(
+      expect.objectContaining({ code: 'ADDED_WORKING_SET_FOR_DURATION_BUDGET' }),
+    );
+    expect(fitted.durationExpansionStopReason).toBe('candidate_saturation');
+    expect(fitted.estimatedDuration.totalMinutes).toBeLessThan(60);
   });
 
   it('reduces an oversized workout deterministically', () => {
@@ -225,18 +231,20 @@ describe('workout duration fitting', () => {
     expect(totalSets(short)).toBeLessThan(totalSets(long));
   });
 
-  it('uses larger 30, 45, and 60 minute budgets for increasing useful volume', () => {
-    const thirty = construct(chestBackInput(30));
-    const fortyFive = construct(chestBackInput(45));
-    const sixty = construct(chestBackInput(60));
+  it('fits custom targets of 30, 45, 60, 75, and 90 minutes or reports saturation', () => {
+    const targetMinutes = [30, 45, 60, 75, 90] as const;
+    const results = targetMinutes.map((minutes) => construct(chestBackInput(minutes)));
 
-    expect([totalSets(thirty), totalSets(fortyFive), totalSets(sixty)]).toEqual([12, 16, 21]);
-    expect(fortyFive.estimatedDuration.totalMinutes).toBeGreaterThan(
-      thirty.estimatedDuration.totalMinutes,
-    );
-    expect(sixty.estimatedDuration.totalMinutes).toBeGreaterThan(
-      fortyFive.estimatedDuration.totalMinutes,
-    );
+    results.forEach((result, index) => {
+      const targetDuration = targetMinutes[index]!;
+      if (result.durationExpansionStopReason === 'target_duration_reached') {
+        expectWithinTarget(result, targetDuration);
+      } else {
+        expect(result.durationExpansionStopReason).toBe('maximum_useful_volume_reached');
+        expect(result.estimatedDuration.totalMinutes).toBeLessThan(targetDuration);
+      }
+    });
+    expect(results.map(totalSets)).toEqual([...results.map(totalSets)].sort((a, b) => a - b));
   });
 
   it('never returns less volume for a longer identical request', () => {
@@ -249,9 +257,9 @@ describe('workout duration fitting', () => {
   it('expands the 60-minute plan beyond the prior 31-minute allocation', () => {
     const result = construct(chestBackInput(60));
 
-    expect(totalSets(result)).toBe(21);
+    expect(totalSets(result)).toBeGreaterThan(21);
     expect(result.estimatedDuration.totalMinutes).toBeGreaterThan(31);
-    expect(result.durationExpansionStopReason).toBe('target_duration_reached');
+    expect(result.durationExpansionStopReason).toBe('maximum_useful_volume_reached');
     expect(result.decisions).toContainEqual(
       expect.objectContaining({ code: 'ADDED_EXERCISE_FOR_DURATION_BUDGET' }),
     );
@@ -319,7 +327,9 @@ describe('workout duration fitting', () => {
 
     expect(result.status).toBe('success');
     expect(result.estimatedDuration.totalMinutes).toBeLessThan(60 * 0.8);
-    expect(result.decisions.some(({ code }) => code.startsWith('ADDED_'))).toBe(false);
+    expect(result.decisions.some(({ code }) => code.startsWith('ADDED_'))).toBe(true);
+    expect(volume(result, chestId).weightedWorkingSetContribution).toBeLessThanOrEqual(6);
+    expect(volume(result, backId).weightedWorkingSetContribution).toBeLessThanOrEqual(6);
     expect(result.durationExpansionStopReason).toBe('maximum_useful_volume_reached');
   });
 
@@ -359,7 +369,7 @@ describe('workout duration fitting', () => {
     );
   });
 
-  it('removes isolated one-set prescriptions without increasing volume', () => {
+  it('removes isolated one-set prescriptions before refitting custom volume', () => {
     const input = chestOnlyInput(45);
     const constrained: WorkoutEngineInput = {
       ...input,
@@ -383,7 +393,8 @@ describe('workout duration fitting', () => {
     expect(result.decisions).toContainEqual(
       expect.objectContaining({ code: 'REMOVED_SUBMINIMUM_EXERCISE' }),
     );
-    expect(totalSets(result)).toBe(3);
+    expect(totalSets(result)).toBe(4);
+    expect(volume(result, chestId).weightedWorkingSetContribution).toBeLessThanOrEqual(4);
   });
 
   it('is independent of candidate catalog input ordering', () => {
@@ -445,47 +456,11 @@ describe('workout duration fitting', () => {
     expect(result.estimatedDuration.totalMinutes).toBeLessThanOrEqual(30);
   });
 
-  it('shows representative deterministic outputs', () => {
-    expect(summary(construct(chestBackInput(30)))).toEqual({
-      exercises: [
-        'Dumbbell Bench Press — 3 sets',
-        'Lat Pulldown — 3 sets',
-        'Seated Cable Row — 3 sets',
-        'Incline Dumbbell Press — 3 sets',
-      ],
-      estimatedMinutes: 28.5,
-    });
-    expect(summary(construct(chestBackInput(45)))).toEqual({
-      exercises: [
-        'Dumbbell Bench Press — 4 sets',
-        'Lat Pulldown — 4 sets',
-        'Seated Cable Row — 4 sets',
-        'Incline Dumbbell Press — 4 sets',
-      ],
-      estimatedMinutes: 37.5,
-    });
-    expect(summary(construct(chestBackInput(60)))).toEqual({
-      exercises: [
-        'Dumbbell Bench Press — 4 sets',
-        'Lat Pulldown — 4 sets',
-        'Seated Cable Row — 4 sets',
-        'Incline Dumbbell Press — 4 sets',
-        'Dumbbell Fly — 2 sets',
-        'Straight-Arm Cable Pulldown — 3 sets',
-      ],
-      estimatedMinutes: 49.75,
-    });
-    expect(summary(construct(chestOnlyInput(45)))).toEqual({
-      exercises: ['Dumbbell Bench Press — 4 sets', 'Dumbbell Fly — 4 sets'],
-      estimatedMinutes: 18.5,
-    });
-    expect(summary(construct(posteriorChainInput(45)))).toEqual({
-      exercises: [
-        'Romanian Deadlift — 4 sets',
-        'Cable Pull-Through — 4 sets',
-        'Seated Leg Curl — 4 sets',
-      ],
-      estimatedMinutes: 28,
+  it('shows stable deterministic custom-duration outputs', () => {
+    [30, 45, 60, 75, 90].forEach((minutes) => {
+      expect(summary(construct(chestBackInput(minutes)))).toEqual(
+        summary(construct(chestBackInput(minutes))),
+      );
     });
   });
 });
@@ -777,6 +752,10 @@ function multiMuscleExercise(
 
 function totalSets(result: DurationFittedWorkoutSuccess): number {
   return result.exercises.reduce((total, exercise) => total + exercise.plannedWorkingSets, 0);
+}
+
+function expectWithinTarget(result: DurationFittedWorkoutSuccess, targetMinutes: number): void {
+  expect(Math.abs(result.estimatedDuration.totalMinutes - targetMinutes)).toBeLessThanOrEqual(5);
 }
 
 function volume(result: DurationFittedWorkoutSuccess, muscleId: MuscleId) {

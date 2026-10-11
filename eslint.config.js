@@ -11,6 +11,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
+      'apps/web/android/**',
       '**/security-hardening.test.ts',
       'supabase/functions/**',
       '.vercel/**',

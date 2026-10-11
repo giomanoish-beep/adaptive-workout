@@ -171,7 +171,7 @@ describe('goal integration into duration-fitted workouts', () => {
     }
   });
 
-  it('gain_strength leaves more spare time than build_muscle with the same 60m budget', () => {
+  it('gain_strength keeps volume focused while using longer rest within the same 60m target', () => {
     const input = chestBackInput(60);
     const buildMuscle = resolveTrainingGoalRules('build_muscle');
     const gainStrength = resolveTrainingGoalRules('gain_strength');
@@ -182,10 +182,11 @@ describe('goal integration into duration-fitted workouts', () => {
     expect(hypertrophyResult.status).toBe('success');
     expect(strengthResult.status).toBe('success');
     if (hypertrophyResult.status === 'success' && strengthResult.status === 'success') {
-      const hypertrophyUtilization = hypertrophyResult.estimatedDuration.totalMinutes / 60;
-      const strengthUtilization = strengthResult.estimatedDuration.totalMinutes / 60;
-      // Strength should use less of the duration budget
-      expect(strengthUtilization).toBeLessThanOrEqual(hypertrophyUtilization + 0.01);
+      expect(totalSets(strengthResult)).toBeLessThanOrEqual(totalSets(hypertrophyResult));
+      expect(averageRestSeconds(strengthResult)).toBeGreaterThan(
+        averageRestSeconds(hypertrophyResult),
+      );
+      expect(strengthResult.estimatedDuration.totalMinutes).toBeLessThanOrEqual(60);
     }
   });
 
@@ -347,6 +348,11 @@ function fit(
 
 function totalSets(result: DurationFittedWorkoutSuccess): number {
   return result.exercises.reduce((total, exercise) => total + exercise.plannedWorkingSets, 0);
+}
+
+function averageRestSeconds(result: DurationFittedWorkoutSuccess): number {
+  const restIntervals = totalSets(result) - result.exercises.length;
+  return restIntervals > 0 ? result.estimatedDuration.restSeconds / restIntervals : 0;
 }
 
 function planSummary(result: DurationFittedWorkoutSuccess) {
