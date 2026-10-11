@@ -371,7 +371,11 @@ The Vite prototype does not currently define deployment security headers. The bu
 
 ### 11.3 Implementation
 
-Security headers are configured in `vercel.json` for production deployment. See `docs/DEPLOYMENT.md` for the exact header inventory and Vercel configuration. The CSP `connect-src` directive must allow connections to the configured Supabase project URL. CSP should be tested before enabling enforcement to avoid breaking Supabase Auth redirects.
+The Android APK does not use a separate web-hosting header layer. Transport
+security is provided by the Android WebView and Supabase HTTPS endpoints; see
+`docs/DEPLOYMENT.md` for the APK and Supabase boundary. If a future hosted
+client is introduced, its CSP `connect-src` directive must allow the configured
+Supabase project URL and be tested before enforcement.
 
 ---
 

@@ -1,6 +1,9 @@
 # Adaptive Workout Agent Guide
 
-This repository builds Adaptive Workout, a TypeScript fitness-planning app with a mobile-first React web UI, pure domain engines, Supabase persistence, and server-side AI access through explicit provider interfaces.
+This repository builds Adaptive Workout, a TypeScript fitness-planning app
+distributed as an Android APK. Its React UI is embedded by Capacitor, with
+pure domain engines, Supabase persistence, and server-side AI access through
+explicit provider interfaces.
 
 ## Instruction precedence
 
@@ -22,7 +25,7 @@ This repository builds Adaptive Workout, a TypeScript fitness-planning app with 
 - `packages/ai/` - provider abstraction and structured AI task contracts.
 - `packages/workout-gen-orchestrator/` - server-side orchestration across domain packages.
 - `supabase/` - local Supabase config, migrations, pgTAP tests, and generated Edge Function bundles.
-- `scripts/` - catalog, Edge Function bundling, PWA, and guard scripts.
+- `scripts/` - catalog, Edge Function bundling, Android packaging, and guard scripts.
 - `docs/` - implementation plan, engine documentation, verification reports, and detailed agent autonomy policy.
 
 ## Deeper guidance
@@ -62,11 +65,12 @@ This repository builds Adaptive Workout, a TypeScript fitness-planning app with 
 - Catalog check: `npm run catalog:check`
 - Edge bundles: `npm run edge-fn:build:all`
 - Production E2E guard: `npm run test:e2e-production-guard`
-- All Playwright projects: `npm run test:e2e -- --workers=1`
+- Embedded-client Chromium projects: `npm run test:e2e -- --workers=1`
 - Desktop Playwright: `npm run test:e2e -- --project=chromium --workers=1`
-- iPhone SE Playwright: `npm run test:e2e -- --project="iPhone SE" --workers=1`
-- iPhone 14 Playwright: `npm run test:e2e -- --project="iPhone 14" --workers=1`
+- Android compact Playwright: `npm run test:e2e -- --project="Android compact" --workers=1`
+- Galaxy A14 Playwright: `npm run test:e2e -- --project="Galaxy A14" --workers=1`
 - Narrow mobile Playwright: `npm run test:e2e -- --project="narrow 320px" --workers=1`
+- Android device test: `npm run android:test:device`
 - Local Supabase start: `npx supabase start`
 - Local database reset: `npx supabase db reset --local`
 - Database lint: `npx supabase db lint --local --level warning --fail-on warning`

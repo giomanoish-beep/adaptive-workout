@@ -1,17 +1,11 @@
-# Adaptive Workout V1 Release Candidate Checklist
+# Adaptive Workout Android release checklist
 
-**Task:** STAB-005
-**Purpose:** Prepare V1 as a release candidate without deploying it.
-**Status:** Automated checks can pass locally and in CI; production deployment and
-iPhone installation remain manual human gates.
-
-This checklist separates deterministic repository checks from actions that need
-secrets, production configuration, remote Supabase access, physical iPhone
-verification, or deployment approval.
+**Scope:** signed Android APK only. The React/Vite client is embedded in the
+APK; there is no browser/PWA/Vercel release target.
 
 ## Automated release-readiness checks
 
-Run these before requesting the manual deployment step:
+Run in this order on the release branch:
 
 1. `npm run release:check`
 2. `npm run typecheck`
@@ -22,232 +16,67 @@ Run these before requesting the manual deployment step:
 7. `npm run build`
 8. `npm run edge-fn:build:all`
 9. `npm run test:e2e-production-guard`
-10. `npx supabase start`
-11. `npx supabase db reset --local`
-12. `npx supabase db lint --local --level warning --fail-on warning`
-13. `npx supabase test db`
-14. `npx supabase migration list --local`
+10. `npm run android:build:debug`
+11. `npm run android:test:device`
+12. `npm run android:build`
+13. `apksigner verify --verbose artifacts/adaptive-workout-1.0-release.apk`
 
-GitHub Actions must also pass for the release-candidate PR:
-
-- quality job;
-- database job;
-- Vercel preview/build checks, when available.
-
-## Manual human gates
-
-STAB-005 does not perform the following actions. They require explicit human
-approval and are listed in detail below:
-
-- production deployment;
-- remote Supabase migration or data changes;
-- Edge Function deployment;
-- production secret or environment-variable changes;
-- production OTP provider/Auth URL configuration;
-- production DeepSeek secret verification;
-- physical iPhone PWA installation verification;
-- PR merge.
+The Chromium Playwright suite is an embedded-client regression harness. It is
+not a web deployment check. GitHub quality and database jobs remain required
+for the release branch.
 
 ## What `npm run release:check` verifies
 
-The release readiness guard is deterministic and does not read production
-secrets. It verifies:
+The deterministic guard does not read secrets or change remote resources. It
+verifies:
 
-- root package scripts required for release validation exist;
-- PWA manifest fields are present and stable;
-- the four PNG PWA icons exist and have the expected dimensions;
-- `apps/web/index.html` contains viewport, manifest, theme-color, and iPhone
-  Add-to-Home-Screen metadata;
-- `vercel.json` uses the expected install/build/output configuration, SPA
-  fallback, and security headers;
-- the numeric email OTP flow requests Supabase email codes, verifies
-  `type: 'email'`, and relies on Supabase session restoration;
-- the production E2E auth seam guard rejects `VITE_E2E_AUTH=true` production
-  builds;
-- Supabase Edge Functions deploy from generated `index.bundle.ts` entrypoints;
-- all three generated Edge Function bundles exist and carry the generated-file
-  banner;
-- the migration count matches CI's database validation expectation;
-- `.env.example` contains only empty placeholders and no other `.env` file is
-  tracked;
-- the server-only DeepSeek provider defaults to `deepseek-v4-flash`, rejects
-  legacy/thinking model IDs, sends JSON Output with disabled thinking mode, and
-  handles terminal and retryable provider errors deterministically;
-- the production `generate-workout` bundle contains the server-only DeepSeek
-  wiring for `grounded_decision_explanation`;
-- the browser build contains no DeepSeek key names, server-only provider
-  implementation, or raw AI package wiring;
-- this checklist and the implementation-plan STAB-005 row exist.
+- required repository, Android and validation scripts exist;
+- the numeric email OTP flow requests and verifies a six-digit email token;
+- the production build rejects the E2E auth seam;
+- Supabase Edge Functions use generated bundle entrypoints;
+- generated bundles and migrations match the CI expectations;
+- `.env.example` contains empty placeholders only and no secret is tracked;
+- DeepSeek remains server-only, uses `deepseek-v4-flash`, disabled thinking,
+  JSON Output, contract validation and bounded error handling;
+- deterministic generation remains safe when AI is unavailable;
+- the browser code delivered inside the APK contains no provider key,
+  prompt, raw response or server-only AI package;
+- this checklist and the implementation plan are present.
 
-## PWA and iPhone readiness
+## Manual human gates
 
-Automated checks confirm that the static assets required before an iPhone test
-exist in the repository:
+These actions are intentionally not automated:
 
-- `apps/web/public/manifest.webmanifest`;
-- `/icons/icon-192.png`;
-- `/icons/icon-512.png`;
-- `/icons/icon-maskable-192.png`;
-- `/icons/icon-maskable-512.png`;
-- Apple touch icon metadata;
-- `viewport-fit=cover`;
-- standalone display mode and matching theme/background colors.
+- approve and perform remote Supabase migrations or Edge Function deployment;
+- configure or rotate production secrets;
+- configure the Supabase Auth email template with `{{ .Token }}` and without
+  `{{ .ConfirmationURL }}`;
+- install the signed APK on the physical Galaxy A14;
+- verify production OTP, session restoration, network interruption and
+  workout persistence on the device;
+- distribute the APK and merge the pull request.
 
-Manual iPhone gate after deployment:
+Do not deploy from STAB-005.
 
-1. Open the production HTTPS URL in Safari on iPhone.
-2. Use Share > Add to Home Screen and confirm the Adaptive Workout icon/name.
-3. Launch from the Home Screen icon and confirm standalone display without
-   Safari chrome.
-4. Confirm short pages do not gain accidental scroll and long pages keep fixed
-   navigation reachable.
-5. Sign in with the production OTP flow, close/reopen the PWA, and confirm the
-   Supabase session restores.
-6. Start or resume a workout and confirm no horizontal overflow appears.
+## Supabase and OTP gate
 
-## Vercel production prerequisites
+Before a production APK is distributed, review linked migrations and deploy
+only reviewed Edge Function bundles. Required server-only names are
+`SUPABASE_SERVICE_ROLE_KEY` and `DEEPSEEK_API_KEY`; `DEEPSEEK_BASE_URL` and
+`DEEPSEEK_MODEL` are optional because code defaults apply. Never print values.
 
-Automated checks verify the repository-owned `vercel.json`:
+The app expects a numeric six-digit email OTP. After template configuration,
+request, redeem, resend and rate-limit the code on the physical device.
 
-- `installCommand`: `npm ci`;
-- `buildCommand`: `npm run build --workspace @adaptive-workout/web`;
-- `outputDirectory`: `apps/web/dist`;
-- SPA fallback to `/index.html`;
-- security headers for MIME sniffing, referrer policy, frame denial,
-  permissions policy, and HSTS.
+## APK gate
 
-Manual Vercel gate:
+Confirm package `com.adaptiveworkout.app`, minimum SDK 24, target SDK 36,
+successful signature verification, and a clean install/upgrade on Android 15
+or newer. The release key and signing properties must stay outside Git.
 
-- verify the production project is linked to the intended GitHub repository;
-- verify the production branch is the approved release branch;
-- verify `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured in
-  Vercel without printing their values;
-- confirm `VITE_E2E_AUTH` is absent or false for production;
-- Do not deploy from STAB-005.
+## Final decision
 
-## Supabase production prerequisites
-
-Automated checks verify local repository configuration only:
-
-- `supabase/config.toml` declares generated bundle entrypoints for
-  `generate-workout`, `refresh-progression`, and `generate-program`;
-- the generated bundles exist;
-- local migrations are counted consistently with CI;
-- CI runs local reset, database lint, and pgTAP.
-
-Manual Supabase gate:
-
-- verify remote migration status against the intended production project;
-- verify production Auth Site URL and Redirect URLs after the final production
-  URL is known;
-- verify Edge Function secrets exist without printing values;
-- verify `DEEPSEEK_API_KEY` exists before enabling AI calls;
-- optionally verify `DEEPSEEK_BASE_URL` and `DEEPSEEK_MODEL`; if absent, the
-  provider uses `https://api.deepseek.com` and `deepseek-v4-flash`;
-- verify `SUPABASE_SERVICE_ROLE_KEY` is configured only for server-side function
-  use;
-- do not run `supabase db push`, mutate remote data, or deploy Edge Functions
-  during STAB-005.
-
-## OTP production readiness
-
-Automated checks verify app-side requirements:
-
-- sign-in calls Supabase `signInWithOtp` with `shouldCreateUser: true`;
-- the app does not forward arbitrary redirect parameters with `emailRedirectTo`;
-- the app expects a six-digit numeric email OTP token, not a magic link;
-- verification calls `verifyOtp` with `type: 'email'`;
-- the browser client enables Supabase session persistence, auto refresh, and
-  URL-session detection;
-- production builds reject the E2E auth seam.
-
-Manual OTP gate:
-
-- configure Supabase Auth Site URL to the final production URL;
-- configure exact production redirect URLs and any approved preview redirect
-  pattern;
-- configure the relevant Supabase email template to render `{{ .Token }}` and
-  not rely on `{{ .ConfirmationURL }}` for this app's production sign-in email;
-- verify the production email contains a numeric six-digit code rather than a
-  magic link;
-- verify an email OTP can be requested and redeemed against the production
-  origin;
-- verify resend/rate-limit behavior with the provider's production policy.
-
-## Edge Function and migration readiness
-
-Before a deployment request:
-
-- run `npm run edge-fn:build:all`;
-- inspect any generated bundle diff;
-- run the database validation commands listed above;
-- confirm CI database job is green.
-
-Manual deployment gate:
-
-- deploy Edge Functions only after explicit approval;
-- apply remote migrations only after explicit approval and migration review;
-- never reset production data.
-
-## DeepSeek AI provider readiness
-
-Automated checks verify repository-owned provider behavior only:
-
-- DeepSeek is implemented behind `AIProvider` and remains server-side.
-- `DEEPSEEK_API_KEY` is required by the server factory and is never read by
-  browser code.
-- `DEEPSEEK_BASE_URL` defaults to `https://api.deepseek.com`.
-- `DEEPSEEK_MODEL` defaults to `deepseek-v4-flash`.
-- DeepSeek requests include `thinking: { type: "disabled" }`.
-- Structured tasks use JSON Output and prompts explicitly request a JSON object
-  with the required schema shape.
-- Provider JSON is validated against the existing task contracts before use.
-- Tests cover success, timeout, empty response, invalid JSON, schema-invalid
-  JSON, 401, 402, 429, 5xx, truncated output, and unavailable provider cases.
-- `generate-workout` invokes only the supported grounded decision explanation
-  task after deterministic generation succeeds.
-- Ordinary deterministic generation still works when no AI provider is
-  configured.
-- Provider failures and invalid provider output return no explanation and do not
-  bypass deterministic safety rules.
-- The browser bundle receives only a safe optional explanation string and no
-  key names, prompts, raw provider responses, or provider internals.
-
-Manual AI provider gate:
-
-- configure `DEEPSEEK_API_KEY` only as a Supabase Edge Function secret;
-- do not print or paste the secret into logs, docs, or browser variables;
-- deploy the updated `generate-workout` function only after explicit approval:
-  `npx supabase functions deploy generate-workout --project-ref bgslpmenvlcgstczzfyg --no-verify-jwt`;
-- after deployment, smoke-test authenticated generation, explanation fallback,
-  persistence, and log/output redaction.
-
-## Release-candidate decision
-
-V1 is ready for the manual deployment step only when:
-
-- all automated local checks pass;
-- PR quality and database checks pass;
-- Vercel preview/build checks pass where available;
-- no generated reports, traces, videos, screenshots, `.env` files, secrets, or
-  unrelated changes are staged;
-- the remaining work is only the documented manual production/iPhone gates.
-
-V1 is not deployed by STAB-005.
-
-## Android APK release gate
-
-The standalone Android package is documented in `docs/ANDROID_APK.md`. Before
-sharing an APK, run:
-
-1. `npm run android:build:debug`
-2. Start an Android 15 or newer emulator, then run `npm run android:test:device`.
-3. `npm run android:build`
-4. Verify the release APK with Android SDK `apksigner verify --verbose`.
-5. Confirm the package is `com.adaptiveworkout.app`, the minimum SDK is 24, and
-   the target SDK is 36.
-
-The release signing key and signing properties must stay outside Git and must
-be backed up securely. Physical Galaxy A14 installation, production OTP,
-background/resume, network interruption, and workout persistence remain manual
-device gates.
+V1 is ready for manual APK installation only when all automated checks and
+required CI jobs pass, the APK is signed, and the remaining work consists
+only of the manual Supabase and Galaxy A14 gates above. No web deployment is
+required or expected.

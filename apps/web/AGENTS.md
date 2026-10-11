@@ -1,6 +1,7 @@
-# Web App Agent Guide
+# Embedded Android Client Guide
 
-This file applies to `apps/web/`. It adds web-specific rules to the root repository guidance.
+This file applies to `apps/web/`. The React/Vite client is packaged inside the
+Capacitor Android APK; it is not a separately deployed web product.
 
 ## React and TypeScript
 
@@ -24,18 +25,22 @@ This file applies to `apps/web/`. It adds web-specific rules to the root reposit
 - Preserve semantic labels, accessible names, focus behavior, and visible status/error reporting.
 - Maintain touch targets large enough for mobile use and avoid overlapping fixed controls.
 - Validate both short-page and long-page mobile behavior: short pages should not gain accidental scroll, and long pages must keep important controls reachable.
-- Respect fixed navigation, bottom safe areas, and viewport units on iOS-sized devices.
+- Respect fixed navigation, bottom safe areas, and viewport units on Android-sized devices.
 - Do not hide content or reduce accessibility to pass visual tests.
 
 ## Playwright projects and commands
 
-Configured projects are `chromium`, `iPhone SE`, `narrow 320px`, and `iPhone 14`.
+Configured projects are `chromium`, `Android compact`, `narrow 320px`, and `Galaxy A14`.
 
 - All projects: `npm run test:e2e -- --workers=1`
 - Desktop Chromium: `npm run test:e2e -- --project=chromium --workers=1`
-- iPhone SE: `npm run test:e2e -- --project="iPhone SE" --workers=1`
+- Android compact: `npm run test:e2e -- --project="Android compact" --workers=1`
 - Narrow 320px: `npm run test:e2e -- --project="narrow 320px" --workers=1`
-- iPhone 14: `npm run test:e2e -- --project="iPhone 14" --workers=1`
+- Galaxy A14: `npm run test:e2e -- --project="Galaxy A14" --workers=1`
+
+Run the native Android checks with `npm run android:test:device` on an Android
+15 emulator or a connected Galaxy A14. The Playwright suite remains a fast
+embedded-client regression harness; it is not a browser deployment test.
 
 Playwright writes HTML reports to `apps/web/playwright-report/` and run artifacts to `apps/web/test-results/`. Remove reports, traces, videos, screenshots, and other generated artifacts before committing unless a task explicitly asks to preserve them.
 

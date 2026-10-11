@@ -4,8 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright end-to-end configuration for @adaptive-workout/web.
  *
  * Starts the Vite dev server automatically with the E2E auth seam
- * enabled (VITE_E2E_AUTH=true). Supports desktop Chromium and an
- * iPhone-sized mobile emulation project.
+ * enabled (VITE_E2E_AUTH=true). The Chromium harness validates the
+ * embedded client used by the Android APK.
  *
  * Features:
  *  - screenshot on failure
@@ -50,9 +50,9 @@ export default defineConfig({
       },
     },
     {
-      name: 'iPhone SE',
+      name: 'Android compact',
       use: {
-        ...devices['iPhone SE'],
+        ...devices['Pixel 5'],
         browserName: 'chromium',
         headless: true,
         launchOptions: {
@@ -73,9 +73,12 @@ export default defineConfig({
       },
     },
     {
-      name: 'iPhone 14',
+      name: 'Galaxy A14',
       use: {
-        ...devices['iPhone 14'],
+        ...devices['Galaxy S9+'],
+        viewport: { width: 412, height: 915 },
+        isMobile: true,
+        hasTouch: true,
         browserName: 'chromium',
         headless: true,
         launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] },

@@ -23,7 +23,6 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "release:check": "node scripts/check-release-readiness.mjs",
     "test": "vitest run",
     "test:e2e": "npm exec --workspace @adaptive-workout/web -- playwright test",
